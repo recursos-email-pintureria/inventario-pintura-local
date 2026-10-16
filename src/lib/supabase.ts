@@ -9,9 +9,9 @@
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || "https://ajrmsviqjmiskbdzlemt.supabase.co";
+  import.meta.env["VITE_SUPABASE_URL"] || "https://ajrmsviqjmiskbdzlemt.supabase.co";
 const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_LGLyVxKmyVjF2j4WtVmyIQ_fMu3DDb4";
+  import.meta.env["VITE_SUPABASE_ANON_KEY"] || "sb_publishable_LGLyVxKmyVjF2j4WtVmyIQ_fMu3DDb4";
 
 const REMEMBER_KEY = "inv-remember-session";
 const isBrowser = typeof window !== "undefined";
