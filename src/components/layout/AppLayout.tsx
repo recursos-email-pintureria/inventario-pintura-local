@@ -66,9 +66,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
 
   // Sin tabla de roles todavía: el rol se lee de los metadatos del usuario.
-  const role = (user?.app_metadata?.role ?? user?.user_metadata?.role) as string | undefined;
+  const role = (user?.app_metadata?.["role"] ?? user?.user_metadata?.["role"]) as string | undefined;
   const isAdmin = role === "admin";
-  const name = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuario") as string;
+  const name = (user?.user_metadata?.["full_name"] || user?.user_metadata?.["name"] || user?.email?.split("@")[0] || "Usuario") as string;
 
   const handleSignOut = async () => {
     await signOut();
