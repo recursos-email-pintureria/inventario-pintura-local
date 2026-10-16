@@ -8,7 +8,7 @@ import { AuthLayout, FormMessage, Spinner } from "@/components/auth/AuthLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { authErrorMessage } from "@/lib/supabase";
 
-export default function VerifyEmail({ initialEmail }: { initialEmail?: string }) {
+export default function VerifyEmail({ initialEmail }: { initialEmail?: string | undefined }) {
   const { resendVerification } = useAuth();
   const [email, setEmail] = useState(initialEmail ?? "");
   const [sending, setSending] = useState(false);

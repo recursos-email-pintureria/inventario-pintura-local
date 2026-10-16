@@ -3,7 +3,7 @@ import VerifyEmail from "@/pages/VerifyEmail";
 
 export const Route = createFileRoute("/verify-email")({
   validateSearch: (s: Record<string, unknown>) => ({
-    email: typeof s.email === "string" ? s.email : undefined,
+    email: typeof s["email"] === "string" ? s["email"] : undefined,
   }),
   head: () => ({
     meta: [
