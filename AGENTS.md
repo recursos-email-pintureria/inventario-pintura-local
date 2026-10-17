@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Load the Users list through `src/lib/usuarios.ts` using separate RLS-protected profile and permission reads, joined by user ID; the tables have no direct foreign-key relationship.
