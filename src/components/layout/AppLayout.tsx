@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMyProfile } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -65,10 +66,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const path = useRouterState({ select: (s) => s.location.pathname });
 
-  // Sin tabla de roles todavía: el rol se lee de los metadatos del usuario.
-  const role = (user?.app_metadata?.["role"] ?? user?.user_metadata?.["role"]) as string | undefined;
-  const isAdmin = role === "admin";
-  const name = (user?.user_metadata?.["full_name"] || user?.user_metadata?.["name"] || user?.email?.split("@")[0] || "Usuario") as string;
+  // Rol y nombre desde la base de datos (perfiles_usuario), no de metadatos.
+  const { perfil, isAdmin } = useMyProfile();
+  const name = perfil?.nombre_completo || (user?.email?.split("@")[0] ?? "Usuario");
 
   const handleSignOut = async () => {
     await signOut();
