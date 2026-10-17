@@ -15,7 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/layout/AppLayout";
 import { pageHead } from "@/lib/meta";
 import { supabase } from "@/lib/supabase";
-import { useMyProfile, type PerfilUsuario, type PermisosUsuario } from "@/hooks/usePermissions";
+import { cargarUsuarios, type UsuarioConPermisos } from "@/lib/usuarios";
+import { useMyProfile, type PermisosUsuario } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/_authenticated/usuarios")({
   head: () => pageHead("Usuarios", "Gestión de usuarios y roles."),
@@ -33,8 +34,6 @@ const PERMISOS: { key: keyof Omit<PermisosUsuario, "id_usuario">; label: string 
   { key: "puede_gestionar_usuarios", label: "Gestionar usuarios" },
 ];
 
-type UsuarioConPermisos = PerfilUsuario & { permisos_usuario: PermisosUsuario | null };
-
 function Usuarios() {
   const { isAdmin, isLoading: cargandoPerfil, perfil: miPerfil } = useMyProfile();
   const navigate = useNavigate();
@@ -44,17 +43,10 @@ function Usuarios() {
   const [activo, setActivo] = useState(true);
   const [permisos, setPermisos] = useState<Record<string, boolean>>({});
 
-  const { data: usuarios, isLoading } = useQuery({
+  const { data: usuarios, isLoading, isError, refetch } = useQuery({
     queryKey: ["usuarios"],
     enabled: isAdmin,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("perfiles_usuario")
-        .select("*, permisos_usuario(*)")
-        .order("nombre_completo");
-      if (error) throw error;
-      return data as UsuarioConPermisos[];
-    },
+    queryFn: cargarUsuarios,
   });
 
   const guardar = useMutation({
@@ -100,6 +92,11 @@ function Usuarios() {
       <Card className="p-4">
         {isLoading || cargandoPerfil ? (
           <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : isError ? (
+          <div role="alert" className="space-y-3">
+            <p className="text-sm text-destructive">No se pudieron cargar los usuarios. Inténtalo de nuevo.</p>
+            <Button variant="outline" onClick={() => refetch()}>Reintentar</Button>
+          </div>
         ) : (
           <Table>
             <TableHeader>
