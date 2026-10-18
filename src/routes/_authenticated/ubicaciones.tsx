@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { MapPin, Plus, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/ubicaciones")({
   },
   pendingComponent: () => <><PageHeader title="Ubicaciones" /><p role="status" className="text-muted-foreground">Cargando ubicaciones…</p></>,
   errorComponent: ({ error, reset }) => {
-    const router = Route.useRouter();
+    const router = useRouter();
     return <><PageHeader title="Ubicaciones" /><div role="alert" className="space-y-3"><p className="text-destructive">{errorUbicaciones(error)}</p><Button variant="outline" onClick={async () => { await router.invalidate(); reset(); }}>Reintentar</Button></div></>;
   },
   component: Ubicaciones,
