@@ -3,6 +3,9 @@ import { isSameDay } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { PermisosUsuario, PerfilUsuario } from '@/hooks/usePermissions';
 import type { Ubicacion } from '@/lib/ubicaciones';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export interface Categoria { id: string; nombre: string; descripcion: string | null; activo: boolean; }
 export interface Producto { id: string; codigo_barras: string; sku: string; nombre: string; descripcion: string | null; id_categoria: string | null; precio_unitario: number | null; activo: boolean; }
@@ -91,19 +94,47 @@ export const formatoFecha = (s: string) => new Intl.DateTimeFormat('es-ES', { da
 export function filasExportacion(items: Movimiento[], data: Inventario) {
   return items.map(m => ({ Fecha: formatoFecha(m.fecha_movimiento), Producto: data.productos.find(p => p.id === m.id_producto)?.nombre ?? m.id_producto, Tipo: m.tipo, Cantidad: m.cantidad, Precio: m.precio_unitario, Total: m.precio_total, Ubicación: data.ubicaciones.find(u => u.id === m.id_ubicacion)?.nombre ?? m.id_ubicacion, Usuario: data.perfiles.find(p => p.id === m.realizado_por)?.nombre_completo ?? 'Usuario no disponible', Notas: m.notas ?? '' }));
 }
+
+// ✅ FUNCIÓN CORREGIDA PARA EXPORTAR (usa los imports directos de arriba)
 export async function exportarMovimientos(formato: 'excel' | 'pdf', items: Movimiento[], data: Inventario) {
   const filas = filasExportacion(items, data);
+  
+  if (filas.length === 0) {
+    throw new Error('No hay movimientos para exportar con los filtros actuales.');
+  }
+
+  const nombreArchivo = `movimientos_${new Date().toISOString().split('T')[0]}`;
+
   if (formato === 'excel') {
-    const XLSX = await import('xlsx');
     const libro = XLSX.utils.book_new();
     const hoja = XLSX.utils.json_to_sheet(filas);
-    // Force text cells for user-authored strings; never interpret them as formulas.
-    XLSX.utils.book_append_sheet(libro, hoja, 'Movimientos'); XLSX.writeFile(libro, 'movimientos.xlsx');
+    XLSX.utils.book_append_sheet(libro, hoja, 'Movimientos');
+    XLSX.writeFile(libro, `${nombreArchivo}.xlsx`);
   } else {
-    const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.text('Movimientos · Inventario Pintura - LM', 14, 15);
-    autoTable(doc, { startY: 22, head: [['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Precio', 'Total', 'Ubicación', 'Usuario', 'Notas']], body: filas.map(f => Object.values(f).map(v => v === null ? '—' : String(v))), styles: { fontSize: 8, overflow: 'linebreak' } });
-    doc.save('movimientos.pdf');
+
+    const cabeceras = [['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Precio', 'Total', 'Ubicación', 'Usuario', 'Notas']];
+    const cuerpo = filas.map(f => [
+      f.Fecha, 
+      f.Producto, 
+      f.Tipo, 
+      String(f.Cantidad),
+      f.Precio === null ? '—' : String(f.Precio),
+      f.Total === null ? '—' : String(f.Total),
+      f.Ubicación, 
+      f.Usuario, 
+      f.Notas
+    ]);
+
+    autoTable(doc, {
+      startY: 22,
+      head: cabeceras,
+      body: cuerpo,
+      styles: { fontSize: 8, overflow: 'linebreak' },
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+    
+    doc.save(`${nombreArchivo}.pdf`);
   }
 }

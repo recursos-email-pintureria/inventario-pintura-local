@@ -35,6 +35,7 @@ const PERMISOS: { key: keyof Omit<PermisosUsuario, "id_usuario">; label: string 
 ];
 
 function Usuarios() {
+  // Aquí está la clave: usamos 'miPerfil'
   const { isAdmin, isLoading: cargandoPerfil, perfil: miPerfil } = useMyProfile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -52,11 +53,25 @@ function Usuarios() {
   const guardar = useMutation({
     mutationFn: async () => {
       if (!editando) return;
+      
+      // ✅ VALIDACIÓN: no permitir que el admin se quite permisos críticos a sí mismo
+      if (editando.id === miPerfil?.id) {
+        if (rol !== 'admin') {
+          toast.error('No puedes cambiar tu propio rol de admin a otro rol.');
+          return; // Detiene la ejecución y no guarda
+        }
+        if (!permisos['puede_gestionar_usuarios']) {
+          toast.error('No puedes quitarte el permiso de gestionar usuarios a ti mismo.');
+          return; // Detiene la ejecución y no guarda
+        }
+      }
+      
       const { error: e1 } = await supabase
         .from("perfiles_usuario")
         .update({ rol, activo })
         .eq("id", editando.id);
       if (e1) throw e1;
+      
       const { error: e2 } = await supabase
         .from("permisos_usuario")
         .update(permisos)
@@ -64,18 +79,14 @@ function Usuarios() {
       if (e2) throw e2;
     },
     onSuccess: () => {
-      toast.success("Usuario actualizado");
+      toast.success("Usuario actualizado correctamente");
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      queryClient.invalidateQueries({ queryKey: ["mi-perfil"] });
       setEditando(null);
     },
-    onError: (e) => toast.error("No se pudo guardar: " + (e as Error).message),
+    onError: (error) => {
+      toast.error("Error al guardar: " + (error as Error).message);
+    }
   });
-
-  if (!cargandoPerfil && !isAdmin) {
-    navigate({ to: "/dashboard", replace: true });
-    return null;
-  }
 
   const abrirEdicion = (u: UsuarioConPermisos) => {
     setEditando(u);
@@ -101,8 +112,11 @@ function Usuarios() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead><TableHead>Email</TableHead><TableHead>Rol</TableHead>
-                <TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -111,7 +125,11 @@ function Usuarios() {
                   <TableCell className="font-medium">{u.nombre_completo}</TableCell>
                   <TableCell>{u.correo}</TableCell>
                   <TableCell className="capitalize">{u.rol}</TableCell>
-                  <TableCell><Badge variant={u.activo ? "default" : "secondary"}>{u.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant={u.activo ? "default" : "secondary"}>
+                      {u.activo ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => abrirEdicion(u)}>
                       <Pencil className="h-4 w-4" />
@@ -126,7 +144,9 @@ function Usuarios() {
 
       <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar usuario</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Editar usuario</DialogTitle>
+          </DialogHeader>
           {editando && (
             <div className="space-y-5">
               <div>
@@ -160,11 +180,16 @@ function Usuarios() {
                   </div>
                 ))}
               </div>
+              
+              {/* Advertencia visual para el propio usuario */}
               {editando.id === miPerfil?.id && (
-                <p className="text-xs text-muted-foreground">
-                  Estás editando tu propia cuenta; ten cuidado de no quitarte el rol de admin.
-                </p>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                  <p className="text-xs text-amber-800 font-medium">
+                    ⚠️ Estás editando tu propia cuenta. No puedes quitarte el rol de admin ni el permiso de gestionar usuarios.
+                  </p>
+                </div>
               )}
+              
               <Button className="w-full" onClick={() => guardar.mutate()} disabled={guardar.isPending}>
                 {guardar.isPending ? "Guardando…" : "Guardar cambios"}
               </Button>
