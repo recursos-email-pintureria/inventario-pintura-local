@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { MapPin, Plus, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMyProfile } from "@/hooks/usePermissions";
 import { ubicacionesQueryOptions, guardarUbicacion, desactivarUbicacion, errorUbicaciones, filtrarUbicaciones, puedeGestionarUbicaciones, tiposUbicacion, type Ubicacion, type TipoUbicacion } from "@/lib/ubicaciones";
+import { inventarioQueryOptions, productosEnUbicacion, type Stock } from "@/lib/inventario";
+import { ErrorInventario } from "@/components/inventario/EstadoInventario";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
   head: () => pageHead("Ubicaciones", "Pasillos, altos y armarios de la sección."),
@@ -24,18 +26,15 @@ export const Route = createFileRoute("/_authenticated/ubicaciones")({
     const { data, error } = await supabase.auth.getUser();
     if (error) throw error;
     if (!data.user) throw new Error("Inicia sesión para ver las ubicaciones.");
-    await context.queryClient.ensureQueryData(ubicacionesQueryOptions(data.user.id));
+    await Promise.all([context.queryClient.ensureQueryData(ubicacionesQueryOptions(data.user.id)), context.queryClient.ensureQueryData(inventarioQueryOptions(data.user.id))]);
     return { userId: data.user.id };
   },
   pendingComponent: () => <><PageHeader title="Ubicaciones" /><p role="status" className="text-muted-foreground">Cargando ubicaciones…</p></>,
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return <><PageHeader title="Ubicaciones" /><div role="alert" className="space-y-3"><p className="text-destructive">{errorUbicaciones(error)}</p><Button variant="outline" onClick={async () => { await router.invalidate(); reset(); }}>Reintentar</Button></div></>;
-  },
+  errorComponent: ErrorInventario,
   component: Ubicaciones,
 });
 
-function List({ items, gestionar, editar, desactivar }: { items: Ubicacion[]; gestionar: boolean; editar: (u: Ubicacion) => void; desactivar: (u: Ubicacion) => void }) {
+function List({ items, stock, gestionar, editar, desactivar }: { items: Ubicacion[]; stock: Stock[]; gestionar: boolean; editar: (u: Ubicacion) => void; desactivar: (u: Ubicacion) => void }) {
   if (!items.length) return <p className="py-6 text-sm text-muted-foreground">No hay ubicaciones activas en esta sección.</p>;
   return (
     <Card className="divide-y">
@@ -43,6 +42,7 @@ function List({ items, gestionar, editar, desactivar }: { items: Ubicacion[]; ge
         <div key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
           <MapPin className="h-4 w-4 shrink-0 text-primary" />
           <div className="min-w-0 flex-1"><p className="break-words font-medium">{u.nombre}</p><p className="text-sm text-muted-foreground">{tiposUbicacion[u.tipo]}</p>{u.descripcion && <p className="break-words text-sm text-muted-foreground">{u.descripcion}</p>}</div>
+          <span className="text-sm text-muted-foreground">{productosEnUbicacion(stock, u.id)} productos</span>
           {gestionar && <div className="ml-auto flex flex-wrap gap-1"><Button size="sm" variant="ghost" onClick={() => editar(u)}><Pencil className="h-4 w-4" />Editar</Button><Button size="sm" variant="ghost" onClick={() => desactivar(u)}><Power className="h-4 w-4" />Desactivar</Button></div>}
         </div>
       ))}
@@ -53,9 +53,11 @@ function List({ items, gestionar, editar, desactivar }: { items: Ubicacion[]; ge
 function Ubicaciones() {
   const { userId } = Route.useLoaderData();
   const { data: items } = useSuspenseQuery(ubicacionesQueryOptions(userId));
+  const { data: inventario } = useSuspenseQuery(inventarioQueryOptions(userId));
   const { user } = useAuth();
   const { permisos } = useMyProfile();
   const gestionar = puedeGestionarUbicaciones(permisos);
+  const editar = gestionar && permisos?.puede_editar_ubicaciones === true;
   const queryClient = useQueryClient();
   const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState<Ubicacion | null>(null);
@@ -64,10 +66,12 @@ function Ubicaciones() {
   const [tipo, setTipo] = useState<TipoUbicacion>("pasillo");
   const [descripcion, setDescripcion] = useState("");
   const [error, setError] = useState("");
-  const actualizar = () => queryClient.invalidateQueries({ queryKey: ["ubicaciones", userId] });
+  const [busqueda, setBusqueda] = useState("");
+  const visibles = items.filter(u => u.nombre.toLocaleLowerCase("es").includes(busqueda.trim().toLocaleLowerCase("es")));
+  const actualizar = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["ubicaciones", userId] }), queryClient.invalidateQueries({ queryKey: ["inventario", userId] })]);
   const guardar = useMutation({
     mutationFn: async () => {
-      if (!gestionar || !user) throw new Error("No tienes permiso para guardar ubicaciones.");
+      if (!(editando ? editar : gestionar) || !user) throw new Error("No tienes permiso para guardar ubicaciones.");
       return guardarUbicacion({ nombre, tipo, descripcion }, editando?.id);
     },
     onSuccess: async () => { await actualizar(); setAbierto(false); toast.success(editando ? "Ubicación actualizada" : "Ubicación creada"); },
@@ -75,7 +79,7 @@ function Ubicaciones() {
   });
   const desactivar = useMutation({
     mutationFn: async () => {
-      if (!gestionar || !desactivando) throw new Error("No tienes permiso para desactivar ubicaciones.");
+      if (!editar || !desactivando) throw new Error("No tienes permiso para desactivar ubicaciones.");
       return desactivarUbicacion(desactivando.id);
     },
     onSuccess: async () => { await actualizar(); setDesactivando(null); toast.success("Ubicación desactivada"); },
@@ -88,12 +92,13 @@ function Ubicaciones() {
   return (
     <>
       <PageHeader title="Ubicaciones" action={gestionar ? <Button onClick={() => abrir(null)}><Plus className="h-4 w-4" /> Nueva ubicación</Button> : undefined} />
+      <Input aria-label="Buscar ubicaciones" placeholder="Buscar por nombre…" value={busqueda} onChange={e => setBusqueda(e.target.value)} className="mb-4 max-w-sm" />
       <Tabs defaultValue="pasillos">
         <TabsList>
           <TabsTrigger value="pasillos">Pasillos</TabsTrigger>
           <TabsTrigger value="altos">Altos/Armarios</TabsTrigger>
         </TabsList>
-        {(["pasillos", "altos"] as const).map((seccion) => <TabsContent key={seccion} value={seccion} className="mt-4"><List items={filtrarUbicaciones(items, seccion)} gestionar={gestionar} editar={abrir} desactivar={(u) => { setError(""); setDesactivando(u); }} /></TabsContent>)}
+        {(["pasillos", "altos"] as const).map((seccion) => <TabsContent key={seccion} value={seccion} className="mt-4"><List items={filtrarUbicaciones(visibles, seccion)} stock={inventario.stock} gestionar={editar} editar={abrir} desactivar={(u) => { setError(""); setDesactivando(u); }} /></TabsContent>)}
       </Tabs>
       <Dialog open={abierto} onOpenChange={(o) => { if (!guardar.isPending) setAbierto(o); }}>
         <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto">

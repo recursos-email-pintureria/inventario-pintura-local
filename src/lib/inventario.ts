@@ -1,4 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
+import { isSameDay } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { PermisosUsuario, PerfilUsuario } from '@/hooks/usePermissions';
 import type { Ubicacion } from '@/lib/ubicaciones';
@@ -37,6 +38,8 @@ export function permisoExplicito(permisos: PermisosUsuario | null | undefined, k
 export function stockProducto(stock: Stock[], id: string) { return stock.filter(s => s.id_producto === id).reduce((n, s) => n + s.cantidad, 0); }
 export function productosEnUbicacion(stock: Stock[], id: string) { return new Set(stock.filter(s => s.id_ubicacion === id && s.cantidad > 0).map(s => s.id_producto)).size; }
 export function productosStockBajo(productos: Producto[], stock: Stock[]) { return productos.filter(p => p.activo && stockProducto(stock, p.id) < 10).length; }
+export function movimientosHoy(items: Movimiento[], hoy = new Date()) { return items.filter(m => isSameDay(new Date(m.fecha_movimiento), hoy)).length; }
+export function actividadReciente(items: Movimiento[]) { return [...items].sort((a, b) => new Date(b.fecha_movimiento).getTime() - new Date(a.fecha_movimiento).getTime()).slice(0, 10); }
 export interface FiltrosMovimiento { desde: string; hasta: string; tipo: string; producto: string; ubicacion: string; }
 export function filtrarMovimientos(items: Movimiento[], f: FiltrosMovimiento) {
   const desde = f.desde ? new Date(`${f.desde}T00:00:00`).getTime() : -Infinity;
