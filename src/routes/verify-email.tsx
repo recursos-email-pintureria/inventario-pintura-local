@@ -7,6 +7,8 @@ export const Route = createFileRoute("/verify-email")({
   }),
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Verifica tu email · Inventario Pintura - LM" },
       { name: "description", content: "Confirma tu email para acceder." },
       { property: "og:title", content: "Verifica tu email · Inventario Pintura - LM" },
