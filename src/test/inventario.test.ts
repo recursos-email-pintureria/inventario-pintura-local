@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { filtrarMovimientos, filasExportacion, productosStockBajo, productosEnUbicacion, validarCantidad, permisoExplicito, type Producto, type Movimiento, type Inventario } from '@/lib/inventario';
+import { filtrarMovimientos, filasExportacion, movimientosHoy, actividadReciente, productosStockBajo, productosEnUbicacion, validarCantidad, permisoExplicito, type Producto, type Movimiento, type Inventario } from '@/lib/inventario';
 import { filtrarUbicaciones, puedeGestionarUbicaciones, type Ubicacion } from '@/lib/ubicaciones';
 import type { PermisosUsuario } from '@/hooks/usePermissions';
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
@@ -28,4 +28,9 @@ describe('Reglas del inventario', () => {
     const filtrados = filtrarMovimientos(items, { desde: '', hasta: '', tipo: 'entrada', producto: '', ubicacion: '' });
     expect(filasExportacion(filtrados, data)).toHaveLength(1); expect(filasExportacion(filtrados, data)[0]).toMatchObject({ Cantidad: 3, Precio: 2, Total: 6, Notas: 'Nota real' });
   });
+});
+
+describe('Dashboard real', () => {
+ it('cuenta solo movimientos del día local actual', () => { expect(movimientosHoy([movimiento('hoy','2026-10-19T23:59:59'),movimiento('ayer','2026-10-18T23:59:59'),movimiento('mañana','2026-10-20T00:00:00')],new Date('2026-10-19T12:00:00'))).toBe(1); });
+ it('actividad reciente son los últimos 10 ordenados por fecha', () => { const items=Array.from({length:12},(_,i)=>movimiento(String(i),`2026-10-${String(i+1).padStart(2,'0')}T12:00:00`)); expect(actividadReciente(items).map(m=>m.id)).toEqual(['11','10','9','8','7','6','5','4','3','2']); });
 });
