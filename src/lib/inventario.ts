@@ -14,7 +14,15 @@ export type TipoMovimiento = 'entrada' | 'salida' | 'reposicion' | 'ajuste';
 export interface Movimiento { id: string; id_producto: string; id_ubicacion: string; tipo: TipoMovimiento; cantidad: number; precio_unitario: number | null; precio_total: number | null; notas: string | null; realizado_por: string; fecha_movimiento: string; }
 export interface Inventario { categorias: Categoria[]; productos: Producto[]; ubicaciones: Ubicacion[]; stock: Stock[]; movimientos: Movimiento[]; perfiles: Pick<PerfilUsuario, 'id' | 'nombre_completo'>[]; puedeVerMovimientos: boolean; }
 
-// Separate reads preserve the existing RLS on each table, including profiles.
+// NUEVO: Interfaz para el mapa de ubicaciones del producto
+export interface ProductoUbicacion {
+  id: string;
+  id_producto: string;
+  id_ubicacion: string;
+  tipo: 'principal' | 'cross' | 'caja' | 'temporal';
+  seccion_origen: string | null;
+}
+
 async function cargarInventario(userId: string): Promise<Inventario> {
   const permiso = await supabase.from('permisos_usuario').select('*').eq('id_usuario', userId).maybeSingle();
   if (permiso.error) throw permiso.error;
@@ -66,13 +74,17 @@ export async function comprobarUnicidad(campo: 'sku' | 'codigo_barras', valor: s
   const { data, error } = await query.limit(1); if (error) throw error;
   return !data?.length;
 }
-export async function guardarProducto(datos: Omit<Producto, 'id' | 'activo'>, id?: string) {
+
+// MODIFICADO: Ahora devuelve el ID del producto guardado
+export async function guardarProducto(datos: Omit<Producto, 'id' | 'activo'>, id?: string): Promise<string> {
   const user = await usuarioActual();
   if (!datos.nombre.trim() || !datos.sku.trim() || !datos.codigo_barras.trim()) throw new Error('Completa nombre, SKU y código de barras.');
   if (datos.precio_unitario !== null && (!Number.isFinite(datos.precio_unitario) || datos.precio_unitario < 0)) throw new Error('Introduce un precio válido.');
   const valores = { ...datos, nombre: datos.nombre.trim(), sku: datos.sku.trim(), codigo_barras: datos.codigo_barras.trim(), descripcion: datos.descripcion?.trim() || null };
   const query = id ? supabase.from('productos').update(valores).eq('id', id) : supabase.from('productos').insert({ ...valores, creado_por: user.id });
-  const { error } = await query.select('id').single(); if (error) throw error;
+  const { data, error } = await query.select('id').single(); 
+  if (error) throw error;
+  return data.id;
 }
 export async function desactivarRegistro(tabla: 'categorias' | 'productos', id: string) { const { error } = await supabase.from(tabla).update({ activo: false }).eq('id', id).select('id').single(); if (error) throw error; }
 export async function crearMovimiento(datos: { id_producto: string; id_ubicacion: string; tipo: TipoMovimiento; cantidad: number; precio_unitario: number | null; notas: string }) {
@@ -82,6 +94,28 @@ export async function crearMovimiento(datos: { id_producto: string; id_ubicacion
   const { error } = await supabase.from('movimientos').insert({ ...datos, notas: datos.notas.trim() || null, realizado_por: user.id });
   if (error) throw error;
 }
+
+// NUEVAS FUNCIONES PARA GESTIÓN DE UBICACIONES MÚLTIPLES
+export async function cargarUbicacionesProducto(id_producto: string): Promise<ProductoUbicacion[]> {
+  const { data, error } = await supabase.from('producto_ubicaciones').select('id, id_producto, id_ubicacion, tipo, seccion_origen').eq('id_producto', id_producto);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function guardarUbicacionesProducto(id_producto: string, ubicaciones: Omit<ProductoUbicacion, 'id' | 'id_producto'>[]) {
+  // 1. Borramos las ubicaciones anteriores para sincronizar limpiamente
+  const { error: deleteError } = await supabase.from('producto_ubicaciones').delete().eq('id_producto', id_producto);
+  if (deleteError) throw deleteError;
+
+  // 2. Insertamos las nuevas
+  if (ubicaciones.length > 0) {
+    const user = await usuarioActual();
+    const datos = ubicaciones.map(u => ({ ...u, id_producto, creado_por: user.id }));
+    const { error: insertError } = await supabase.from('producto_ubicaciones').insert(datos);
+    if (insertError) throw insertError;
+  }
+}
+
 export function errorInventario(error: unknown) {
   const e = error as { code?: string; message?: string };
   if (e?.code === '23505') return 'Ya existe ese nombre, SKU o código de barras, incluso entre registros desactivados.';
@@ -94,17 +128,10 @@ export const formatoFecha = (s: string) => new Intl.DateTimeFormat('es-ES', { da
 export function filasExportacion(items: Movimiento[], data: Inventario) {
   return items.map(m => ({ Fecha: formatoFecha(m.fecha_movimiento), Producto: data.productos.find(p => p.id === m.id_producto)?.nombre ?? m.id_producto, Tipo: m.tipo, Cantidad: m.cantidad, Precio: m.precio_unitario, Total: m.precio_total, Ubicación: data.ubicaciones.find(u => u.id === m.id_ubicacion)?.nombre ?? m.id_ubicacion, Usuario: data.perfiles.find(p => p.id === m.realizado_por)?.nombre_completo ?? 'Usuario no disponible', Notas: m.notas ?? '' }));
 }
-
-// ✅ FUNCIÓN CORREGIDA PARA EXPORTAR (usa los imports directos de arriba)
 export async function exportarMovimientos(formato: 'excel' | 'pdf', items: Movimiento[], data: Inventario) {
   const filas = filasExportacion(items, data);
-  
-  if (filas.length === 0) {
-    throw new Error('No hay movimientos para exportar con los filtros actuales.');
-  }
-
+  if (filas.length === 0) throw new Error('No hay movimientos para exportar con los filtros actuales.');
   const nombreArchivo = `movimientos_${new Date().toISOString().split('T')[0]}`;
-
   if (formato === 'excel') {
     const libro = XLSX.utils.book_new();
     const hoja = XLSX.utils.json_to_sheet(filas);
@@ -113,28 +140,9 @@ export async function exportarMovimientos(formato: 'excel' | 'pdf', items: Movim
   } else {
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.text('Movimientos · Inventario Pintura - LM', 14, 15);
-
     const cabeceras = [['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Precio', 'Total', 'Ubicación', 'Usuario', 'Notas']];
-    const cuerpo = filas.map(f => [
-      f.Fecha, 
-      f.Producto, 
-      f.Tipo, 
-      String(f.Cantidad),
-      f.Precio === null ? '—' : String(f.Precio),
-      f.Total === null ? '—' : String(f.Total),
-      f.Ubicación, 
-      f.Usuario, 
-      f.Notas
-    ]);
-
-    autoTable(doc, {
-      startY: 22,
-      head: cabeceras,
-      body: cuerpo,
-      styles: { fontSize: 8, overflow: 'linebreak' },
-      headStyles: { fillColor: [41, 128, 185] }
-    });
-    
+    const cuerpo = filas.map(f => [f.Fecha, f.Producto, f.Tipo, String(f.Cantidad), f.Precio === null ? '—' : String(f.Precio), f.Total === null ? '—' : String(f.Total), f.Ubicación, f.Usuario, f.Notas]);
+    autoTable(doc, { startY: 22, head: cabeceras, body: cuerpo, styles: { fontSize: 8, overflow: 'linebreak' }, headStyles: { fillColor: [41, 128, 185] } });
     doc.save(`${nombreArchivo}.pdf`);
   }
 }
