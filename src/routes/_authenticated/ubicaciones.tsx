@@ -17,7 +17,7 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
 
 const iconosTipo: Record<string, string> = {
   pasillo: '🛣️',
-  armario: '🗄️',
+  armario: '️',
   alto: '',
   cross: '🔄',
   caja: '💳',
@@ -76,8 +76,12 @@ function UbicacionesPage() {
       // Verificar cuáles se pueden borrar definitivamente
       const borrablesSet = new Set<string>()
       for (const u of ubicacionesData) {
-        const sePuede = await sePuedeBorrarDefinitivamente(u.id)
-        if (sePuede) borrablesSet.add(u.id)
+        try {
+          const sePuede = await sePuedeBorrarDefinitivamente(u.id)
+          if (sePuede) borrablesSet.add(u.id)
+        } catch (e) {
+          // Si hay error, no se puede borrar
+        }
       }
       setBorrables(borrablesSet)
     } catch (err: any) {
@@ -129,9 +133,20 @@ function UbicacionesPage() {
     setTipo(ubicacion.tipo)
     setNombre(ubicacion.nombre)
     setDescripcion(ubicacion.descripcion || '')
-    setSeccionId(typeof ubicacion.seccion === 'string' ? ubicacion.seccion : ubicacion.seccion?.id || '')
+    
+    // 🔧 CORREGIDO: obtener el ID de la sección correctamente
+    const seccionActual = typeof ubicacion.seccion === 'string' 
+      ? ubicacion.seccion 
+      : ubicacion.seccion?.id || ''
+    setSeccionId(seccionActual)
+    
     setUbicacionPadreId(ubicacion.id_ubicacion_padre || '')
-    setSeccionOrigenId(typeof ubicacion.seccion_origen === 'string' ? ubicacion.seccion_origen : ubicacion.seccion_origen?.id || '')
+    
+    const seccionOrigenActual = typeof ubicacion.seccion_origen === 'string'
+      ? ubicacion.seccion_origen
+      : ubicacion.seccion_origen?.id || ''
+    setSeccionOrigenId(seccionOrigenActual)
+    
     setPosicionLateral(ubicacion.posicion_lateral || '')
     setPosicionLongitudinal(ubicacion.posicion_longitudinal || '')
     setNumero(ubicacion.numero || '')
@@ -183,7 +198,7 @@ function UbicacionesPage() {
         numero: numero !== '' ? numero : null,
       }
 
-      // Lógica de sección mejorada
+      // Lógica de sección
       if (tipo === 'pasillo') {
         datosUbicacion.seccion = seccionId || null
         datosUbicacion.seccion_origen = null
@@ -195,8 +210,8 @@ function UbicacionesPage() {
         datosUbicacion.seccion = null
         datosUbicacion.seccion_origen = null
       } else {
-        // Armario, alto, caja: usan la sección elegida manualmente, o heredan del padre si no se especifica
-        if (seccionId) {
+        // Armario, alto, caja: heredan del padre por defecto, pero se puede sobrescribir
+        if (seccionId && seccionId !== '') {
           datosUbicacion.seccion = seccionId
         } else {
           const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
@@ -299,10 +314,10 @@ function UbicacionesPage() {
               }}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="pasillo">🛣️ Pasillo</option>
+              <option value="pasillo">️ Pasillo</option>
               <option value="armario">🗄️ Armario</option>
               <option value="alto"> Alto</option>
-              <option value="cross">🔄 Cross</option>
+              <option value="cross"> Cross</option>
               <option value="caja">💳 Caja</option>
               <option value="reserva">🏭 Reserva</option>
             </select>
@@ -366,31 +381,31 @@ function UbicacionesPage() {
               </select>
               {pasillosAgrupados.length === 0 && (
                 <p className="text-sm text-red-600 mt-1">
-                  ️ No hay pasillos creados. Primero crea un pasillo.
+                  ⚠️ No hay pasillos creados. Primero crea un pasillo.
                 </p>
               )}
             </div>
           )}
         </div>
 
-        {/* 🔧 NUEVO: Campo Sección para armarios/altos/cajas (opcional) */}
+        {/* 🔧 CAMPO SECCIÓN PARA ARMARIOS/ALTOS/CAJAS - SIEMPRE VISIBLE */}
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
-              Sección <span className="text-gray-400 font-normal">(opcional, por defecto hereda del pasillo padre)</span>
+              Sección <span className="text-gray-400 font-normal">(opcional)</span>
             </label>
             <select
               value={seccionId}
               onChange={(e) => setSeccionId(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— Heredar del pasillo padre —</option>
+              <option value="">— Heredar del pasillo padre (recomendado) —</option>
               {secciones.map(s => (
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-               Déjalo vacío para usar la sección del pasillo padre, o elige otra si el armario contiene productos de otra sección.
+              💡 Déjalo en "Heredar del pasillo padre" para mantener la coherencia. Solo cámbialo si el armario contiene productos de otra sección.
             </p>
           </div>
         )}
@@ -529,8 +544,8 @@ function UbicacionesPage() {
           {sePuedeBorrar ? (
             <button
               onClick={() => borrarDefinitivamente(ubicacion.id)}
-              className="text-red-700 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
-              title="Borrar definitivamente"
+              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+              title="Borrar definitivamente (sin historial)"
             >
               🗑️
             </button>
