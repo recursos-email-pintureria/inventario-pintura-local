@@ -150,16 +150,16 @@ function UbicacionesPage() {
     }
   }
 
-  // 🔧 FUNCIÓN CORREGIDA: obtiene los pasillos agrupados por sección
+  // 🔧 FUNCIÓN CORREGIDA: compara u.seccion?.id en lugar de u.seccion
   function getPasillosAgrupados() {
     return secciones
       .map(seccion => {
         const pasillos = ubicaciones.filter(
-          u => u.tipo === 'pasillo' && u.seccion === seccion.id
+          u => u.tipo === 'pasillo' && u.seccion?.id === seccion.id
         )
         return { seccion, pasillos }
       })
-      .filter(grupo => grupo.pasillos.length > 0) // Oculta secciones sin pasillos
+      .filter(grupo => grupo.pasillos.length > 0)
   }
 
   function renderizarFormulario() {
