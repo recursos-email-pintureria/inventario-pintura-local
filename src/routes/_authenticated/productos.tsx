@@ -67,6 +67,7 @@ function Productos() {
   const [error, setError] = useState('');
   
   const [ubicacionesProducto, setUbicacionesProducto] = useState<any[]>([]);
+  const [nuevaUbicacionPadreId, setNuevaUbicacionPadreId] = useState(''); // NUEVO: Para el primer select
   const [nuevaUbicacionId, setNuevaUbicacionId] = useState('');
   const [nuevoTipoUbicacion, setNuevoTipoUbicacion] = useState<'principal' | 'cross' | 'caja' | 'temporal'>('principal');
   const [nuevaSeccionOrigen, setNuevaSeccionOrigen] = useState('');
@@ -261,7 +262,7 @@ function Productos() {
               <Input id="producto-precio" type="number" min="0" step="0.01" value={precio} onChange={e => setPrecio(e.target.value)} disabled={guardar.isPending} />
             </div>
 
-            {/* ✅ MEJORADO: GESTIÓN DE UBICACIONES MÚLTIPLES CON JERARQUÍA VISUAL COMPLETA */}
+            {/* ✅ NUEVO: SISTEMA DE DOS SELECTS - PRIMERO PASILLO, LUEGO HIJO */}
             {editando && (
               <div className="space-y-3 pt-4 border-t mt-4">
                 <Label className="text-base font-semibold flex items-center gap-2">
@@ -293,150 +294,121 @@ function Productos() {
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 p-3 bg-background border rounded-md">
-                  <Select value={nuevaUbicacionId} onValueChange={setNuevaUbicacionId}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Seleccionar ubicación..." /></SelectTrigger>
-                    {/* ✅ DESPLEGABLE JERÁRQUICO MEJORADO CON ICONOS E INDENTACIÓN */}
-                    <SelectContent className="max-h-96">
-                      {/* GRUPO 1: Pasillos con sus hijos */}
-                      {data.ubicaciones
-                        .filter((u: any) => u.tipo === 'pasillo')
-                        .map((padre: any) => {
-                          const hijosDisponibles = data.ubicaciones.filter(
-                            (h: any) => h.id_ubicacion_padre === padre.id && !ubicacionesProducto.some((up: any) => up.id_ubicacion === h.id)
-                          );
-                          const padreDisponible = !ubicacionesProducto.some((up: any) => up.id_ubicacion === padre.id);
-
-                          if (!padreDisponible && hijosDisponibles.length === 0) return null;
-
-                          return (
-                            <SelectGroup key={padre.id}>
-                              <SelectLabel className="text-xs font-bold text-blue-700 uppercase tracking-wider px-2">
-                                🛣️ {padre.nombre} {padre.descripcion ? `- ${padre.descripcion}` : ''}
-                              </SelectLabel>
-                              
-                              {padreDisponible && (
-                                <SelectItem value={padre.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span>🛣️</span>
-                                    <span className="font-bold">{padre.nombre}</span>
-                                    <span className="text-xs text-muted-foreground">(pasillo)</span>
-                                  </div>
-                                </SelectItem>
-                              )}
-                              
-                              {hijosDisponibles.map((hijo: any) => (
-                                <SelectItem key={hijo.id} value={hijo.id}>
-                                  <div className="flex items-center gap-2 pl-4">
-                                    <span className="text-muted-foreground">└─</span>
-                                    <span>
-                                      {hijo.tipo === 'armario' ? '🗄️' : 
-                                       hijo.tipo === 'alto' ? '📦' : 
-                                       hijo.tipo === 'cross' ? '🔄' : 
-                                       hijo.tipo === 'caja' ? '💳' : '📍'}
-                                    </span>
-                                    <span className="font-medium">{hijo.nombre}</span>
-                                    <span className="text-xs text-muted-foreground">({hijo.tipo})</span>
-                                    {hijo.posicion_lateral && (
-                                      <span className="text-xs text-gray-400">[{hijo.posicion_lateral}]</span>
-                                    )}
-                                    {hijo.numero && (
-                                      <span className="text-xs text-gray-400">Nº{hijo.numero}</span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          );
-                        })}
-
-                      {/* GRUPO 2: Reserva con sus cajas */}
-                      {data.ubicaciones
-                        .filter((u: any) => u.tipo === 'reserva')
-                        .map((reserva: any) => {
-                          const cajasDisponibles = data.ubicaciones.filter(
-                            (h: any) => h.id_ubicacion_padre === reserva.id && !ubicacionesProducto.some((up: any) => up.id_ubicacion === h.id)
-                          );
-                          const reservaDisponible = !ubicacionesProducto.some((up: any) => up.id_ubicacion === reserva.id);
-
-                          if (!reservaDisponible && cajasDisponibles.length === 0) return null;
-
-                          return (
-                            <SelectGroup key={reserva.id}>
-                              <SelectLabel className="text-xs font-bold text-gray-700 uppercase tracking-wider px-2">
+                {/* SELECT 1: Elegir Pasillo/Reserva */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="select-pasillo" className="text-sm font-medium">1. Selecciona zona principal</Label>
+                    <Select 
+                      value={nuevaUbicacionPadreId} 
+                      onValueChange={(value) => {
+                        setNuevaUbicacionPadreId(value);
+                        setNuevaUbicacionId(value); // Por defecto, la ubicación final es el propio pasillo (General)
+                      }}
+                    >
+                      <SelectTrigger id="select-pasillo">
+                        <SelectValue placeholder="Elige pasillo o reserva..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel className="text-xs font-bold text-blue-700">🛣️ PASILLOS</SelectLabel>
+                          {data.ubicaciones
+                            .filter((u: any) => u.tipo === 'pasillo')
+                            .map((pasillo: any) => (
+                              <SelectItem key={pasillo.id} value={pasillo.id}>
+                                🛣️ {pasillo.nombre} {pasillo.descripcion ? `- ${pasillo.descripcion}` : ''}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel className="text-xs font-bold text-gray-700">🏭 RESERVA</SelectLabel>
+                          {data.ubicaciones
+                            .filter((u: any) => u.tipo === 'reserva')
+                            .map((reserva: any) => (
+                              <SelectItem key={reserva.id} value={reserva.id}>
                                 🏭 {reserva.nombre}
-                              </SelectLabel>
-                              
-                              {reservaDisponible && (
-                                <SelectItem value={reserva.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span>🏭</span>
-                                    <span className="font-bold">{reserva.nombre}</span>
-                                    <span className="text-xs text-muted-foreground">(reserva)</span>
-                                  </div>
-                                </SelectItem>
-                              )}
-                              
-                              {cajasDisponibles.map((caja: any) => (
-                                <SelectItem key={caja.id} value={caja.id}>
-                                  <div className="flex items-center gap-2 pl-4">
-                                    <span className="text-muted-foreground">└─</span>
-                                    <span>💳</span>
-                                    <span className="font-medium">{caja.nombre}</span>
-                                    <span className="text-xs text-muted-foreground">(caja)</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          );
-                        })}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                      {/* GRUPO 3: Ubicaciones sueltas (sin padre) */}
-                      {data.ubicaciones
-                        .filter((u: any) => !u.id_ubicacion_padre && u.tipo !== 'pasillo' && u.tipo !== 'reserva')
-                        .filter((u: any) => !ubicacionesProducto.some((up: any) => up.id_ubicacion === u.id))
-                        .map((u: any) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{u.tipo === 'armario' ? '🗄️' : u.tipo === 'alto' ? '📦' : '📍'}</span>
-                              <span>{u.nombre}</span>
-                              <span className="text-xs text-muted-foreground">({u.tipo})</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  {nuevaUbicacionId && (
-                    <>
-                      <Select value={nuevoTipoUbicacion} onValueChange={(v: any) => setNuevoTipoUbicacion(v)}>
-                        <SelectTrigger className="w-32"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                  {/* SELECT 2: Elegir hijo del pasillo seleccionado */}
+                  {nuevaUbicacionPadreId && (
+                    <div>
+                      <Label htmlFor="select-hijo" className="text-sm font-medium">2. Ubicación específica</Label>
+                      <Select 
+                        value={nuevaUbicacionId} 
+                        onValueChange={setNuevaUbicacionId}
+                      >
+                        <SelectTrigger id="select-hijo">
+                          <SelectValue placeholder="Elige ubicación específica..." />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="principal">Principal</SelectItem>
-                          <SelectItem value="cross">Cross</SelectItem>
-                          <SelectItem value="caja">Caja</SelectItem>
-                          <SelectItem value="temporal">Temporal</SelectItem>
+                          {/* Opción: el propio pasillo/reserva (General) */}
+                          <SelectItem value={nuevaUbicacionPadreId}>
+                            {data.ubicaciones.find((u: any) => u.id === nuevaUbicacionPadreId)?.tipo === 'pasillo' ? '🛣️' : '🏭'} 
+                            {' '}{data.ubicaciones.find((u: any) => u.id === nuevaUbicacionPadreId)?.nombre} (General)
+                          </SelectItem>
+                          
+                          {/* Separador visual */}
+                          {data.ubicaciones.filter((h: any) => h.id_ubicacion_padre === nuevaUbicacionPadreId).length > 0 && (
+                            <div className="h-px bg-gray-200 my-1 mx-2" />
+                          )}
+                          
+                          {/* Hijos disponibles del pasillo seleccionado */}
+                          {data.ubicaciones
+                            .filter((h: any) => h.id_ubicacion_padre === nuevaUbicacionPadreId && !ubicacionesProducto.some((up: any) => up.id_ubicacion === h.id))
+                            .map((hijo: any) => (
+                              <SelectItem key={hijo.id} value={hijo.id}>
+                                <span className="pl-2">
+                                  {hijo.tipo === 'armario' ? '🗄️' : 
+                                   hijo.tipo === 'alto' ? '📦' : 
+                                   hijo.tipo === 'cross' ? '🔄' : 
+                                   hijo.tipo === 'caja' ? '💳' : '📍'} 
+                                  {' '}{hijo.nombre} ({hijo.tipo})
+                                  {hijo.posicion_lateral && ` [${hijo.posicion_lateral}]`}
+                                  {hijo.numero && ` Nº${hijo.numero}`}
+                                </span>
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
-                      
-                      {nuevoTipoUbicacion === 'cross' && (
-                        <Input placeholder="Sección origen" value={nuevaSeccionOrigen} onChange={e => setNuevaSeccionOrigen(e.target.value)} className="w-40" />
-                      )}
-                      
-                      <Button type="button" variant="secondary" onClick={() => {
-                        if (!nuevaUbicacionId) return;
-                        setUbicacionesProducto(prev => [...prev, { 
-                          id_ubicacion: nuevaUbicacionId, 
-                          tipo: nuevoTipoUbicacion, 
-                          seccion_origen: nuevoTipoUbicacion === 'cross' ? nuevaSeccionOrigen : null 
-                        }]);
-                        setNuevaUbicacionId(''); 
-                        setNuevoTipoUbicacion('principal'); 
-                        setNuevaSeccionOrigen('');
-                      }}>Añadir</Button>
-                    </>
+                    </div>
                   )}
                 </div>
+
+                {/* Select de tipo de ubicación y botón añadir */}
+                {nuevaUbicacionId && (
+                  <div className="flex flex-col sm:flex-row gap-2 p-3 bg-background border rounded-md">
+                    <Select value={nuevoTipoUbicacion} onValueChange={(v: any) => setNuevoTipoUbicacion(v)}>
+                      <SelectTrigger className="w-full sm:w-32"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="principal">Principal</SelectItem>
+                        <SelectItem value="cross">Cross</SelectItem>
+                        <SelectItem value="caja">Caja</SelectItem>
+                        <SelectItem value="temporal">Temporal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {nuevoTipoUbicacion === 'cross' && (
+                      <Input placeholder="Sección origen" value={nuevaSeccionOrigen} onChange={e => setNuevaSeccionOrigen(e.target.value)} className="flex-1" />
+                    )}
+                    
+                    <Button type="button" variant="secondary" onClick={() => {
+                      if (!nuevaUbicacionId) return;
+                      setUbicacionesProducto(prev => [...prev, { 
+                        id_ubicacion: nuevaUbicacionId, 
+                        tipo: nuevoTipoUbicacion, 
+                        seccion_origen: nuevoTipoUbicacion === 'cross' ? nuevaSeccionOrigen : null 
+                      }]);
+                      setNuevaUbicacionPadreId(''); 
+                      setNuevaUbicacionId(''); 
+                      setNuevoTipoUbicacion('principal'); 
+                      setNuevaSeccionOrigen('');
+                    }}>Añadir</Button>
+                  </div>
+                )}
               </div>
             )}
 
