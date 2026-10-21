@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/AppLayout';
@@ -66,7 +66,6 @@ function Productos() {
   const [precio, setPrecio] = useState(''); 
   const [error, setError] = useState('');
   
-  // Estados para gestión de ubicaciones múltiples
   const [ubicacionesProducto, setUbicacionesProducto] = useState<any[]>([]);
   const [nuevaUbicacionId, setNuevaUbicacionId] = useState('');
   const [nuevoTipoUbicacion, setNuevoTipoUbicacion] = useState<'principal' | 'cross' | 'caja' | 'temporal'>('principal');
@@ -83,10 +82,8 @@ function Productos() {
       const [codigoLibre, skuLibre] = await Promise.all([comprobarUnicidad('codigo_barras', codigo, editando?.id), comprobarUnicidad('sku', sku, editando?.id)]);
       if (!codigoLibre || !skuLibre) throw new Error('El código de barras o SKU ya pertenece a otro producto.');
       
-      // 1. Guardar el producto
       await guardarProducto({ codigo_barras: codigo, sku, nombre, descripcion, id_categoria: categoria === 'ninguna' ? null : categoria, precio_unitario: precio === '' ? null : Number(precio) }, editando?.id);
       
-      // 2. Si estamos editando, sincronizar ubicaciones
       if (editando) {
         await guardarUbicacionesProducto(editando.id, ubicacionesProducto);
       }
@@ -122,7 +119,6 @@ function Productos() {
     setPrecio(p?.precio_unitario == null ? '' : String(p.precio_unitario)); 
     setError(''); 
     
-    // Cargar ubicaciones si es edición
     if (p) {
       setCargandoUbicaciones(true);
       try {
@@ -146,6 +142,17 @@ function Productos() {
   const filtrados = data.productos.filter(p => p.activo && (categoriaFiltro === 'todos' || p.id_categoria === categoriaFiltro) && [p.codigo_barras, p.sku, p.nombre].some(v => v.toLocaleLowerCase('es').includes(query)));
   const paginaActual = Math.min(pagina, Math.max(0, Math.ceil(filtrados.length / 20) - 1)); 
   const rows = filtrados.slice(paginaActual * 20, (paginaActual + 1) * 20);
+
+  // Función auxiliar para mostrar la ruta completa de la ubicación
+  function obtenerNombreUbicacion(id_ubicacion: string) {
+    const ubi = data.ubicaciones.find(u => u.id === id_ubicacion);
+    if (!ubi) return 'Desconocida';
+    if (ubi.id_ubicacion_padre) {
+      const padre = data.ubicaciones.find(p => p.id === ubi.id_ubicacion_padre);
+      return padre ? `${padre.nombre} > ${ubi.nombre}` : ubi.nombre;
+    }
+    return ubi.nombre;
+  }
 
   return (
     <>
@@ -181,7 +188,6 @@ function Productos() {
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs">{p.codigo_barras}</TableCell>
                 <TableCell className="font-mono text-xs">{p.sku}</TableCell>
-                {/* ✅ ARREGLO DEL NOMBRE CORTADO: align-middle min-h-[60px] */}
                 <TableCell className="max-w-64 break-words align-middle min-h-[60px]">{p.nombre}</TableCell>
                 <TableCell>{data.categorias.find(c => c.id === p.id_categoria)?.nombre ?? '—'}</TableCell>
                 <TableCell className="text-right">{formatoPrecio(p.precio_unitario)}</TableCell>
@@ -255,7 +261,7 @@ function Productos() {
               <Input id="producto-precio" type="number" min="0" step="0.01" value={precio} onChange={e => setPrecio(e.target.value)} disabled={guardar.isPending} />
             </div>
 
-            {/* ✅ NUEVA SECCIÓN: GESTIÓN DE UBICACIONES MÚLTIPLES (Solo al editar) */}
+            {/* ✅ MEJORADO: GESTIÓN DE UBICACIONES MÚLTIPLES CON JERARQUÍA VISUAL */}
             {editando && (
               <div className="space-y-3 pt-4 border-t mt-4">
                 <Label className="text-base font-semibold flex items-center gap-2">
@@ -270,11 +276,11 @@ function Productos() {
                     <p className="text-sm text-muted-foreground italic">No hay ubicaciones asignadas. Añade una abajo.</p>
                   ) : (
                     ubicacionesProducto.map((u, index) => {
-                      const ubicacionNombre = data.ubicaciones.find(ub => ub.id === u.id_ubicacion)?.nombre || 'Ubicación desconocida';
+                      const nombreMostrar = obtenerNombreUbicacion(u.id_ubicacion);
                       return (
                         <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md text-sm border">
                           <Badge variant={u.tipo === 'principal' ? 'default' : 'secondary'} className="capitalize text-xs">{u.tipo}</Badge>
-                          <span className="flex-1 truncate font-medium">{ubicacionNombre}</span>
+                          <span className="flex-1 truncate font-medium" title={nombreMostrar}>{nombreMostrar}</span>
                           {u.tipo === 'cross' && u.seccion_origen && (
                             <span className="text-xs text-muted-foreground italic">de {u.seccion_origen}</span>
                           )}
@@ -290,10 +296,51 @@ function Productos() {
                 <div className="flex flex-col sm:flex-row gap-2 p-3 bg-background border rounded-md">
                   <Select value={nuevaUbicacionId} onValueChange={setNuevaUbicacionId}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Seleccionar ubicación..." /></SelectTrigger>
-                    <SelectContent>
-                      {data.ubicaciones.filter(u => !ubicacionesProducto.some(up => up.id_ubicacion === u.id)).map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.nombre} ({u.tipo})</SelectItem>
-                      ))}
+                    {/* ✅ DESPLEGABLE JERÁRQUICO MEJORADO */}
+                    <SelectContent className="max-h-80">
+                      {data.ubicaciones
+                        .filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
+                        .map(padre => {
+                          const hijosDisponibles = data.ubicaciones.filter(
+                            h => h.id_ubicacion_padre === padre.id && !ubicacionesProducto.some(up => up.id_ubicacion === h.id)
+                          );
+                          const padreDisponible = !ubicacionesProducto.some(up => up.id_ubicacion === padre.id);
+
+                          if (!padreDisponible && hijosDisponibles.length === 0) return null;
+
+                          return (
+                            <SelectGroup key={padre.id}>
+                              <SelectLabel className="text-xs font-bold text-primary/70 uppercase tracking-wider">
+                                {padre.tipo === 'pasillo' ? `🛣️ ${padre.nombre}` : `🏭 ${padre.nombre}`}
+                              </SelectLabel>
+                              
+                              {padreDisponible && (
+                                <SelectItem value={padre.id}>
+                                  <span className="font-semibold">{padre.nombre}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">({padre.tipo})</span>
+                                </SelectItem>
+                              )}
+                              
+                              {hijosDisponibles.map(hijo => (
+                                <SelectItem key={hijo.id} value={hijo.id} className="pl-8">
+                                  <span className="text-muted-foreground mr-1">└─</span>
+                                  <span className="font-medium">{hijo.nombre}</span>
+                                  <span className="text-xs text-muted-foreground ml-1">({hijo.tipo})</span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          );
+                        })}
+                      
+                      {/* Ubicaciones sueltas (sin padre) */}
+                      {data.ubicaciones
+                        .filter(u => !u.id_ubicacion_padre && u.tipo !== 'pasillo' && u.tipo !== 'reserva')
+                        .filter(u => !ubicacionesProducto.some(up => up.id_ubicacion === u.id))
+                        .map(u => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.nombre} ({u.tipo})
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   
@@ -310,7 +357,7 @@ function Productos() {
                       </Select>
                       
                       {nuevoTipoUbicacion === 'cross' && (
-                        <Input placeholder="Sección origen (ej: Pinturas)" value={nuevaSeccionOrigen} onChange={e => setNuevaSeccionOrigen(e.target.value)} className="w-40" />
+                        <Input placeholder="Sección origen" value={nuevaSeccionOrigen} onChange={e => setNuevaSeccionOrigen(e.target.value)} className="w-40" />
                       )}
                       
                       <Button type="button" variant="secondary" onClick={() => {
