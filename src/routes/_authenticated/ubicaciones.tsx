@@ -6,6 +6,8 @@ import {
   crearUbicacion,
   actualizarUbicacion,
   desactivarUbicacion,
+  borrarUbicacionDefinitivamente,
+  sePuedeBorrarDefinitivamente,
   errorInventario
 } from '../../lib/inventario'
 
@@ -39,6 +41,7 @@ function UbicacionesPage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
+  const [borrables, setBorrables] = useState<Set<string>>(new Set())
 
   const [tipo, setTipo] = useState<'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva'>('pasillo')
   const [nombre, setNombre] = useState('')
@@ -69,6 +72,14 @@ function UbicacionesPage() {
           .map(u => u.id)
       )
       setExpandidos(padres)
+
+      // Verificar cuáles se pueden borrar definitivamente
+      const borrablesSet = new Set<string>()
+      for (const u of ubicacionesData) {
+        const sePuede = await sePuedeBorrarDefinitivamente(u.id)
+        if (sePuede) borrablesSet.add(u.id)
+      }
+      setBorrables(borrablesSet)
     } catch (err: any) {
       setError(errorInventario(err))
     } finally {
@@ -172,7 +183,7 @@ function UbicacionesPage() {
         numero: numero !== '' ? numero : null,
       }
 
-      // Herencia automática de sección
+      // Lógica de sección mejorada
       if (tipo === 'pasillo') {
         datosUbicacion.seccion = seccionId || null
         datosUbicacion.seccion_origen = null
@@ -184,9 +195,13 @@ function UbicacionesPage() {
         datosUbicacion.seccion = null
         datosUbicacion.seccion_origen = null
       } else {
-        // Armario, alto, caja: heredan la sección del padre
-        const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
-        datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
+        // Armario, alto, caja: usan la sección elegida manualmente, o heredan del padre si no se especifica
+        if (seccionId) {
+          datosUbicacion.seccion = seccionId
+        } else {
+          const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
+          datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
+        }
         datosUbicacion.seccion_origen = null
       }
 
@@ -203,11 +218,22 @@ function UbicacionesPage() {
     }
   }
 
-  async function eliminarUbicacion(id: string) {
-    if (!confirm('¿Seguro que quieres desactivar esta ubicación?')) return
+  async function desactivarUbicacionHandler(id: string) {
+    if (!confirm('¿Seguro que quieres desactivar esta ubicación? Los movimientos históricos se conservarán.')) return
     
     try {
       await desactivarUbicacion(id)
+      await cargarDatos()
+    } catch (err: any) {
+      setError(errorInventario(err))
+    }
+  }
+
+  async function borrarDefinitivamente(id: string) {
+    if (!confirm('⚠️ ¿Borrar DEFINITIVAMENTE? Esta acción NO se puede deshacer.\n\nSolo hazlo si estás seguro de que no hay productos ni movimientos asociados.')) return
+    
+    try {
+      await borrarUbicacionDefinitivamente(id)
       await cargarDatos()
     } catch (err: any) {
       setError(errorInventario(err))
@@ -235,17 +261,13 @@ function UbicacionesPage() {
     }))
   }
 
-  // 🔧 CORREGIDO: muestra la sección correcta según el tipo
   function getSeccionReal(ubicacion: any): string {
-    // Para cross: mostrar sección de origen (donde están los productos)
     if (ubicacion.tipo === 'cross') {
       return ubicacion.seccion_origen_nombre || '-'
     }
-    // Para armario/alto/caja: mostrar la sección heredada del padre
     return ubicacion.seccion_nombre || '-'
   }
 
-  // 🔧 CORREGIDO: detalles limpios sin almohadilla
   function getDetalles(ubicacion: any): string {
     const partes: string[] = []
     if (ubicacion.posicion_lateral) partes.push(ubicacion.posicion_lateral)
@@ -344,12 +366,34 @@ function UbicacionesPage() {
               </select>
               {pasillosAgrupados.length === 0 && (
                 <p className="text-sm text-red-600 mt-1">
-                  ⚠️ No hay pasillos creados. Primero crea un pasillo.
+                  ️ No hay pasillos creados. Primero crea un pasillo.
                 </p>
               )}
             </div>
           )}
         </div>
+
+        {/* 🔧 NUEVO: Campo Sección para armarios/altos/cajas (opcional) */}
+        {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">
+              Sección <span className="text-gray-400 font-normal">(opcional, por defecto hereda del pasillo padre)</span>
+            </label>
+            <select
+              value={seccionId}
+              onChange={(e) => setSeccionId(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— Heredar del pasillo padre —</option>
+              {secciones.map(s => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+               Déjalo vacío para usar la sección del pasillo padre, o elige otra si el armario contiene productos de otra sección.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
@@ -438,8 +482,9 @@ function UbicacionesPage() {
     )
   }
 
-  //  FILA REUTILIZABLE con botones alineados a la derecha
   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
+    const sePuedeBorrar = borrables.has(ubicacion.id)
+
     return (
       <div
         className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${
@@ -448,7 +493,6 @@ function UbicacionesPage() {
             : 'hover:bg-blue-50'
         } transition-colors`}
       >
-        {/* Nombre */}
         <div className="col-span-4 flex items-center gap-2">
           {esHijo && <span className="text-gray-400 text-xs">├─</span>}
           <span className="text-base">{iconosTipo[ubicacion.tipo]}</span>
@@ -460,24 +504,20 @@ function UbicacionesPage() {
           )}
         </div>
 
-        {/* Tipo */}
         <div className="col-span-2">
           <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[ubicacion.tipo]}`}>
             {ubicacion.tipo.charAt(0).toUpperCase() + ubicacion.tipo.slice(1)}
           </span>
         </div>
 
-        {/* Detalles limpios */}
         <div className="col-span-3 text-sm text-gray-600">
           {getDetalles(ubicacion)}
         </div>
 
-        {/* Sección */}
         <div className="col-span-2 text-sm text-gray-600">
           {getSeccionReal(ubicacion)}
         </div>
 
-        {/* 🔧 Botones alineados a la derecha de cada fila */}
         <div className="col-span-1 flex justify-end gap-1">
           <button
             onClick={() => editarUbicacion(ubicacion)}
@@ -486,13 +526,23 @@ function UbicacionesPage() {
           >
             ✏️
           </button>
-          <button
-            onClick={() => eliminarUbicacion(ubicacion.id)}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-            title="Desactivar"
-          >
-            🗑️
-          </button>
+          {sePuedeBorrar ? (
+            <button
+              onClick={() => borrarDefinitivamente(ubicacion.id)}
+              className="text-red-700 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+              title="Borrar definitivamente"
+            >
+              🗑️
+            </button>
+          ) : (
+            <button
+              onClick={() => desactivarUbicacionHandler(ubicacion.id)}
+              className="text-orange-600 hover:text-orange-800 p-1 rounded hover:bg-orange-50 transition-colors"
+              title="Desactivar (tiene historial)"
+            >
+              ⏸️
+            </button>
+          )}
         </div>
       </div>
     )
@@ -514,7 +564,6 @@ function UbicacionesPage() {
 
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {/* Barra de controles */}
         <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
           <div className="text-sm text-gray-600">
             <strong>{ubicaciones.length}</strong> ubicaciones · <strong>{agrupadas.length}</strong> grupos
@@ -529,7 +578,6 @@ function UbicacionesPage() {
           </div>
         </div>
 
-        {/* Cabecera */}
         <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
           <div className="col-span-4">Ubicación</div>
           <div className="col-span-2">Tipo</div>
@@ -538,7 +586,6 @@ function UbicacionesPage() {
           <div className="col-span-1 text-right">Acciones</div>
         </div>
 
-        {/* Filas jerárquicas */}
         <div className="divide-y divide-gray-100">
           {agrupadas.map(({ padre, hijos }) => {
             const estaExpandido = expandidos.has(padre.id)
@@ -546,7 +593,6 @@ function UbicacionesPage() {
 
             return (
               <div key={padre.id}>
-                {/* Fila del padre (clickeable para expandir) */}
                 <div
                   className={tieneHijos ? 'cursor-pointer' : ''}
                   onClick={() => tieneHijos && toggleExpandir(padre.id)}
@@ -554,7 +600,6 @@ function UbicacionesPage() {
                   <FilaUbicacion ubicacion={padre} esHijo={false} />
                 </div>
 
-                {/* Filas de hijos */}
                 {estaExpandido && hijos.map(hijo => (
                   <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
                 ))}
