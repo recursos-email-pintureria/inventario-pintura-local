@@ -16,9 +16,9 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
 const iconosTipo: Record<string, string> = {
   pasillo: '🛣️',
   armario: '🗄️',
-  alto: '📦',
+  alto: '',
   cross: '🔄',
-  caja: '',
+  caja: '💳',
   reserva: '🏭',
 }
 
@@ -118,7 +118,6 @@ function UbicacionesPage() {
     setTipo(ubicacion.tipo)
     setNombre(ubicacion.nombre)
     setDescripcion(ubicacion.descripcion || '')
-    // 🔧 CORREGIDO: usar el ID de la sección, no el objeto
     setSeccionId(typeof ubicacion.seccion === 'string' ? ubicacion.seccion : ubicacion.seccion?.id || '')
     setUbicacionPadreId(ubicacion.id_ubicacion_padre || '')
     setSeccionOrigenId(typeof ubicacion.seccion_origen === 'string' ? ubicacion.seccion_origen : ubicacion.seccion_origen?.id || '')
@@ -173,12 +172,11 @@ function UbicacionesPage() {
         numero: numero !== '' ? numero : null,
       }
 
-      // 🔧 CORREGIDO: Los armarios/altos/cajas heredan la sección del padre automáticamente
+      // Herencia automática de sección
       if (tipo === 'pasillo') {
         datosUbicacion.seccion = seccionId || null
         datosUbicacion.seccion_origen = null
       } else if (tipo === 'cross') {
-        // El cross hereda la sección del padre pero tiene sección_origen diferente
         const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
         datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
         datosUbicacion.seccion_origen = seccionOrigenId || null
@@ -237,12 +235,23 @@ function UbicacionesPage() {
     }))
   }
 
-  // 🔧 NUEVA FUNCIÓN: obtener la sección real de una ubicación
+  // 🔧 CORREGIDO: muestra la sección correcta según el tipo
   function getSeccionReal(ubicacion: any): string {
+    // Para cross: mostrar sección de origen (donde están los productos)
     if (ubicacion.tipo === 'cross') {
       return ubicacion.seccion_origen_nombre || '-'
     }
+    // Para armario/alto/caja: mostrar la sección heredada del padre
     return ubicacion.seccion_nombre || '-'
+  }
+
+  // 🔧 CORREGIDO: detalles limpios sin almohadilla
+  function getDetalles(ubicacion: any): string {
+    const partes: string[] = []
+    if (ubicacion.posicion_lateral) partes.push(ubicacion.posicion_lateral)
+    if (ubicacion.posicion_longitudinal) partes.push(ubicacion.posicion_longitudinal)
+    if (ubicacion.numero) partes.push(`Nº${ubicacion.numero}`)
+    return partes.join(' · ') || '-'
   }
 
   function renderizarFormulario() {
@@ -269,8 +278,8 @@ function UbicacionesPage() {
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
               <option value="pasillo">🛣️ Pasillo</option>
-              <option value="armario">️ Armario</option>
-              <option value="alto">📦 Alto</option>
+              <option value="armario">🗄️ Armario</option>
+              <option value="alto"> Alto</option>
               <option value="cross">🔄 Cross</option>
               <option value="caja">💳 Caja</option>
               <option value="reserva">🏭 Reserva</option>
@@ -429,30 +438,62 @@ function UbicacionesPage() {
     )
   }
 
-  // 🔧 COMPONENTE: Botones de acción reutilizables
-  function BotonesAccion({ ubicacion }: { ubicacion: any }) {
+  //  FILA REUTILIZABLE con botones alineados a la derecha
+  function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     return (
-      <div className="flex gap-1">
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            editarUbicacion(ubicacion)
-          }}
-          className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-          title="Editar"
-        >
-          ✏️ Editar
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            eliminarUbicacion(ubicacion.id)
-          }}
-          className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-          title="Desactivar"
-        >
-          🗑️ Desactivar
-        </button>
+      <div
+        className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${
+          esHijo 
+            ? 'pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4' 
+            : 'hover:bg-blue-50'
+        } transition-colors`}
+      >
+        {/* Nombre */}
+        <div className="col-span-4 flex items-center gap-2">
+          {esHijo && <span className="text-gray-400 text-xs">├─</span>}
+          <span className="text-base">{iconosTipo[ubicacion.tipo]}</span>
+          <span className={`text-sm ${esHijo ? 'font-medium text-gray-800' : 'font-semibold text-gray-900'}`}>
+            {ubicacion.nombre}
+          </span>
+          {ubicacion.descripcion && (
+            <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>
+          )}
+        </div>
+
+        {/* Tipo */}
+        <div className="col-span-2">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[ubicacion.tipo]}`}>
+            {ubicacion.tipo.charAt(0).toUpperCase() + ubicacion.tipo.slice(1)}
+          </span>
+        </div>
+
+        {/* Detalles limpios */}
+        <div className="col-span-3 text-sm text-gray-600">
+          {getDetalles(ubicacion)}
+        </div>
+
+        {/* Sección */}
+        <div className="col-span-2 text-sm text-gray-600">
+          {getSeccionReal(ubicacion)}
+        </div>
+
+        {/* 🔧 Botones alineados a la derecha de cada fila */}
+        <div className="col-span-1 flex justify-end gap-1">
+          <button
+            onClick={() => editarUbicacion(ubicacion)}
+            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+            title="Editar"
+          >
+            ✏️
+          </button>
+          <button
+            onClick={() => eliminarUbicacion(ubicacion.id)}
+            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+            title="Desactivar"
+          >
+            🗑️
+          </button>
+        </div>
       </div>
     )
   }
@@ -473,6 +514,7 @@ function UbicacionesPage() {
 
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* Barra de controles */}
         <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
           <div className="text-sm text-gray-600">
             <strong>{ubicaciones.length}</strong> ubicaciones · <strong>{agrupadas.length}</strong> grupos
@@ -487,13 +529,16 @@ function UbicacionesPage() {
           </div>
         </div>
 
+        {/* Cabecera */}
         <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-          <div className="col-span-5">Ubicación</div>
+          <div className="col-span-4">Ubicación</div>
           <div className="col-span-2">Tipo</div>
           <div className="col-span-3">Detalles</div>
           <div className="col-span-2">Sección</div>
+          <div className="col-span-1 text-right">Acciones</div>
         </div>
 
+        {/* Filas jerárquicas */}
         <div className="divide-y divide-gray-100">
           {agrupadas.map(({ padre, hijos }) => {
             const estaExpandido = expandidos.has(padre.id)
@@ -501,79 +546,17 @@ function UbicacionesPage() {
 
             return (
               <div key={padre.id}>
-                {/* Fila del padre */}
+                {/* Fila del padre (clickeable para expandir) */}
                 <div
-                  className={`grid grid-cols-12 gap-2 px-4 py-3 hover:bg-blue-50 transition-colors ${
-                    tieneHijos ? 'cursor-pointer' : ''
-                  }`}
+                  className={tieneHijos ? 'cursor-pointer' : ''}
                   onClick={() => tieneHijos && toggleExpandir(padre.id)}
                 >
-                  <div className="col-span-5 flex items-center gap-2">
-                    {tieneHijos && (
-                      <span className="text-gray-400 text-sm w-4">
-                        {estaExpandido ? '▼' : '▶'}
-                      </span>
-                    )}
-                    <span className="text-lg">{iconosTipo[padre.tipo]}</span>
-                    <span className="font-semibold text-gray-900">{padre.nombre}</span>
-                    {padre.descripcion && (
-                      <span className="text-sm text-gray-500">({padre.descripcion})</span>
-                    )}
-                  </div>
-                  <div className="col-span-2 flex items-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[padre.tipo]}`}>
-                      {padre.tipo.charAt(0).toUpperCase() + padre.tipo.slice(1)}
-                    </span>
-                  </div>
-                  <div className="col-span-3 flex items-center text-sm text-gray-600">
-                    {padre.posicion_lateral && <span className="mr-2">[{padre.posicion_lateral}]</span>}
-                    {padre.numero && <span>#{padre.numero}</span>}
-                  </div>
-                  <div className="col-span-2 flex items-center text-sm text-gray-600">
-                    {getSeccionReal(padre)}
-                  </div>
+                  <FilaUbicacion ubicacion={padre} esHijo={false} />
                 </div>
 
-                {/* Hijos */}
+                {/* Filas de hijos */}
                 {estaExpandido && hijos.map(hijo => (
-                  <div
-                    key={hijo.id}
-                    className="grid grid-cols-12 gap-2 px-4 py-2 pl-12 bg-gray-50 hover:bg-gray-100 transition-colors border-l-2 border-gray-300 ml-4"
-                  >
-                    <div className="col-span-5 flex items-center gap-2">
-                      <span className="text-gray-400 text-xs">├─</span>
-                      <span className="text-base">{iconosTipo[hijo.tipo]}</span>
-                      <span className="font-medium text-gray-800">{hijo.nombre}</span>
-                      {hijo.descripcion && (
-                        <span className="text-xs text-gray-500">({hijo.descripcion})</span>
-                      )}
-                    </div>
-                    <div className="col-span-2 flex items-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[hijo.tipo]}`}>
-                        {hijo.tipo.charAt(0).toUpperCase() + hijo.tipo.slice(1)}
-                      </span>
-                    </div>
-                    <div className="col-span-3 flex items-center text-sm text-gray-600 flex-wrap gap-1">
-                      {hijo.posicion_lateral && <span className="bg-gray-200 px-1 rounded text-xs">[{hijo.posicion_lateral}]</span>}
-                      {hijo.posicion_longitudinal && <span className="bg-gray-200 px-1 rounded text-xs">({hijo.posicion_longitudinal})</span>}
-                      {hijo.numero && <span className="bg-gray-200 px-1 rounded text-xs">#{hijo.numero}</span>}
-                    </div>
-                    <div className="col-span-2 flex items-center text-sm text-gray-600">
-                      {getSeccionReal(hijo)}
-                    </div>
-                  </div>
-                ))}
-
-                {/* 🔧 Botones de acción del PADRE */}
-                <div className="flex justify-end gap-1 px-4 py-1 bg-gray-50 border-b border-gray-200">
-                  <BotonesAccion ubicacion={padre} />
-                </div>
-
-                {/* 🔧 Botones de acción de cada HIJO */}
-                {estaExpandido && hijos.map(hijo => (
-                  <div key={hijo.id} className="flex justify-end gap-1 px-4 py-1 pl-12 bg-gray-50 border-b border-gray-100 ml-4">
-                    <BotonesAccion ubicacion={hijo} />
-                  </div>
+                  <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
                 ))}
               </div>
             )
