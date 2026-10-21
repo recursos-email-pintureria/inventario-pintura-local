@@ -13,6 +13,26 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
+// Iconos por tipo
+const iconosTipo: Record<string, string> = {
+  pasillo: '🛣️',
+  armario: '🗄️',
+  alto: '📦',
+  cross: '🔄',
+  caja: '',
+  reserva: '🏭',
+}
+
+// Colores por tipo
+const coloresTipo: Record<string, string> = {
+  pasillo: 'bg-blue-100 text-blue-800 border-blue-200',
+  armario: 'bg-green-100 text-green-800 border-green-200',
+  alto: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  cross: 'bg-purple-100 text-purple-800 border-purple-200',
+  caja: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  reserva: 'bg-gray-100 text-gray-800 border-gray-200',
+}
+
 function UbicacionesPage() {
   const [secciones, setSecciones] = useState<any[]>([])
   const [ubicaciones, setUbicaciones] = useState<any[]>([])
@@ -20,6 +40,7 @@ function UbicacionesPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
 
   const [tipo, setTipo] = useState<'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva'>('pasillo')
   const [nombre, setNombre] = useState('')
@@ -44,11 +65,40 @@ function UbicacionesPage() {
       ])
       setSecciones(seccionesData)
       setUbicaciones(ubicacionesData)
+      // Expandir todos los padres por defecto
+      const padres = new Set(
+        ubicacionesData
+          .filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
+          .map(u => u.id)
+      )
+      setExpandidos(padres)
     } catch (err: any) {
       setError(errorInventario(err))
     } finally {
       setCargando(false)
     }
+  }
+
+  function toggleExpandir(id: string) {
+    setExpandidos(prev => {
+      const nuevo = new Set(prev)
+      if (nuevo.has(id)) nuevo.delete(id)
+      else nuevo.add(id)
+      return nuevo
+    })
+  }
+
+  function expandirTodos() {
+    const padres = new Set(
+      ubicaciones
+        .filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
+        .map(u => u.id)
+    )
+    setExpandidos(padres)
+  }
+
+  function colapsarTodos() {
+    setExpandidos(new Set())
   }
 
   function resetearFormulario() {
@@ -78,6 +128,7 @@ function UbicacionesPage() {
     setPosicionLongitudinal(ubicacion.posicion_longitudinal || '')
     setNumero(ubicacion.numero || '')
     setMostrarFormulario(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   async function guardarUbicacion() {
@@ -150,7 +201,6 @@ function UbicacionesPage() {
     }
   }
 
-  // 🔧 FUNCIÓN CORREGIDA: compara u.seccion?.id en lugar de u.seccion
   function getPasillosAgrupados() {
     return secciones
       .map(seccion => {
@@ -160,6 +210,17 @@ function UbicacionesPage() {
         return { seccion, pasillos }
       })
       .filter(grupo => grupo.pasillos.length > 0)
+  }
+
+  // Agrupar ubicaciones: padres (pasillos/reserva) y sus hijos
+  function getUbicacionesAgrupadas() {
+    const padres = ubicaciones.filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
+    const hijos = ubicaciones.filter(u => u.tipo !== 'pasillo' && u.tipo !== 'reserva')
+    
+    return padres.map(padre => ({
+      padre,
+      hijos: hijos.filter(h => h.id_ubicacion_padre === padre.id)
+    }))
   }
 
   function renderizarFormulario() {
@@ -185,12 +246,12 @@ function UbicacionesPage() {
               }}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="pasillo">Pasillo</option>
-              <option value="armario">Armario</option>
-              <option value="alto">Alto</option>
-              <option value="cross">Cross</option>
-              <option value="caja">Caja</option>
-              <option value="reserva">Reserva</option>
+              <option value="pasillo">🛣️ Pasillo</option>
+              <option value="armario">🗄️ Armario</option>
+              <option value="alto">📦 Alto</option>
+              <option value="cross">🔄 Cross</option>
+              <option value="caja">💳 Caja</option>
+              <option value="reserva">🏭 Reserva</option>
             </select>
           </div>
 
@@ -252,7 +313,7 @@ function UbicacionesPage() {
               </select>
               {pasillosAgrupados.length === 0 && (
                 <p className="text-sm text-red-600 mt-1">
-                  ⚠️ No hay pasillos creados. Primero crea un pasillo en la sección deseada.
+                  ️ No hay pasillos creados. Primero crea un pasillo en la sección deseada.
                 </p>
               )}
             </div>
@@ -346,7 +407,7 @@ function UbicacionesPage() {
     )
   }
 
-  function renderizarTabla() {
+  function renderizarTablaJerarquica() {
     if (cargando) return <div className="text-center py-12 text-gray-500">Cargando ubicaciones...</div>
 
     if (ubicaciones.length === 0) {
@@ -358,52 +419,130 @@ function UbicacionesPage() {
       )
     }
 
+    const agrupadas = getUbicacionesAgrupadas()
+
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Nombre</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ubicación completa</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sección origen</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {ubicaciones.map(u => (
-                <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      u.tipo === 'pasillo' ? 'bg-blue-100 text-blue-800' :
-                      u.tipo === 'armario' || u.tipo === 'alto' ? 'bg-green-100 text-green-800' :
-                      u.tipo === 'cross' ? 'bg-purple-100 text-purple-800' :
-                      u.tipo === 'caja' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {u.tipo.charAt(0).toUpperCase() + u.tipo.slice(1)}
+        {/* Barra de controles */}
+        <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            <strong>{ubicaciones.length}</strong> ubicaciones · <strong>{agrupadas.length}</strong> grupos
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={expandirTodos}
+              className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors"
+            >
+              ▼ Expandir todo
+            </button>
+            <button
+              onClick={colapsarTodos}
+              className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors"
+            >
+              ▶ Colapsar todo
+            </button>
+          </div>
+        </div>
+
+        {/* Cabecera */}
+        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+          <div className="col-span-5">Ubicación</div>
+          <div className="col-span-2">Tipo</div>
+          <div className="col-span-3">Detalles</div>
+          <div className="col-span-2">Sección</div>
+        </div>
+
+        {/* Filas jerárquicas */}
+        <div className="divide-y divide-gray-100">
+          {agrupadas.map(({ padre, hijos }) => {
+            const estaExpandido = expandidos.has(padre.id)
+            const tieneHijos = hijos.length > 0
+
+            return (
+              <div key={padre.id}>
+                {/* Fila del padre (pasillo o reserva) */}
+                <div
+                  className={`grid grid-cols-12 gap-2 px-4 py-3 hover:bg-blue-50 transition-colors ${
+                    tieneHijos ? 'cursor-pointer' : ''
+                  }`}
+                  onClick={() => tieneHijos && toggleExpandir(padre.id)}
+                >
+                  <div className="col-span-5 flex items-center gap-2">
+                    {tieneHijos && (
+                      <span className="text-gray-400 text-sm w-4">
+                        {estaExpandido ? '▼' : '▶'}
+                      </span>
+                    )}
+                    <span className="text-lg">{iconosTipo[padre.tipo]}</span>
+                    <span className="font-semibold text-gray-900">{padre.nombre}</span>
+                    {padre.descripcion && (
+                      <span className="text-sm text-gray-500">({padre.descripcion})</span>
+                    )}
+                  </div>
+                  <div className="col-span-2 flex items-center">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[padre.tipo]}`}>
+                      {padre.tipo.charAt(0).toUpperCase() + padre.tipo.slice(1)}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.nombre}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {u.ubicacion_padre_nombre ? `${u.ubicacion_padre_nombre} > ` : ''}
-                    {u.nombre}
-                    {u.posicion_lateral && ` [${u.posicion_lateral}]`}
-                    {u.posicion_longitudinal && ` (${u.posicion_longitudinal})`}
-                    {u.numero && ` #${u.numero}`}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {u.seccion_origen_nombre || u.seccion_nombre || '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <button onClick={() => editarUbicacion(u)} className="text-blue-600 hover:text-blue-800 mr-3 p-1 hover:bg-blue-50 rounded" title="Editar">✏️</button>
-                    <button onClick={() => eliminarUbicacion(u.id)} className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded" title="Desactivar">🗑️</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <div className="col-span-3 flex items-center text-sm text-gray-600">
+                    {padre.posicion_lateral && <span className="mr-2">[{padre.posicion_lateral}]</span>}
+                    {padre.numero && <span>#{padre.numero}</span>}
+                  </div>
+                  <div className="col-span-2 flex items-center text-sm text-gray-600">
+                    {padre.seccion_nombre || '-'}
+                  </div>
+                </div>
+
+                {/* Filas de hijos (indentadas) */}
+                {estaExpandido && hijos.map(hijo => (
+                  <div
+                    key={hijo.id}
+                    className="grid grid-cols-12 gap-2 px-4 py-2 pl-12 bg-gray-50 hover:bg-gray-100 transition-colors border-l-2 border-gray-300 ml-4"
+                  >
+                    <div className="col-span-5 flex items-center gap-2">
+                      <span className="text-gray-400 text-xs">├─</span>
+                      <span className="text-base">{iconosTipo[hijo.tipo]}</span>
+                      <span className="font-medium text-gray-800">{hijo.nombre}</span>
+                      {hijo.descripcion && (
+                        <span className="text-xs text-gray-500">({hijo.descripcion})</span>
+                      )}
+                    </div>
+                    <div className="col-span-2 flex items-center">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[hijo.tipo]}`}>
+                        {hijo.tipo.charAt(0).toUpperCase() + hijo.tipo.slice(1)}
+                      </span>
+                    </div>
+                    <div className="col-span-3 flex items-center text-sm text-gray-600 flex-wrap gap-1">
+                      {hijo.posicion_lateral && <span className="bg-gray-200 px-1 rounded text-xs">[{hijo.posicion_lateral}]</span>}
+                      {hijo.posicion_longitudinal && <span className="bg-gray-200 px-1 rounded text-xs">({hijo.posicion_longitudinal})</span>}
+                      {hijo.numero && <span className="bg-gray-200 px-1 rounded text-xs">#{hijo.numero}</span>}
+                    </div>
+                    <div className="col-span-2 flex items-center text-sm text-gray-600">
+                      {hijo.seccion_origen_nombre || hijo.seccion_nombre || '-'}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Acciones del padre */}
+                <div className="flex justify-end gap-1 px-4 py-1 bg-gray-50 border-b border-gray-200">
+                  <button
+                    onClick={() => editarUbicacion(padre)}
+                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                    title="Editar"
+                  >
+                    ✏️ Editar
+                  </button>
+                  <button
+                    onClick={() => eliminarUbicacion(padre.id)}
+                    className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
+                    title="Desactivar"
+                  >
+                    🗑️ Desactivar
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     )
@@ -425,7 +564,7 @@ function UbicacionesPage() {
       </div>
 
       {mostrarFormulario && renderizarFormulario()}
-      {renderizarTabla()}
+      {renderizarTablaJerarquica()}
     </div>
   )
 }
