@@ -13,7 +13,6 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
-// Iconos por tipo
 const iconosTipo: Record<string, string> = {
   pasillo: '🛣️',
   armario: '🗄️',
@@ -23,7 +22,6 @@ const iconosTipo: Record<string, string> = {
   reserva: '🏭',
 }
 
-// Colores por tipo
 const coloresTipo: Record<string, string> = {
   pasillo: 'bg-blue-100 text-blue-800 border-blue-200',
   armario: 'bg-green-100 text-green-800 border-green-200',
@@ -65,7 +63,6 @@ function UbicacionesPage() {
       ])
       setSecciones(seccionesData)
       setUbicaciones(ubicacionesData)
-      // Expandir todos los padres por defecto
       const padres = new Set(
         ubicacionesData
           .filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
@@ -121,9 +118,10 @@ function UbicacionesPage() {
     setTipo(ubicacion.tipo)
     setNombre(ubicacion.nombre)
     setDescripcion(ubicacion.descripcion || '')
-    setSeccionId(ubicacion.seccion || '')
+    // 🔧 CORREGIDO: usar el ID de la sección, no el objeto
+    setSeccionId(typeof ubicacion.seccion === 'string' ? ubicacion.seccion : ubicacion.seccion?.id || '')
     setUbicacionPadreId(ubicacion.id_ubicacion_padre || '')
-    setSeccionOrigenId(ubicacion.seccion_origen || '')
+    setSeccionOrigenId(typeof ubicacion.seccion_origen === 'string' ? ubicacion.seccion_origen : ubicacion.seccion_origen?.id || '')
     setPosicionLateral(ubicacion.posicion_lateral || '')
     setPosicionLongitudinal(ubicacion.posicion_longitudinal || '')
     setNumero(ubicacion.numero || '')
@@ -165,16 +163,33 @@ function UbicacionesPage() {
         return
       }
 
-      const datosUbicacion = {
+      const datosUbicacion: any = {
         nombre: nombre.trim(),
         tipo,
         descripcion: descripcion.trim() || null,
         id_ubicacion_padre: ubicacionPadreId || null,
-        seccion: seccionId || null,
-        seccion_origen: seccionOrigenId || null,
         posicion_lateral: posicionLateral || null,
         posicion_longitudinal: posicionLongitudinal || null,
         numero: numero !== '' ? numero : null,
+      }
+
+      // 🔧 CORREGIDO: Los armarios/altos/cajas heredan la sección del padre automáticamente
+      if (tipo === 'pasillo') {
+        datosUbicacion.seccion = seccionId || null
+        datosUbicacion.seccion_origen = null
+      } else if (tipo === 'cross') {
+        // El cross hereda la sección del padre pero tiene sección_origen diferente
+        const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
+        datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
+        datosUbicacion.seccion_origen = seccionOrigenId || null
+      } else if (tipo === 'reserva') {
+        datosUbicacion.seccion = null
+        datosUbicacion.seccion_origen = null
+      } else {
+        // Armario, alto, caja: heredan la sección del padre
+        const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
+        datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
+        datosUbicacion.seccion_origen = null
       }
 
       if (editandoId) {
@@ -205,14 +220,13 @@ function UbicacionesPage() {
     return secciones
       .map(seccion => {
         const pasillos = ubicaciones.filter(
-          u => u.tipo === 'pasillo' && u.seccion?.id === seccion.id
+          u => u.tipo === 'pasillo' && (u.seccion?.id === seccion.id || u.seccion === seccion.id)
         )
         return { seccion, pasillos }
       })
       .filter(grupo => grupo.pasillos.length > 0)
   }
 
-  // Agrupar ubicaciones: padres (pasillos/reserva) y sus hijos
   function getUbicacionesAgrupadas() {
     const padres = ubicaciones.filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
     const hijos = ubicaciones.filter(u => u.tipo !== 'pasillo' && u.tipo !== 'reserva')
@@ -221,6 +235,14 @@ function UbicacionesPage() {
       padre,
       hijos: hijos.filter(h => h.id_ubicacion_padre === padre.id)
     }))
+  }
+
+  // 🔧 NUEVA FUNCIÓN: obtener la sección real de una ubicación
+  function getSeccionReal(ubicacion: any): string {
+    if (ubicacion.tipo === 'cross') {
+      return ubicacion.seccion_origen_nombre || '-'
+    }
+    return ubicacion.seccion_nombre || '-'
   }
 
   function renderizarFormulario() {
@@ -247,7 +269,7 @@ function UbicacionesPage() {
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
               <option value="pasillo">🛣️ Pasillo</option>
-              <option value="armario">🗄️ Armario</option>
+              <option value="armario">️ Armario</option>
               <option value="alto">📦 Alto</option>
               <option value="cross">🔄 Cross</option>
               <option value="caja">💳 Caja</option>
@@ -313,7 +335,7 @@ function UbicacionesPage() {
               </select>
               {pasillosAgrupados.length === 0 && (
                 <p className="text-sm text-red-600 mt-1">
-                  ️ No hay pasillos creados. Primero crea un pasillo en la sección deseada.
+                  ⚠️ No hay pasillos creados. Primero crea un pasillo.
                 </p>
               )}
             </div>
@@ -407,6 +429,34 @@ function UbicacionesPage() {
     )
   }
 
+  // 🔧 COMPONENTE: Botones de acción reutilizables
+  function BotonesAccion({ ubicacion }: { ubicacion: any }) {
+    return (
+      <div className="flex gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            editarUbicacion(ubicacion)
+          }}
+          className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+          title="Editar"
+        >
+          ✏️ Editar
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            eliminarUbicacion(ubicacion.id)
+          }}
+          className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+          title="Desactivar"
+        >
+          🗑️ Desactivar
+        </button>
+      </div>
+    )
+  }
+
   function renderizarTablaJerarquica() {
     if (cargando) return <div className="text-center py-12 text-gray-500">Cargando ubicaciones...</div>
 
@@ -423,28 +473,20 @@ function UbicacionesPage() {
 
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {/* Barra de controles */}
         <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
           <div className="text-sm text-gray-600">
             <strong>{ubicaciones.length}</strong> ubicaciones · <strong>{agrupadas.length}</strong> grupos
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={expandirTodos}
-              className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors"
-            >
+            <button onClick={expandirTodos} className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors">
               ▼ Expandir todo
             </button>
-            <button
-              onClick={colapsarTodos}
-              className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors"
-            >
+            <button onClick={colapsarTodos} className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors">
               ▶ Colapsar todo
             </button>
           </div>
         </div>
 
-        {/* Cabecera */}
         <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
           <div className="col-span-5">Ubicación</div>
           <div className="col-span-2">Tipo</div>
@@ -452,7 +494,6 @@ function UbicacionesPage() {
           <div className="col-span-2">Sección</div>
         </div>
 
-        {/* Filas jerárquicas */}
         <div className="divide-y divide-gray-100">
           {agrupadas.map(({ padre, hijos }) => {
             const estaExpandido = expandidos.has(padre.id)
@@ -460,7 +501,7 @@ function UbicacionesPage() {
 
             return (
               <div key={padre.id}>
-                {/* Fila del padre (pasillo o reserva) */}
+                {/* Fila del padre */}
                 <div
                   className={`grid grid-cols-12 gap-2 px-4 py-3 hover:bg-blue-50 transition-colors ${
                     tieneHijos ? 'cursor-pointer' : ''
@@ -489,11 +530,11 @@ function UbicacionesPage() {
                     {padre.numero && <span>#{padre.numero}</span>}
                   </div>
                   <div className="col-span-2 flex items-center text-sm text-gray-600">
-                    {padre.seccion_nombre || '-'}
+                    {getSeccionReal(padre)}
                   </div>
                 </div>
 
-                {/* Filas de hijos (indentadas) */}
+                {/* Hijos */}
                 {estaExpandido && hijos.map(hijo => (
                   <div
                     key={hijo.id}
@@ -518,28 +559,22 @@ function UbicacionesPage() {
                       {hijo.numero && <span className="bg-gray-200 px-1 rounded text-xs">#{hijo.numero}</span>}
                     </div>
                     <div className="col-span-2 flex items-center text-sm text-gray-600">
-                      {hijo.seccion_origen_nombre || hijo.seccion_nombre || '-'}
+                      {getSeccionReal(hijo)}
                     </div>
                   </div>
                 ))}
 
-                {/* Acciones del padre */}
+                {/* 🔧 Botones de acción del PADRE */}
                 <div className="flex justify-end gap-1 px-4 py-1 bg-gray-50 border-b border-gray-200">
-                  <button
-                    onClick={() => editarUbicacion(padre)}
-                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
-                    title="Editar"
-                  >
-                    ✏️ Editar
-                  </button>
-                  <button
-                    onClick={() => eliminarUbicacion(padre.id)}
-                    className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
-                    title="Desactivar"
-                  >
-                    🗑️ Desactivar
-                  </button>
+                  <BotonesAccion ubicacion={padre} />
                 </div>
+
+                {/* 🔧 Botones de acción de cada HIJO */}
+                {estaExpandido && hijos.map(hijo => (
+                  <div key={hijo.id} className="flex justify-end gap-1 px-4 py-1 pl-12 bg-gray-50 border-b border-gray-100 ml-4">
+                    <BotonesAccion ubicacion={hijo} />
+                  </div>
+                ))}
               </div>
             )
           })}
