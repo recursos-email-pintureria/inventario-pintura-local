@@ -83,21 +83,26 @@ function UbicacionesPage() {
       )
       setExpandidos(padres)
 
-      // Verificar productos por ubicación (para el badge y validación de borrado)
-      const productosMap = new Map<string, number>()
-      for (const u of ubicacionesData) {
-        const { data } = await supabase
-          .from('stock')
-          .select('id_producto', { count: 'exact', head: true })
-          .eq('id_ubicacion', u.id)
-          .gt('cantidad', 0)
-        
-        if (data) {
-          productosMap.set(u.id, data.length)
-        }
-      }
-      setProductosPorUbicacion(productosMap)
-
+      // Verificar productos por ubicación (consulta simplificada)
+const productosMap = new Map<string, number>()
+for (const u of ubicacionesData) {
+  const { data, error } = await supabase
+    .from('stock')
+    .select('id_producto, cantidad')
+    .eq('id_ubicacion', u.id)
+    .gt('cantidad', 0)
+  
+  if (error) {
+    console.error(`Error consultando stock para ${u.nombre}:`, error)
+  } else {
+    const cantidad = data?.length || 0
+    productosMap.set(u.id, cantidad)
+    if (cantidad > 0) {
+      console.log(`✅ ${u.nombre} tiene ${cantidad} productos`)
+    }
+  }
+}
+setProductosPorUbicacion(productosMap)
       // Verificar cuáles se pueden borrar
       const borrablesSet = new Set<string>()
       for (const u of ubicacionesData) {
