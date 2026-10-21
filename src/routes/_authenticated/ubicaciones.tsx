@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import {
   obtenerSecciones,
   obtenerUbicaciones,
@@ -12,6 +11,9 @@ import {
   errorInventario
 } from '../../lib/inventario'
 import { supabase } from '../../lib/supabase'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 
 export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
@@ -46,7 +48,10 @@ function UbicacionesPage() {
   const [borrables, setBorrables] = useState<Set<string>>(new Set())
   const [productosPorUbicacion, setProductosPorUbicacion] = useState<Map<string, number>>(new Map())
 
-  const navigate = useNavigate()
+  // Estados para el modal de stock
+  const [ubicacionStockAbierta, setUbicacionStockAbierta] = useState<any>(null)
+  const [stockDetalle, setStockDetalle] = useState<any[]>([])
+  const [cargandoStock, setCargandoStock] = useState(false)
 
   const [tipo, setTipo] = useState<string>('pasillo')
   const [nombre, setNombre] = useState('')
@@ -78,7 +83,7 @@ function UbicacionesPage() {
       )
       setExpandidos(padres)
 
-      // Verificar productos por ubicación
+      // Verificar productos por ubicación (para el badge y validación de borrado)
       const productosMap = new Map<string, number>()
       for (const u of ubicacionesData) {
         const { data } = await supabase
@@ -113,6 +118,31 @@ function UbicacionesPage() {
       setError(errorInventario(err))
     } finally {
       setCargando(false)
+    }
+  }
+
+  // Función para abrir el modal y cargar los productos de esa ubicación
+  async function abrirStockUbicacion(ubicacion: any) {
+    setUbicacionStockAbierta(ubicacion)
+    setCargandoStock(true)
+    setStockDetalle([])
+    try {
+      const { data, error } = await supabase
+        .from('stock')
+        .select(`
+          cantidad,
+          producto:productos(nombre, sku, codigo_barras)
+        `)
+        .eq('id_ubicacion', ubicacion.id)
+        .gt('cantidad', 0)
+        .order('producto(nombre)')
+      
+      if (error) throw error
+      setStockDetalle(data || [])
+    } catch (err) {
+      console.error('Error cargando stock:', err)
+    } finally {
+      setCargandoStock(false)
     }
   }
 
@@ -177,36 +207,12 @@ function UbicacionesPage() {
   async function guardarUbicacion() {
     try {
       setError('')
-
-      if (!nombre.trim()) {
-        setError('El nombre es obligatorio')
-        return
-      }
-
-      if (tipo === 'pasillo' && !seccionId) {
-        setError('Debes seleccionar una sección para el pasillo')
-        return
-      }
-
-      if ((tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && !ubicacionPadreId) {
-        setError('Debes seleccionar un pasillo padre')
-        return
-      }
-
-      if (tipo === 'cross' && !seccionOrigenId) {
-        setError('Debes seleccionar la sección de origen')
-        return
-      }
-
-      if ((tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && !posicionLateral) {
-        setError('Debes seleccionar la posición lateral')
-        return
-      }
-
-      if (tipo === 'cross' && !posicionLongitudinal) {
-        setError('Debes seleccionar la posición longitudinal')
-        return
-      }
+      if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
+      if (tipo === 'pasillo' && !seccionId) { setError('Debes seleccionar una sección para el pasillo'); return }
+      if ((tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && !ubicacionPadreId) { setError('Debes seleccionar un pasillo padre'); return }
+      if (tipo === 'cross' && !seccionOrigenId) { setError('Debes seleccionar la sección de origen'); return }
+      if ((tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && !posicionLateral) { setError('Debes seleccionar la posición lateral'); return }
+      if (tipo === 'cross' && !posicionLongitudinal) { setError('Debes seleccionar la posición longitudinal'); return }
 
       const datosUbicacion: any = {
         nombre: nombre.trim(),
@@ -271,10 +277,6 @@ function UbicacionesPage() {
     }
   }
 
-  function verProductos(ubicacionId: string) {
-    navigate({ to: '/productos', search: { ubicacion: ubicacionId } })
-  }
-
   function getPasillosAgrupados() {
     return secciones
       .map((seccion: any) => {
@@ -296,9 +298,7 @@ function UbicacionesPage() {
   }
 
   function getSeccionReal(ubicacion: any): string {
-    if (ubicacion.tipo === 'cross') {
-      return ubicacion.seccion_origen_nombre || '-'
-    }
+    if (ubicacion.tipo === 'cross') return ubicacion.seccion_origen_nombre || '-'
     return ubicacion.seccion_nombre || '-'
   }
 
@@ -312,27 +312,13 @@ function UbicacionesPage() {
 
   function renderizarFormulario() {
     const pasillosAgrupados = getPasillosAgrupados()
-
     return (
       <div className="bg-white p-6 rounded-lg shadow-md space-y-4 mb-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800">
-          {editandoId ? 'Editar ubicación' : 'Nueva ubicación'}
-        </h3>
-
+        <h3 className="text-lg font-semibold text-gray-800">{editandoId ? 'Editar ubicación' : 'Nueva ubicación'}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Tipo *</label>
-            <select
-              value={tipo}
-              onChange={(e) => {
-                setTipo(e.target.value)
-                setUbicacionPadreId('')
-                setPosicionLateral('')
-                setPosicionLongitudinal('')
-                setSeccionOrigenId('')
-              }}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={tipo} onChange={(e) => { setTipo(e.target.value); setUbicacionPadreId(''); setPosicionLateral(''); setPosicionLongitudinal(''); setSeccionOrigenId(''); }} className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
               <option value="pasillo">🛣️ Pasillo</option>
               <option value="armario">🗄️ Armario</option>
               <option value="alto">📦 Alto</option>
@@ -341,167 +327,86 @@ function UbicacionesPage() {
               <option value="reserva">🏭 Reserva</option>
             </select>
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Nombre *</label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: 12 o Armario 1"
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: 12 o Armario 1" className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
-
         <div>
           <label className="block text-sm font-medium mb-1 text-gray-700">Descripción</label>
-          <input
-            type="text"
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-          />
+          <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500" />
         </div>
-
         {tipo === 'pasillo' && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Sección *</label>
-            <select
-              value={seccionId}
-              onChange={(e) => setSeccionId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={seccionId} onChange={(e) => setSeccionId(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
               <option value="">Selecciona una sección</option>
-              {secciones.map((s: any) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
+              {secciones.map((s: any) => (<option key={s.id} value={s.id}>{s.nombre}</option>))}
             </select>
           </div>
         )}
-
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Pasillo padre *</label>
-            <select
-              value={ubicacionPadreId}
-              onChange={(e) => setUbicacionPadreId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={ubicacionPadreId} onChange={(e) => setUbicacionPadreId(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
               <option value="">Selecciona un pasillo</option>
               {pasillosAgrupados.map(({ seccion, pasillos }: any) => (
                 <optgroup key={seccion.id} label={seccion.nombre}>
-                  {pasillos.map((p: any) => (
-                    <option key={p.id} value={p.id}>{p.nombre}</option>
-                  ))}
+                  {pasillos.map((p: any) => (<option key={p.id} value={p.id}>{p.nombre}</option>))}
                 </optgroup>
               ))}
             </select>
           </div>
         )}
-
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Sección <span className="text-gray-400 font-normal">(opcional)</span>
-            </label>
-            <select
-              value={seccionId}
-              onChange={(e) => setSeccionId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
+            <label className="block text-sm font-medium mb-1 text-gray-700">Sección <span className="text-gray-400 font-normal">(opcional)</span></label>
+            <select value={seccionId} onChange={(e) => setSeccionId(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
               <option value="">— Heredar del pasillo padre —</option>
-              {secciones.map((s: any) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
+              {secciones.map((s: any) => (<option key={s.id} value={s.id}>{s.nombre}</option>))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Déjalo vacío para heredar del pasillo padre.
-            </p>
           </div>
         )}
-
         {tipo === 'cross' && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Sección de origen *</label>
-            <select
-              value={seccionOrigenId}
-              onChange={(e) => setSeccionOrigenId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={seccionOrigenId} onChange={(e) => setSeccionOrigenId(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500">
               <option value="">¿De qué sección son los productos?</option>
-              {secciones.map((s: any) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
+              {secciones.map((s: any) => (<option key={s.id} value={s.id}>{s.nombre}</option>))}
             </select>
           </div>
         )}
-
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Número</label>
-            <input
-              type="number"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value === '' ? '' : parseInt(e.target.value))}
-              placeholder="Ej: 1, 2, 3"
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="number" value={numero} onChange={(e) => setNumero(e.target.value === '' ? '' : parseInt(e.target.value))} placeholder="Ej: 1, 2, 3" className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500" />
           </div>
         )}
-
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Posición lateral *</label>
             <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLateral" value="izquierda" checked={posicionLateral === 'izquierda'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" />
-                <span>Izquierda</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLateral" value="derecha" checked={posicionLateral === 'derecha'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" />
-                <span>Derecha</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLateral" value="centro" checked={posicionLateral === 'centro'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" />
-                <span>Centro</span>
-              </label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="posicionLateral" value="izquierda" checked={posicionLateral === 'izquierda'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" /><span>Izquierda</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="posicionLateral" value="derecha" checked={posicionLateral === 'derecha'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" /><span>Derecha</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="posicionLateral" value="centro" checked={posicionLateral === 'centro'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" /><span>Centro</span></label>
             </div>
           </div>
         )}
-
         {tipo === 'cross' && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Posición longitudinal *</label>
             <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLongitudinal" value="principio" checked={posicionLongitudinal === 'principio'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" />
-                <span>Principio</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLongitudinal" value="final" checked={posicionLongitudinal === 'final'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" />
-                <span>Final</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLongitudinal" value="paso" checked={posicionLongitudinal === 'paso'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" />
-                <span>Paso</span>
-              </label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="posicionLongitudinal" value="principio" checked={posicionLongitudinal === 'principio'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" /><span>Principio</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="posicionLongitudinal" value="final" checked={posicionLongitudinal === 'final'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" /><span>Final</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="posicionLongitudinal" value="paso" checked={posicionLongitudinal === 'paso'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" /><span>Paso</span></label>
             </div>
           </div>
         )}
-
         <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button onClick={guardarUbicacion} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium">
-            {editandoId ? 'Actualizar' : 'Crear'}
-          </button>
-          <button onClick={resetearFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 font-medium">
-            Cancelar
-          </button>
+          <button onClick={guardarUbicacion} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium">{editandoId ? 'Actualizar' : 'Crear'}</button>
+          <button onClick={resetearFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 font-medium">Cancelar</button>
         </div>
-
-        {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded border border-red-200 text-sm">{error}</div>
-        )}
+        {error && <div className="bg-red-50 text-red-700 p-3 rounded border border-red-200 text-sm">{error}</div>}
       </div>
     )
   }
@@ -523,17 +428,17 @@ function UbicacionesPage() {
             {ubicacion.tipo.charAt(0).toUpperCase() + ubicacion.tipo.slice(1)}
           </span>
         </div>
-        <div className="col-span-3 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
+        <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
         <div className="col-span-2 text-sm text-gray-600">{getSeccionReal(ubicacion)}</div>
-        <div className="col-span-1 flex justify-end gap-1">
-          {/* Botón Ver Productos */}
+        <div className="col-span-2 flex justify-end gap-1">
+          {/* Botón Ver Stock (solo si hay productos) */}
           {numProductos > 0 && (
             <button 
-              onClick={() => verProductos(ubicacion.id)} 
-              className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50" 
-              title={`Ver ${numProductos} producto(s)`}
+              onClick={() => abrirStockUbicacion(ubicacion)} 
+              className="flex items-center gap-1 text-xs bg-green-100 text-green-700 hover:bg-green-200 px-2 py-1 rounded font-medium transition-colors" 
+              title="Ver productos en esta ubicación"
             >
-              👁️
+              📦 {numProductos}
             </button>
           )}
           {/* Botón Editar */}
@@ -552,11 +457,7 @@ function UbicacionesPage() {
   function renderizarTabla() {
     if (cargando) return <div className="text-center py-12 text-gray-500">Cargando...</div>
     if (ubicaciones.length === 0) {
-      return (
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <p className="text-gray-500">No hay ubicaciones.</p>
-        </div>
-      )
+      return <div className="text-center py-12 bg-white rounded-lg border"><p className="text-gray-500">No hay ubicaciones.</p></div>
     }
 
     const agrupadas = getUbicacionesAgrupadas()
@@ -574,9 +475,9 @@ function UbicacionesPage() {
         <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
           <div className="col-span-4">Ubicación</div>
           <div className="col-span-2">Tipo</div>
-          <div className="col-span-3">Detalles</div>
+          <div className="col-span-2">Detalles</div>
           <div className="col-span-2">Sección</div>
-          <div className="col-span-1 text-right">Acciones</div>
+          <div className="col-span-2 text-right">Acciones</div>
         </div>
 
         <div className="divide-y divide-gray-100">
@@ -613,6 +514,55 @@ function UbicacionesPage() {
 
       {mostrarFormulario && renderizarFormulario()}
       {renderizarTabla()}
+
+      {/* MODAL PARA VER STOCK DE LA UBICACIÓN */}
+      <Dialog open={!!ubicacionStockAbierta} onOpenChange={(open) => { if (!open) setUbicacionStockAbierta(null) }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-2xl">{ubicacionStockAbierta ? iconosTipo[ubicacionStockAbierta.tipo] : ''}</span>
+              Stock en: {ubicacionStockAbierta?.nombre}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {cargandoStock ? (
+            <div className="py-8 text-center text-gray-500">Cargando productos...</div>
+          ) : stockDetalle.length === 0 ? (
+            <div className="py-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+              No hay productos con stock en esta ubicación.
+            </div>
+          ) : (
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SKU / Código</TableHead>
+                    <TableHead>Producto</TableHead>
+                    <TableHead className="text-right">Cantidad</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stockDetalle.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-mono text-xs">
+                        {item.producto?.sku || '—'}
+                        <br />
+                        <span className="text-gray-400">{item.producto?.codigo_barras}</span>
+                      </TableCell>
+                      <TableCell className="font-medium">{item.producto?.nombre || 'Producto desconocido'}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="secondary" className="text-base px-3 py-1">
+                          {item.cantidad}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
