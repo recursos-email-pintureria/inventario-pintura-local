@@ -14,7 +14,6 @@ export type TipoMovimiento = 'entrada' | 'salida' | 'reposicion' | 'ajuste';
 export interface Movimiento { id: string; id_producto: string; id_ubicacion: string; tipo: TipoMovimiento; cantidad: number; precio_unitario: number | null; precio_total: number | null; notas: string | null; realizado_por: string; fecha_movimiento: string; }
 export interface Inventario { categorias: Categoria[]; productos: Producto[]; ubicaciones: Ubicacion[]; stock: Stock[]; movimientos: Movimiento[]; perfiles: Pick<PerfilUsuario, 'id' | 'nombre_completo'>[]; puedeVerMovimientos: boolean; }
 
-// NUEVO: Interfaz para el mapa de ubicaciones del producto
 export interface ProductoUbicacion {
   id: string;
   id_producto: string;
@@ -38,19 +37,23 @@ async function cargarInventario(userId: string): Promise<Inventario> {
   for (const result of [categorias, productos, ubicaciones, stock, movimientos, perfiles]) if (result.error) throw result.error;
   return { categorias: categorias.data as Categoria[], productos: productos.data as Producto[], ubicaciones: ubicaciones.data as Ubicacion[], stock: stock.data as Stock[], movimientos: movimientos.data as Movimiento[], perfiles: perfiles.data as Inventario['perfiles'], puedeVerMovimientos };
 }
+
 export const inventarioQueryOptions = (userId: string) => queryOptions({ queryKey: ['inventario', userId], queryFn: () => cargarInventario(userId) });
+
 export async function usuarioActual() {
   const { data, error } = await supabase.auth.getUser();
   if (error) throw error;
   if (!data.user) throw new Error('Inicia sesión para continuar.');
   return data.user;
 }
+
 export function permisoExplicito(permisos: PermisosUsuario | null | undefined, key: keyof Omit<PermisosUsuario, 'id_usuario'>) { return permisos?.[key] === true; }
 export function stockProducto(stock: Stock[], id: string) { return stock.filter(s => s.id_producto === id).reduce((n, s) => n + s.cantidad, 0); }
 export function productosEnUbicacion(stock: Stock[], id: string) { return new Set(stock.filter(s => s.id_ubicacion === id && s.cantidad > 0).map(s => s.id_producto)).size; }
 export function productosStockBajo(productos: Producto[], stock: Stock[]) { return productos.filter(p => p.activo && stockProducto(stock, p.id) < 10).length; }
 export function movimientosHoy(items: Movimiento[], hoy = new Date()) { return items.filter(m => isSameDay(new Date(m.fecha_movimiento), hoy)).length; }
 export function actividadReciente(items: Movimiento[]) { return [...items].sort((a, b) => new Date(b.fecha_movimiento).getTime() - new Date(a.fecha_movimiento).getTime()).slice(0, 10); }
+
 export interface FiltrosMovimiento { desde: string; hasta: string; tipo: string; producto: string; ubicacion: string; }
 export function filtrarMovimientos(items: Movimiento[], f: FiltrosMovimiento) {
   const desde = f.desde ? new Date(`${f.desde}T00:00:00`).getTime() : -Infinity;
@@ -60,13 +63,16 @@ export function filtrarMovimientos(items: Movimiento[], f: FiltrosMovimiento) {
     return fecha >= desde && fecha <= hasta && (!f.tipo || m.tipo === f.tipo) && (!f.producto || m.id_producto === f.producto) && (!f.ubicacion || m.id_ubicacion === f.ubicacion);
   });
 }
+
 export function validarCantidad(cantidad: number) { if (!Number.isInteger(cantidad) || cantidad <= 0) throw new Error('La cantidad debe ser un entero mayor que cero.'); }
+
 export async function guardarCategoria(nombre: string, descripcion: string, id?: string) {
   if (!nombre.trim()) throw new Error('Introduce un nombre.');
   const valores = { nombre: nombre.trim(), descripcion: descripcion.trim() || null };
   const query = id ? supabase.from('categorias').update(valores).eq('id', id) : supabase.from('categorias').insert(valores);
   const { error } = await query.select('id').single(); if (error) throw error;
 }
+
 export async function comprobarUnicidad(campo: 'sku' | 'codigo_barras', valor: string, id?: string) {
   if (!valor.trim()) return true;
   let query = supabase.from('productos').select('id').eq(campo, valor.trim());
@@ -75,7 +81,6 @@ export async function comprobarUnicidad(campo: 'sku' | 'codigo_barras', valor: s
   return !data?.length;
 }
 
-// MODIFICADO: Ahora devuelve el ID del producto guardado
 export async function guardarProducto(datos: Omit<Producto, 'id' | 'activo'>, id?: string): Promise<string> {
   const user = await usuarioActual();
   if (!datos.nombre.trim() || !datos.sku.trim() || !datos.codigo_barras.trim()) throw new Error('Completa nombre, SKU y código de barras.');
@@ -86,7 +91,9 @@ export async function guardarProducto(datos: Omit<Producto, 'id' | 'activo'>, id
   if (error) throw error;
   return data.id;
 }
+
 export async function desactivarRegistro(tabla: 'categorias' | 'productos', id: string) { const { error } = await supabase.from(tabla).update({ activo: false }).eq('id', id).select('id').single(); if (error) throw error; }
+
 export async function crearMovimiento(datos: { id_producto: string; id_ubicacion: string; tipo: TipoMovimiento; cantidad: number; precio_unitario: number | null; notas: string }) {
   validarCantidad(datos.cantidad);
   if (!datos.id_producto || !datos.id_ubicacion) throw new Error('Selecciona producto y ubicación.');
@@ -95,7 +102,6 @@ export async function crearMovimiento(datos: { id_producto: string; id_ubicacion
   if (error) throw error;
 }
 
-// NUEVAS FUNCIONES PARA GESTIÓN DE UBICACIONES MÚLTIPLES
 export async function cargarUbicacionesProducto(id_producto: string): Promise<ProductoUbicacion[]> {
   const { data, error } = await supabase.from('producto_ubicaciones').select('id, id_producto, id_ubicacion, tipo, seccion_origen').eq('id_producto', id_producto);
   if (error) throw error;
@@ -103,11 +109,9 @@ export async function cargarUbicacionesProducto(id_producto: string): Promise<Pr
 }
 
 export async function guardarUbicacionesProducto(id_producto: string, ubicaciones: Omit<ProductoUbicacion, 'id' | 'id_producto'>[]) {
-  // 1. Borramos las ubicaciones anteriores para sincronizar limpiamente
   const { error: deleteError } = await supabase.from('producto_ubicaciones').delete().eq('id_producto', id_producto);
   if (deleteError) throw deleteError;
 
-  // 2. Insertamos las nuevas
   if (ubicaciones.length > 0) {
     const user = await usuarioActual();
     const datos = ubicaciones.map(u => ({ ...u, id_producto, creado_por: user.id }));
@@ -123,11 +127,14 @@ export function errorInventario(error: unknown) {
   if (e?.code === '42501' || e?.code === 'PGRST116') return 'No tienes permiso para esta operación o el registro ya no está disponible.';
   return e?.message || 'No se pudo completar la operación. Inténtalo de nuevo.';
 }
+
 export const formatoPrecio = (n: number | null) => n === null ? '—' : new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 export const formatoFecha = (s: string) => new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(s));
+
 export function filasExportacion(items: Movimiento[], data: Inventario) {
   return items.map(m => ({ Fecha: formatoFecha(m.fecha_movimiento), Producto: data.productos.find(p => p.id === m.id_producto)?.nombre ?? m.id_producto, Tipo: m.tipo, Cantidad: m.cantidad, Precio: m.precio_unitario, Total: m.precio_total, Ubicación: data.ubicaciones.find(u => u.id === m.id_ubicacion)?.nombre ?? m.id_ubicacion, Usuario: data.perfiles.find(p => p.id === m.realizado_por)?.nombre_completo ?? 'Usuario no disponible', Notas: m.notas ?? '' }));
 }
+
 export async function exportarMovimientos(formato: 'excel' | 'pdf', items: Movimiento[], data: Inventario) {
   const filas = filasExportacion(items, data);
   if (filas.length === 0) throw new Error('No hay movimientos para exportar con los filtros actuales.');
@@ -170,7 +177,6 @@ export interface UbicacionJerarquica {
   numero: number | null;
   descripcion: string | null;
   activo: boolean;
-  // Campos de relación para mostrar nombres en la UI
   seccion_nombre?: string;
   seccion_origen_nombre?: string;
   ubicacion_padre_nombre?: string;
@@ -202,14 +208,7 @@ export async function obtenerUbicaciones(): Promise<UbicacionJerarquica[]> {
   
   if (error) throw error;
   
-  return (data || []).map((u: any) => ({
-    ...u,
-    seccion_nombre: u.seccion?.nombre || null,
-    seccion_origen_nombre: u.seccion_origen?.nombre || null,
-    ubicacion_padre_nombre: u.ubicacion_padre?.nombre || null,
-  }));
-
-  // Mapear para aplanar los nombres y que sea fácil de usar en la interfaz
+  // CORREGIDO: Eliminado el return duplicado que causaba código inalcanzable
   return (data || []).map((u: any) => ({
     ...u,
     seccion_nombre: u.seccion?.nombre || null,
@@ -269,4 +268,57 @@ export async function desactivarUbicacion(id: string) {
     .eq('id', id);
   
   if (error) throw error;
+}
+
+// Borrar ubicación definitivamente (solo si no tiene movimientos ni stock)
+export async function borrarUbicacionDefinitivamente(id: string) {
+  const { data: stock, error: stockError } = await supabase
+    .from('stock')
+    .select('id')
+    .eq('id_ubicacion', id)
+    .limit(1);
+  
+  if (stockError) throw stockError;
+  if (stock && stock.length > 0) {
+    throw new Error('No se puede borrar: la ubicación tiene stock asociado. Desactívala en su lugar.');
+  }
+
+  const { data: movimientos, error: movError } = await supabase
+    .from('movimientos')
+    .select('id')
+    .eq('id_ubicacion', id)
+    .limit(1);
+  
+  if (movError) throw movError;
+  if (movimientos && movimientos.length > 0) {
+    throw new Error('No se puede borrar: la ubicación tiene movimientos históricos. Desactívala en su lugar.');
+  }
+
+  const { error } = await supabase
+    .from('ubicaciones')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
+}
+
+// Verificar si una ubicación se puede borrar definitivamente
+export async function sePuedeBorrarDefinitivamente(id: string): Promise<boolean> {
+  const { data: stock } = await supabase
+    .from('stock')
+    .select('id')
+    .eq('id_ubicacion', id)
+    .limit(1);
+  
+  if (stock && stock.length > 0) return false;
+
+  const { data: movimientos } = await supabase
+    .from('movimientos')
+    .select('id')
+    .eq('id_ubicacion', id)
+    .limit(1);
+  
+  if (movimientos && movimientos.length > 0) return false;
+
+  return true;
 }
