@@ -192,9 +192,9 @@ export async function obtenerUbicaciones(): Promise<UbicacionJerarquica[]> {
     .from('ubicaciones')
     .select(`
       *,
-      seccion:seccion(nombre),
-      seccion_origen:seccion_origen(nombre),
-      ubicacion_padre:id_ubicacion_padre(nombre, tipo)
+      seccion:seccion(id, nombre),
+      seccion_origen:seccion_origen(id, nombre),
+      ubicacion_padre:id_ubicacion_padre(id, nombre, tipo)
     `)
     .eq('activo', true)
     .order('tipo')
@@ -202,6 +202,13 @@ export async function obtenerUbicaciones(): Promise<UbicacionJerarquica[]> {
   
   if (error) throw error;
   
+  return (data || []).map((u: any) => ({
+    ...u,
+    seccion_nombre: u.seccion?.nombre || null,
+    seccion_origen_nombre: u.seccion_origen?.nombre || null,
+    ubicacion_padre_nombre: u.ubicacion_padre?.nombre || null,
+  }));
+
   // Mapear para aplanar los nombres y que sea fácil de usar en la interfaz
   return (data || []).map((u: any) => ({
     ...u,
