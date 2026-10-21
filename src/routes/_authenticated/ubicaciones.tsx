@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   obtenerSecciones,
   obtenerUbicaciones,
@@ -10,6 +11,7 @@ import {
   sePuedeBorrarDefinitivamente,
   errorInventario
 } from '../../lib/inventario'
+import { supabase } from '../../lib/supabase'
 
 export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
@@ -17,8 +19,8 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
 
 const iconosTipo: Record<string, string> = {
   pasillo: '🛣️',
-  armario: '️',
-  alto: '',
+  armario: '🗄️',
+  alto: '📦',
   cross: '🔄',
   caja: '💳',
   reserva: '🏭',
@@ -42,15 +44,18 @@ function UbicacionesPage() {
   const [error, setError] = useState('')
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [borrables, setBorrables] = useState<Set<string>>(new Set())
+  const [productosPorUbicacion, setProductosPorUbicacion] = useState<Map<string, number>>(new Map())
 
-  const [tipo, setTipo] = useState<'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva'>('pasillo')
+  const navigate = useNavigate()
+
+  const [tipo, setTipo] = useState<string>('pasillo')
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
-  const [seccionId, setSeccionId] = useState<string>('')
-  const [ubicacionPadreId, setUbicacionPadreId] = useState<string>('')
-  const [seccionOrigenId, setSeccionOrigenId] = useState<string>('')
-  const [posicionLateral, setPosicionLateral] = useState<'izquierda' | 'derecha' | 'centro' | ''>('')
-  const [posicionLongitudinal, setPosicionLongitudinal] = useState<'principio' | 'final' | 'paso' | ''>('')
+  const [seccionId, setSeccionId] = useState('')
+  const [ubicacionPadreId, setUbicacionPadreId] = useState('')
+  const [seccionOrigenId, setSeccionOrigenId] = useState('')
+  const [posicionLateral, setPosicionLateral] = useState('')
+  const [posicionLongitudinal, setPosicionLongitudinal] = useState('')
   const [numero, setNumero] = useState<number | ''>('')
 
   useEffect(() => {
@@ -68,19 +73,39 @@ function UbicacionesPage() {
       setUbicaciones(ubicacionesData)
       const padres = new Set(
         ubicacionesData
-          .filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
-          .map(u => u.id)
+          .filter((u: any) => u.tipo === 'pasillo' || u.tipo === 'reserva')
+          .map((u: any) => u.id)
       )
       setExpandidos(padres)
 
-      // Verificar cuáles se pueden borrar definitivamente
+      // Verificar productos por ubicación
+      const productosMap = new Map<string, number>()
+      for (const u of ubicacionesData) {
+        const { data } = await supabase
+          .from('stock')
+          .select('id_producto', { count: 'exact', head: true })
+          .eq('id_ubicacion', u.id)
+          .gt('cantidad', 0)
+        
+        if (data) {
+          productosMap.set(u.id, data.length)
+        }
+      }
+      setProductosPorUbicacion(productosMap)
+
+      // Verificar cuáles se pueden borrar
       const borrablesSet = new Set<string>()
       for (const u of ubicacionesData) {
-        try {
-          const sePuede = await sePuedeBorrarDefinitivamente(u.id)
-          if (sePuede) borrablesSet.add(u.id)
-        } catch (e) {
-          // Si hay error, no se puede borrar
+        const tieneProductos = productosMap.get(u.id) || 0
+        const tieneHijos = ubicacionesData.some((h: any) => h.id_ubicacion_padre === u.id)
+        
+        if (tieneProductos === 0 && !tieneHijos) {
+          try {
+            const sePuede = await sePuedeBorrarDefinitivamente(u.id)
+            if (sePuede) borrablesSet.add(u.id)
+          } catch (e) {
+            // ignorar
+          }
         }
       }
       setBorrables(borrablesSet)
@@ -103,8 +128,8 @@ function UbicacionesPage() {
   function expandirTodos() {
     const padres = new Set(
       ubicaciones
-        .filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
-        .map(u => u.id)
+        .filter((u: any) => u.tipo === 'pasillo' || u.tipo === 'reserva')
+        .map((u: any) => u.id)
     )
     setExpandidos(padres)
   }
@@ -133,20 +158,15 @@ function UbicacionesPage() {
     setTipo(ubicacion.tipo)
     setNombre(ubicacion.nombre)
     setDescripcion(ubicacion.descripcion || '')
-    
-    // 🔧 CORREGIDO: obtener el ID de la sección correctamente
     const seccionActual = typeof ubicacion.seccion === 'string' 
       ? ubicacion.seccion 
       : ubicacion.seccion?.id || ''
     setSeccionId(seccionActual)
-    
     setUbicacionPadreId(ubicacion.id_ubicacion_padre || '')
-    
     const seccionOrigenActual = typeof ubicacion.seccion_origen === 'string'
       ? ubicacion.seccion_origen
       : ubicacion.seccion_origen?.id || ''
     setSeccionOrigenId(seccionOrigenActual)
-    
     setPosicionLateral(ubicacion.posicion_lateral || '')
     setPosicionLongitudinal(ubicacion.posicion_longitudinal || '')
     setNumero(ubicacion.numero || '')
@@ -174,17 +194,17 @@ function UbicacionesPage() {
       }
 
       if (tipo === 'cross' && !seccionOrigenId) {
-        setError('Debes seleccionar la sección de origen de los productos del cross')
+        setError('Debes seleccionar la sección de origen')
         return
       }
 
       if ((tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && !posicionLateral) {
-        setError('Debes seleccionar la posición lateral (izquierda/derecha)')
+        setError('Debes seleccionar la posición lateral')
         return
       }
 
       if (tipo === 'cross' && !posicionLongitudinal) {
-        setError('Debes seleccionar la posición longitudinal (principio/final/paso)')
+        setError('Debes seleccionar la posición longitudinal')
         return
       }
 
@@ -198,23 +218,21 @@ function UbicacionesPage() {
         numero: numero !== '' ? numero : null,
       }
 
-      // Lógica de sección
       if (tipo === 'pasillo') {
         datosUbicacion.seccion = seccionId || null
         datosUbicacion.seccion_origen = null
       } else if (tipo === 'cross') {
-        const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
+        const padre = ubicaciones.find((u: any) => u.id === ubicacionPadreId)
         datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
         datosUbicacion.seccion_origen = seccionOrigenId || null
       } else if (tipo === 'reserva') {
         datosUbicacion.seccion = null
         datosUbicacion.seccion_origen = null
       } else {
-        // Armario, alto, caja: heredan del padre por defecto, pero se puede sobrescribir
         if (seccionId && seccionId !== '') {
           datosUbicacion.seccion = seccionId
         } else {
-          const padre = ubicaciones.find(u => u.id === ubicacionPadreId)
+          const padre = ubicaciones.find((u: any) => u.id === ubicacionPadreId)
           datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null
         }
         datosUbicacion.seccion_origen = null
@@ -234,8 +252,7 @@ function UbicacionesPage() {
   }
 
   async function desactivarUbicacionHandler(id: string) {
-    if (!confirm('¿Seguro que quieres desactivar esta ubicación? Los movimientos históricos se conservarán.')) return
-    
+    if (!confirm('¿Desactivar esta ubicación? Se conservará el historial.')) return
     try {
       await desactivarUbicacion(id)
       await cargarDatos()
@@ -245,8 +262,7 @@ function UbicacionesPage() {
   }
 
   async function borrarDefinitivamente(id: string) {
-    if (!confirm('⚠️ ¿Borrar DEFINITIVAMENTE? Esta acción NO se puede deshacer.\n\nSolo hazlo si estás seguro de que no hay productos ni movimientos asociados.')) return
-    
+    if (!confirm('⚠️ ¿Borrar DEFINITIVAMENTE? No se puede deshacer.')) return
     try {
       await borrarUbicacionDefinitivamente(id)
       await cargarDatos()
@@ -255,24 +271,27 @@ function UbicacionesPage() {
     }
   }
 
+  function verProductos(ubicacionId: string) {
+    navigate({ to: '/productos', search: { ubicacion: ubicacionId } })
+  }
+
   function getPasillosAgrupados() {
     return secciones
-      .map(seccion => {
+      .map((seccion: any) => {
         const pasillos = ubicaciones.filter(
-          u => u.tipo === 'pasillo' && (u.seccion?.id === seccion.id || u.seccion === seccion.id)
+          (u: any) => u.tipo === 'pasillo' && (u.seccion?.id === seccion.id || u.seccion === seccion.id)
         )
         return { seccion, pasillos }
       })
-      .filter(grupo => grupo.pasillos.length > 0)
+      .filter((grupo: any) => grupo.pasillos.length > 0)
   }
 
   function getUbicacionesAgrupadas() {
-    const padres = ubicaciones.filter(u => u.tipo === 'pasillo' || u.tipo === 'reserva')
-    const hijos = ubicaciones.filter(u => u.tipo !== 'pasillo' && u.tipo !== 'reserva')
-    
-    return padres.map(padre => ({
+    const padres = ubicaciones.filter((u: any) => u.tipo === 'pasillo' || u.tipo === 'reserva')
+    const hijos = ubicaciones.filter((u: any) => u.tipo !== 'pasillo' && u.tipo !== 'reserva')
+    return padres.map((padre: any) => ({
       padre,
-      hijos: hijos.filter(h => h.id_ubicacion_padre === padre.id)
+      hijos: hijos.filter((h: any) => h.id_ubicacion_padre === padre.id)
     }))
   }
 
@@ -306,7 +325,7 @@ function UbicacionesPage() {
             <select
               value={tipo}
               onChange={(e) => {
-                setTipo(e.target.value as any)
+                setTipo(e.target.value)
                 setUbicacionPadreId('')
                 setPosicionLateral('')
                 setPosicionLongitudinal('')
@@ -314,10 +333,10 @@ function UbicacionesPage() {
               }}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="pasillo">️ Pasillo</option>
+              <option value="pasillo">🛣️ Pasillo</option>
               <option value="armario">🗄️ Armario</option>
-              <option value="alto"> Alto</option>
-              <option value="cross"> Cross</option>
+              <option value="alto">📦 Alto</option>
+              <option value="cross">🔄 Cross</option>
               <option value="caja">💳 Caja</option>
               <option value="reserva">🏭 Reserva</option>
             </select>
@@ -329,7 +348,7 @@ function UbicacionesPage() {
               type="text"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder={tipo === 'pasillo' ? 'Ej: 12, 14, Perimetral' : 'Ej: Armario 1'}
+              placeholder="Ej: 12 o Armario 1"
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -345,50 +364,42 @@ function UbicacionesPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tipo === 'pasillo' && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Sección *</label>
-              <select
-                value={seccionId}
-                onChange={(e) => setSeccionId(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Selecciona una sección</option>
-                {secciones.map(s => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
+        {tipo === 'pasillo' && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">Sección *</label>
+            <select
+              value={seccionId}
+              onChange={(e) => setSeccionId(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Selecciona una sección</option>
+              {secciones.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
-          {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Pasillo padre *</label>
-              <select
-                value={ubicacionPadreId}
-                onChange={(e) => setUbicacionPadreId(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Selecciona un pasillo</option>
-                {pasillosAgrupados.map(({ seccion, pasillos }) => (
-                  <optgroup key={seccion.id} label={seccion.nombre}>
-                    {pasillos.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              {pasillosAgrupados.length === 0 && (
-                <p className="text-sm text-red-600 mt-1">
-                  ⚠️ No hay pasillos creados. Primero crea un pasillo.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+        {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">Pasillo padre *</label>
+            <select
+              value={ubicacionPadreId}
+              onChange={(e) => setUbicacionPadreId(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Selecciona un pasillo</option>
+              {pasillosAgrupados.map(({ seccion, pasillos }: any) => (
+                <optgroup key={seccion.id} label={seccion.nombre}>
+                  {pasillos.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
 
-        {/* 🔧 CAMPO SECCIÓN PARA ARMARIOS/ALTOS/CAJAS - SIEMPRE VISIBLE */}
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -399,62 +410,60 @@ function UbicacionesPage() {
               onChange={(e) => setSeccionId(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— Heredar del pasillo padre (recomendado) —</option>
-              {secciones.map(s => (
+              <option value="">— Heredar del pasillo padre —</option>
+              {secciones.map((s: any) => (
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              💡 Déjalo en "Heredar del pasillo padre" para mantener la coherencia. Solo cámbialo si el armario contiene productos de otra sección.
+              Déjalo vacío para heredar del pasillo padre.
             </p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Número</label>
-              <input
-                type="number"
-                value={numero}
-                onChange={(e) => setNumero(e.target.value === '' ? '' : parseInt(e.target.value))}
-                placeholder="Ej: 1, 2, 3"
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          )}
+        {tipo === 'cross' && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">Sección de origen *</label>
+            <select
+              value={seccionOrigenId}
+              onChange={(e) => setSeccionOrigenId(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">¿De qué sección son los productos?</option>
+              {secciones.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
-          {tipo === 'cross' && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">Sección de origen de los productos *</label>
-              <select
-                value={seccionOrigenId}
-                onChange={(e) => setSeccionOrigenId(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">¿De qué sección son los productos?</option>
-                {secciones.map(s => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
+        {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">Número</label>
+            <input
+              type="number"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value === '' ? '' : parseInt(e.target.value))}
+              placeholder="Ej: 1, 2, 3"
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
 
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Posición lateral *</label>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLateral" value="izquierda" checked={posicionLateral === 'izquierda'} onChange={(e) => setPosicionLateral(e.target.value as any)} className="w-4 h-4 text-blue-600" />
+                <input type="radio" name="posicionLateral" value="izquierda" checked={posicionLateral === 'izquierda'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" />
                 <span>Izquierda</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLateral" value="derecha" checked={posicionLateral === 'derecha'} onChange={(e) => setPosicionLateral(e.target.value as any)} className="w-4 h-4 text-blue-600" />
+                <input type="radio" name="posicionLateral" value="derecha" checked={posicionLateral === 'derecha'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" />
                 <span>Derecha</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLateral" value="centro" checked={posicionLateral === 'centro'} onChange={(e) => setPosicionLateral(e.target.value as any)} className="w-4 h-4 text-blue-600" />
+                <input type="radio" name="posicionLateral" value="centro" checked={posicionLateral === 'centro'} onChange={(e) => setPosicionLateral(e.target.value)} className="w-4 h-4 text-blue-600" />
                 <span>Centro</span>
               </label>
             </div>
@@ -466,26 +475,26 @@ function UbicacionesPage() {
             <label className="block text-sm font-medium mb-1 text-gray-700">Posición longitudinal *</label>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLongitudinal" value="principio" checked={posicionLongitudinal === 'principio'} onChange={(e) => setPosicionLongitudinal(e.target.value as any)} className="w-4 h-4 text-blue-600" />
+                <input type="radio" name="posicionLongitudinal" value="principio" checked={posicionLongitudinal === 'principio'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" />
                 <span>Principio</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLongitudinal" value="final" checked={posicionLongitudinal === 'final'} onChange={(e) => setPosicionLongitudinal(e.target.value as any)} className="w-4 h-4 text-blue-600" />
+                <input type="radio" name="posicionLongitudinal" value="final" checked={posicionLongitudinal === 'final'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" />
                 <span>Final</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="posicionLongitudinal" value="paso" checked={posicionLongitudinal === 'paso'} onChange={(e) => setPosicionLongitudinal(e.target.value as any)} className="w-4 h-4 text-blue-600" />
-                <span>Paso (entre secciones)</span>
+                <input type="radio" name="posicionLongitudinal" value="paso" checked={posicionLongitudinal === 'paso'} onChange={(e) => setPosicionLongitudinal(e.target.value)} className="w-4 h-4 text-blue-600" />
+                <span>Paso</span>
               </label>
             </div>
           </div>
         )}
 
         <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button onClick={guardarUbicacion} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium transition-colors">
-            {editandoId ? 'Actualizar ubicación' : 'Crear ubicación'}
+          <button onClick={guardarUbicacion} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium">
+            {editandoId ? 'Actualizar' : 'Crear'}
           </button>
-          <button onClick={resetearFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 font-medium transition-colors">
+          <button onClick={resetearFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 font-medium">
             Cancelar
           </button>
         </div>
@@ -499,78 +508,53 @@ function UbicacionesPage() {
 
   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const sePuedeBorrar = borrables.has(ubicacion.id)
+    const numProductos = productosPorUbicacion.get(ubicacion.id) || 0
 
     return (
-      <div
-        className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${
-          esHijo 
-            ? 'pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4' 
-            : 'hover:bg-blue-50'
-        } transition-colors`}
-      >
+      <div className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${esHijo ? 'pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4' : 'hover:bg-blue-50'}`}>
         <div className="col-span-4 flex items-center gap-2">
-          {esHijo && <span className="text-gray-400 text-xs">├─</span>}
+          {esHijo && <span className="text-gray-400 text-xs">─</span>}
           <span className="text-base">{iconosTipo[ubicacion.tipo]}</span>
-          <span className={`text-sm ${esHijo ? 'font-medium text-gray-800' : 'font-semibold text-gray-900'}`}>
-            {ubicacion.nombre}
-          </span>
-          {ubicacion.descripcion && (
-            <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>
-          )}
+          <span className={`text-sm ${esHijo ? 'font-medium' : 'font-semibold'}`}>{ubicacion.nombre}</span>
+          {ubicacion.descripcion && <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>}
         </div>
-
         <div className="col-span-2">
           <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[ubicacion.tipo]}`}>
             {ubicacion.tipo.charAt(0).toUpperCase() + ubicacion.tipo.slice(1)}
           </span>
         </div>
-
-        <div className="col-span-3 text-sm text-gray-600">
-          {getDetalles(ubicacion)}
-        </div>
-
-        <div className="col-span-2 text-sm text-gray-600">
-          {getSeccionReal(ubicacion)}
-        </div>
-
+        <div className="col-span-3 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
+        <div className="col-span-2 text-sm text-gray-600">{getSeccionReal(ubicacion)}</div>
         <div className="col-span-1 flex justify-end gap-1">
-          <button
-            onClick={() => editarUbicacion(ubicacion)}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-            title="Editar"
-          >
-            ✏️
-          </button>
+          {/* Botón Ver Productos */}
+          {numProductos > 0 && (
+            <button 
+              onClick={() => verProductos(ubicacion.id)} 
+              className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50" 
+              title={`Ver ${numProductos} producto(s)`}
+            >
+              👁️
+            </button>
+          )}
+          {/* Botón Editar */}
+          <button onClick={() => editarUbicacion(ubicacion)} className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50" title="Editar">✏️</button>
+          {/* Botón Borrar/Desactivar */}
           {sePuedeBorrar ? (
-            <button
-              onClick={() => borrarDefinitivamente(ubicacion.id)}
-              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-              title="Borrar definitivamente (sin historial)"
-            >
-              🗑️
-            </button>
+            <button onClick={() => borrarDefinitivamente(ubicacion.id)} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50" title="Borrar definitivamente">🗑️</button>
           ) : (
-            <button
-              onClick={() => desactivarUbicacionHandler(ubicacion.id)}
-              className="text-orange-600 hover:text-orange-800 p-1 rounded hover:bg-orange-50 transition-colors"
-              title="Desactivar (tiene historial)"
-            >
-              ⏸️
-            </button>
+            <button onClick={() => desactivarUbicacionHandler(ubicacion.id)} className="text-orange-600 hover:text-orange-800 p-1 rounded hover:bg-orange-50" title="Desactivar (tiene productos/historial)">⏸️</button>
           )}
         </div>
       </div>
     )
   }
 
-  function renderizarTablaJerarquica() {
-    if (cargando) return <div className="text-center py-12 text-gray-500">Cargando ubicaciones...</div>
-
+  function renderizarTabla() {
+    if (cargando) return <div className="text-center py-12 text-gray-500">Cargando...</div>
     if (ubicaciones.length === 0) {
       return (
-        <div className="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-200">
-          <p className="text-gray-500 mb-2">No hay ubicaciones creadas.</p>
-          <p className="text-sm text-gray-400">Haz clic en "Nueva ubicación" para empezar a mapear tu tienda.</p>
+        <div className="text-center py-12 bg-white rounded-lg border">
+          <p className="text-gray-500">No hay ubicaciones.</p>
         </div>
       )
     }
@@ -578,22 +562,16 @@ function UbicacionesPage() {
     const agrupadas = getUbicacionesAgrupadas()
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            <strong>{ubicaciones.length}</strong> ubicaciones · <strong>{agrupadas.length}</strong> grupos
-          </div>
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
+          <div className="text-sm text-gray-600"><strong>{ubicaciones.length}</strong> ubicaciones</div>
           <div className="flex gap-2">
-            <button onClick={expandirTodos} className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors">
-              ▼ Expandir todo
-            </button>
-            <button onClick={colapsarTodos} className="text-xs bg-white border border-gray-300 px-3 py-1 rounded hover:bg-gray-100 transition-colors">
-              ▶ Colapsar todo
-            </button>
+            <button onClick={expandirTodos} className="text-xs bg-white border px-3 py-1 rounded">▼ Expandir</button>
+            <button onClick={colapsarTodos} className="text-xs bg-white border px-3 py-1 rounded">▶ Colapsar</button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
           <div className="col-span-4">Ubicación</div>
           <div className="col-span-2">Tipo</div>
           <div className="col-span-3">Detalles</div>
@@ -602,20 +580,15 @@ function UbicacionesPage() {
         </div>
 
         <div className="divide-y divide-gray-100">
-          {agrupadas.map(({ padre, hijos }) => {
+          {agrupadas.map(({ padre, hijos }: any) => {
             const estaExpandido = expandidos.has(padre.id)
             const tieneHijos = hijos.length > 0
-
             return (
               <div key={padre.id}>
-                <div
-                  className={tieneHijos ? 'cursor-pointer' : ''}
-                  onClick={() => tieneHijos && toggleExpandir(padre.id)}
-                >
+                <div className={tieneHijos ? 'cursor-pointer' : ''} onClick={() => tieneHijos && toggleExpandir(padre.id)}>
                   <FilaUbicacion ubicacion={padre} esHijo={false} />
                 </div>
-
-                {estaExpandido && hijos.map(hijo => (
+                {estaExpandido && hijos.map((hijo: any) => (
                   <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
                 ))}
               </div>
@@ -633,16 +606,13 @@ function UbicacionesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Ubicaciones</h1>
           <p className="text-sm text-gray-500 mt-1">Gestiona la estructura jerárquica de tu tienda.</p>
         </div>
-        <button
-          onClick={() => { resetearFormulario(); setMostrarFormulario(true) }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
-        >
+        <button onClick={() => { resetearFormulario(); setMostrarFormulario(true) }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium">
           + Nueva ubicación
         </button>
       </div>
 
       {mostrarFormulario && renderizarFormulario()}
-      {renderizarTablaJerarquica()}
+      {renderizarTabla()}
     </div>
   )
 }
