@@ -21,7 +21,6 @@ function UbicacionesPage() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
-  // Estado del formulario
   const [tipo, setTipo] = useState<'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva'>('pasillo')
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -141,7 +140,7 @@ function UbicacionesPage() {
   }
 
   async function eliminarUbicacion(id: string) {
-    if (!confirm('¿Seguro que quieres desactivar esta ubicación? Los movimientos históricos se conservarán.')) return
+    if (!confirm('¿Seguro que quieres desactivar esta ubicación?')) return
     
     try {
       await desactivarUbicacion(id)
@@ -151,7 +150,21 @@ function UbicacionesPage() {
     }
   }
 
+  // 🔧 FUNCIÓN CORREGIDA: obtiene los pasillos agrupados por sección
+  function getPasillosAgrupados() {
+    return secciones
+      .map(seccion => {
+        const pasillos = ubicaciones.filter(
+          u => u.tipo === 'pasillo' && u.seccion === seccion.id
+        )
+        return { seccion, pasillos }
+      })
+      .filter(grupo => grupo.pasillos.length > 0) // Oculta secciones sin pasillos
+  }
+
   function renderizarFormulario() {
+    const pasillosAgrupados = getPasillosAgrupados()
+
     return (
       <div className="bg-white p-6 rounded-lg shadow-md space-y-4 mb-6 border border-gray-200">
         <h3 className="text-lg font-semibold text-gray-800">
@@ -159,7 +172,6 @@ function UbicacionesPage() {
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tipo */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Tipo *</label>
             <select
@@ -182,7 +194,6 @@ function UbicacionesPage() {
             </select>
           </div>
 
-          {/* Nombre */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Nombre *</label>
             <input
@@ -195,7 +206,6 @@ function UbicacionesPage() {
           </div>
         </div>
 
-        {/* Descripción */}
         <div>
           <label className="block text-sm font-medium mb-1 text-gray-700">Descripción</label>
           <input
@@ -207,7 +217,6 @@ function UbicacionesPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Sección (para pasillos) */}
           {tipo === 'pasillo' && (
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">Sección *</label>
@@ -224,7 +233,6 @@ function UbicacionesPage() {
             </div>
           )}
 
-          {/* Pasillo padre (para armario, alto, cross) */}
           {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">Pasillo padre *</label>
@@ -234,23 +242,24 @@ function UbicacionesPage() {
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Selecciona un pasillo</option>
-                {secciones.map(seccion => (
+                {pasillosAgrupados.map(({ seccion, pasillos }) => (
                   <optgroup key={seccion.id} label={seccion.nombre}>
-                    {ubicaciones
-                      .filter(u => u.tipo === 'pasillo' && u.seccion === seccion.id)
-                      .map(p => (
-                        <option key={p.id} value={p.id}>{p.nombre}</option>
-                      ))
-                    }
+                    {pasillos.map(p => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
                   </optgroup>
                 ))}
               </select>
+              {pasillosAgrupados.length === 0 && (
+                <p className="text-sm text-red-600 mt-1">
+                  ⚠️ No hay pasillos creados. Primero crea un pasillo en la sección deseada.
+                </p>
+              )}
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Número (para armario, alto, caja) */}
           {(tipo === 'armario' || tipo === 'alto' || tipo === 'caja') && (
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">Número</label>
@@ -264,7 +273,6 @@ function UbicacionesPage() {
             </div>
           )}
 
-          {/* Sección origen (solo para cross) */}
           {tipo === 'cross' && (
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">Sección de origen de los productos *</label>
@@ -282,110 +290,57 @@ function UbicacionesPage() {
           )}
         </div>
 
-        {/* Posición lateral (para armario, alto, cross) */}
         {(tipo === 'armario' || tipo === 'alto' || tipo === 'cross') && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Posición lateral *</label>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="posicionLateral"
-                  value="izquierda"
-                  checked={posicionLateral === 'izquierda'}
-                  onChange={(e) => setPosicionLateral(e.target.value as any)}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="posicionLateral" value="izquierda" checked={posicionLateral === 'izquierda'} onChange={(e) => setPosicionLateral(e.target.value as any)} className="w-4 h-4 text-blue-600" />
                 <span>Izquierda</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="posicionLateral"
-                  value="derecha"
-                  checked={posicionLateral === 'derecha'}
-                  onChange={(e) => setPosicionLateral(e.target.value as any)}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="posicionLateral" value="derecha" checked={posicionLateral === 'derecha'} onChange={(e) => setPosicionLateral(e.target.value as any)} className="w-4 h-4 text-blue-600" />
                 <span>Derecha</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="posicionLateral"
-                  value="centro"
-                  checked={posicionLateral === 'centro'}
-                  onChange={(e) => setPosicionLateral(e.target.value as any)}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="posicionLateral" value="centro" checked={posicionLateral === 'centro'} onChange={(e) => setPosicionLateral(e.target.value as any)} className="w-4 h-4 text-blue-600" />
                 <span>Centro</span>
               </label>
             </div>
           </div>
         )}
 
-        {/* Posición longitudinal (solo para cross) */}
         {tipo === 'cross' && (
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Posición longitudinal *</label>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="posicionLongitudinal"
-                  value="principio"
-                  checked={posicionLongitudinal === 'principio'}
-                  onChange={(e) => setPosicionLongitudinal(e.target.value as any)}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="posicionLongitudinal" value="principio" checked={posicionLongitudinal === 'principio'} onChange={(e) => setPosicionLongitudinal(e.target.value as any)} className="w-4 h-4 text-blue-600" />
                 <span>Principio</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="posicionLongitudinal"
-                  value="final"
-                  checked={posicionLongitudinal === 'final'}
-                  onChange={(e) => setPosicionLongitudinal(e.target.value as any)}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="posicionLongitudinal" value="final" checked={posicionLongitudinal === 'final'} onChange={(e) => setPosicionLongitudinal(e.target.value as any)} className="w-4 h-4 text-blue-600" />
                 <span>Final</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="posicionLongitudinal"
-                  value="paso"
-                  checked={posicionLongitudinal === 'paso'}
-                  onChange={(e) => setPosicionLongitudinal(e.target.value as any)}
-                  className="w-4 h-4 text-blue-600"
-                />
+                <input type="radio" name="posicionLongitudinal" value="paso" checked={posicionLongitudinal === 'paso'} onChange={(e) => setPosicionLongitudinal(e.target.value as any)} className="w-4 h-4 text-blue-600" />
                 <span>Paso (entre secciones)</span>
               </label>
             </div>
           </div>
         )}
 
-        {/* Botones */}
         <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button
-            onClick={guardarUbicacion}
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium transition-colors"
-          >
+          <button onClick={guardarUbicacion} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium transition-colors">
             {editandoId ? 'Actualizar ubicación' : 'Crear ubicación'}
           </button>
-          <button
-            onClick={resetearFormulario}
-            className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 font-medium transition-colors"
-          >
+          <button onClick={resetearFormulario} className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300 font-medium transition-colors">
             Cancelar
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded border border-red-200 text-sm">
-            {error}
-          </div>
+          <div className="bg-red-50 text-red-700 p-3 rounded border border-red-200 text-sm">{error}</div>
         )}
       </div>
     )
@@ -442,20 +397,8 @@ function UbicacionesPage() {
                     {u.seccion_origen_nombre || u.seccion_nombre || '-'}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    <button
-                      onClick={() => editarUbicacion(u)}
-                      className="text-blue-600 hover:text-blue-800 mr-3 p-1 hover:bg-blue-50 rounded"
-                      title="Editar"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => eliminarUbicacion(u.id)}
-                      className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                      title="Desactivar"
-                    >
-                      🗑️
-                    </button>
+                    <button onClick={() => editarUbicacion(u)} className="text-blue-600 hover:text-blue-800 mr-3 p-1 hover:bg-blue-50 rounded" title="Editar">✏️</button>
+                    <button onClick={() => eliminarUbicacion(u.id)} className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded" title="Desactivar">🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -474,10 +417,7 @@ function UbicacionesPage() {
           <p className="text-sm text-gray-500 mt-1">Gestiona la estructura jerárquica de tu tienda.</p>
         </div>
         <button
-          onClick={() => {
-            resetearFormulario()
-            setMostrarFormulario(true)
-          }}
+          onClick={() => { resetearFormulario(); setMostrarFormulario(true) }}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
         >
           + Nueva ubicación
