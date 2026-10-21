@@ -146,3 +146,120 @@ export async function exportarMovimientos(formato: 'excel' | 'pdf', items: Movim
     doc.save(`${nombreArchivo}.pdf`);
   }
 }
+
+// ============================================
+// FUNCIONES PARA UBICACIONES JERÁRQUICAS (FASE 4)
+// ============================================
+
+export interface Seccion {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+}
+
+export interface UbicacionJerarquica {
+  id: string;
+  nombre: string;
+  tipo: 'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva';
+  id_ubicacion_padre: string | null;
+  seccion: string | null;
+  seccion_origen: string | null;
+  posicion_lateral: 'izquierda' | 'derecha' | 'centro' | null;
+  posicion_longitudinal: 'principio' | 'final' | 'paso' | null;
+  numero: number | null;
+  descripcion: string | null;
+  activo: boolean;
+  // Campos de relación para mostrar nombres en la UI
+  seccion_nombre?: string;
+  seccion_origen_nombre?: string;
+  ubicacion_padre_nombre?: string;
+}
+
+export async function obtenerSecciones(): Promise<Seccion[]> {
+  const { data, error } = await supabase
+    .from('secciones')
+    .select('*')
+    .eq('activo', true)
+    .order('nombre');
+  
+  if (error) throw error;
+  return data || [];
+}
+
+export async function obtenerUbicaciones(): Promise<UbicacionJerarquica[]> {
+  const { data, error } = await supabase
+    .from('ubicaciones')
+    .select(`
+      *,
+      seccion:seccion(nombre),
+      seccion_origen:seccion_origen(nombre),
+      ubicacion_padre:id_ubicacion_padre(nombre, tipo)
+    `)
+    .eq('activo', true)
+    .order('tipo')
+    .order('nombre');
+  
+  if (error) throw error;
+  
+  // Mapear para aplanar los nombres y que sea fácil de usar en la interfaz
+  return (data || []).map((u: any) => ({
+    ...u,
+    seccion_nombre: u.seccion?.nombre || null,
+    seccion_origen_nombre: u.seccion_origen?.nombre || null,
+    ubicacion_padre_nombre: u.ubicacion_padre?.nombre || null,
+  }));
+}
+
+export async function crearUbicacion(ubicacion: {
+  nombre: string;
+  tipo: 'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva';
+  id_ubicacion_padre?: string | null;
+  seccion?: string | null;
+  seccion_origen?: string | null;
+  posicion_lateral?: 'izquierda' | 'derecha' | 'centro' | null;
+  posicion_longitudinal?: 'principio' | 'final' | 'paso' | null;
+  numero?: number | null;
+  descripcion?: string | null;
+}) {
+  const { data, error } = await supabase
+    .from('ubicaciones')
+    .insert([ubicacion])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+}
+
+export async function actualizarUbicacion(id: string, ubicacion: Partial<{
+  nombre: string;
+  tipo: 'pasillo' | 'armario' | 'alto' | 'cross' | 'caja' | 'reserva';
+  id_ubicacion_padre?: string | null;
+  seccion?: string | null;
+  seccion_origen?: string | null;
+  posicion_lateral?: 'izquierda' | 'derecha' | 'centro' | null;
+  posicion_longitudinal?: 'principio' | 'final' | 'paso' | null;
+  numero?: number | null;
+  descripcion?: string | null;
+  activo?: boolean;
+}>) {
+  const { data, error } = await supabase
+    .from('ubicaciones')
+    .update(ubicacion)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+}
+
+export async function desactivarUbicacion(id: string) {
+  const { error } = await supabase
+    .from('ubicaciones')
+    .update({ activo: false })
+    .eq('id', id);
+  
+  if (error) throw error;
+}
