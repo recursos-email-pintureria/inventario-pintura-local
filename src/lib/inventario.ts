@@ -398,6 +398,113 @@ export async function crearMovimientoConStock(datos: {
   return { nuevaCantidad };
 }
 
+// NUEVA FUNCIÓN: Traslado entre ubicaciones (resta de origen y suma en destino en 1 paso)
+export async function crearTraslado(datos: { 
+  id_producto: string; 
+  id_ubicacion_origen: string; 
+  id_ubicacion_destino: string; 
+  cantidad: number; 
+  notas: string 
+}) {
+  validarCantidad(datos.cantidad);
+  if (!datos.id_producto) throw new Error('Selecciona un producto.');
+  if (!datos.id_ubicacion_origen) throw new Error('Selecciona la ubicación de origen.');
+  if (!datos.id_ubicacion_destino) throw new Error('Selecciona la ubicación de destino.');
+  if (datos.id_ubicacion_origen === datos.id_ubicacion_destino) {
+    throw new Error('La ubicación de origen y destino no pueden ser la misma.');
+  }
+  
+  const user = await usuarioActual();
+  const fecha = new Date().toISOString();
+  
+  // 1. Verificar stock en origen
+  const { data: stockOrigen, error: errorOrigen } = await supabase
+    .from('stock')
+    .select('cantidad')
+    .eq('id_producto', datos.id_producto)
+    .eq('id_ubicacion', datos.id_ubicacion_origen)
+    .maybeSingle();
+  
+  if (errorOrigen) throw errorOrigen;
+  
+  const cantidadEnOrigen = stockOrigen?.cantidad || 0;
+  if (cantidadEnOrigen < datos.cantidad) {
+    throw new Error(`No hay stock suficiente en origen. Stock actual: ${cantidadEnOrigen}`);
+  }
+  
+  // 2. Crear movimiento de SALIDA del origen
+  const { error: movSalida } = await supabase
+    .from('movimientos')
+    .insert({ 
+      id_producto: datos.id_producto,
+      id_ubicacion: datos.id_ubicacion_origen,
+      tipo: 'salida' as TipoMovimiento,
+      cantidad: datos.cantidad,
+      precio_unitario: null,
+      precio_total: null,
+      notas: `TRASLADO → ${datos.notas || 'Sin notas'}`,
+      realizado_por: user.id,
+      fecha_movimiento: fecha
+    });
+  if (movSalida) throw movSalida;
+  
+  // 3. Crear movimiento de ENTRADA en el destino
+  const { error: movEntrada } = await supabase
+    .from('movimientos')
+    .insert({ 
+      id_producto: datos.id_producto,
+      id_ubicacion: datos.id_ubicacion_destino,
+      tipo: 'entrada' as TipoMovimiento,
+      cantidad: datos.cantidad,
+      precio_unitario: null,
+      precio_total: null,
+      notas: `TRASLADO desde origen → ${datos.notas || 'Sin notas'}`,
+      realizado_por: user.id,
+      fecha_movimiento: fecha
+    });
+  if (movEntrada) throw movEntrada;
+  
+  // 4. Restar del origen
+  const nuevaCantidadOrigen = cantidadEnOrigen - datos.cantidad;
+  const { error: updateOrigen } = await supabase
+    .from('stock')
+    .update({ cantidad: nuevaCantidadOrigen })
+    .eq('id_producto', datos.id_producto)
+    .eq('id_ubicacion', datos.id_ubicacion_origen);
+  if (updateOrigen) throw updateOrigen;
+  
+  // 5. Sumar en el destino
+  const { data: stockDestino } = await supabase
+    .from('stock')
+    .select('cantidad')
+    .eq('id_producto', datos.id_producto)
+    .eq('id_ubicacion', datos.id_ubicacion_destino)
+    .maybeSingle();
+  
+  const cantidadEnDestino = stockDestino?.cantidad || 0;
+  const nuevaCantidadDestino = cantidadEnDestino + datos.cantidad;
+  
+  if (stockDestino) {
+    const { error: updateDestino } = await supabase
+      .from('stock')
+      .update({ cantidad: nuevaCantidadDestino })
+      .eq('id_producto', datos.id_producto)
+      .eq('id_ubicacion', datos.id_ubicacion_destino);
+    if (updateDestino) throw updateDestino;
+  } else {
+    const { error: insertDestino } = await supabase
+      .from('stock')
+      .insert({ 
+        id_producto: datos.id_producto, 
+        id_ubicacion: datos.id_ubicacion_destino, 
+        cantidad: nuevaCantidadDestino 
+      });
+    if (insertDestino) throw insertDestino;
+  }
+  
+  return { nuevaCantidadOrigen, nuevaCantidadDestino };
+}
+
 export async function obtenerStockActual(id_producto: string, id_ubicacion: string): Promise<number> {
   const { data } = await supabase
     .from('stock')
@@ -406,4 +513,16 @@ export async function obtenerStockActual(id_producto: string, id_ubicacion: stri
     .eq('id_ubicacion', id_ubicacion)
     .maybeSingle();
   return data?.cantidad || 0;
+}
+
+// Obtener todas las ubicaciones donde hay stock de un producto
+export async function obtenerUbicacionesConStock(id_producto: string): Promise<{ id_ubicacion: string; cantidad: number }[]> {
+  const { data, error } = await supabase
+    .from('stock')
+    .select('id_ubicacion, cantidad')
+    .eq('id_producto', id_producto)
+    .gt('cantidad', 0);
+  
+  if (error) throw error;
+  return data || [];
 }

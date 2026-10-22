@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Plus, Search, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowUpFromLine, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowUpFromLine, RotateCcw, SlidersHorizontal, ArrowRightLeft, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,7 +17,7 @@ import { pageHead } from '@/lib/meta';
 import { useMyProfile } from '@/hooks/usePermissions';
 import { 
   inventarioQueryOptions, usuarioActual, permisoExplicito, 
-  crearMovimientoConStock, obtenerStockActual,
+  crearMovimientoConStock, crearTraslado, obtenerStockActual, obtenerUbicacionesConStock,
   errorInventario, formatoPrecio, formatoFecha, 
   filtrarMovimientos, exportarMovimientos,
   type Movimiento, type FiltrosMovimiento 
@@ -25,7 +25,7 @@ import {
 import { CargandoInventario, ErrorInventario } from '@/components/inventario/EstadoInventario';
 
 export const Route = createFileRoute('/_authenticated/movimientos')({
-  head: () => pageHead('Movimientos', 'Registro de entradas y salidas de stock.'),
+  head: () => pageHead('Movimientos', 'Registro de entradas, salidas, traslados y ajustes de stock.'),
   loader: async ({ context }) => { 
     const user = await usuarioActual(); 
     await context.queryClient.ensureQueryData(inventarioQueryOptions(user.id)); 
@@ -43,30 +43,36 @@ const CONFIG_TIPOS = {
     icon: ArrowDownToLine, 
     color: 'bg-green-100 text-green-800 border-green-200',
     colorBtn: 'bg-green-600 hover:bg-green-700',
-    descripcion: 'Mercancía recibida'
+    descripcion: 'Mercancía recibida',
+    emoji: ''
   },
   salida: { 
     label: 'Salida', 
     icon: ArrowUpFromLine, 
     color: 'bg-red-100 text-red-800 border-red-200',
     colorBtn: 'bg-red-600 hover:bg-red-700',
-    descripcion: 'Venta o consumo'
+    descripcion: 'Venta o consumo',
+    emoji: '📤'
   },
-  reposicion: { 
-    label: 'Reposición', 
-    icon: RotateCcw, 
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    colorBtn: 'bg-yellow-600 hover:bg-yellow-700',
-    descripcion: 'Reponer desde reserva'
+  traslado: { 
+    label: 'Traslado', 
+    icon: ArrowRightLeft, 
+    color: 'bg-purple-100 text-purple-800 border-purple-200',
+    colorBtn: 'bg-purple-600 hover:bg-purple-700',
+    descripcion: 'Mover entre ubicaciones',
+    emoji: '🔄'
   },
   ajuste: { 
     label: 'Ajuste', 
     icon: SlidersHorizontal, 
     color: 'bg-blue-100 text-blue-800 border-blue-200',
     colorBtn: 'bg-blue-600 hover:bg-blue-700',
-    descripcion: 'Corrección de inventario'
+    descripcion: 'Corrección de inventario',
+    emoji: '🔧'
   },
 } as const;
+
+type TipoMovimientoForm = 'entrada' | 'salida' | 'traslado' | 'ajuste';
 
 function MovimientosPage() {
   const { userId } = Route.useLoaderData();
@@ -79,14 +85,24 @@ function MovimientosPage() {
   const [abierto, setAbierto] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   const [productoId, setProductoId] = useState('');
+  const [tipo, setTipo] = useState<TipoMovimientoForm>('entrada');
+  
+  // Para entrada/salida/ajuste: una sola ubicación
   const [ubicacionPadreId, setUbicacionPadreId] = useState('');
   const [ubicacionId, setUbicacionId] = useState('');
-  const [tipo, setTipo] = useState<'entrada' | 'salida' | 'reposicion' | 'ajuste'>('entrada');
+  
+  // Para traslado: origen y destino
+  const [ubicacionOrigenPadreId, setUbicacionOrigenPadreId] = useState('');
+  const [ubicacionOrigenId, setUbicacionOrigenId] = useState('');
+  const [ubicacionDestinoPadreId, setUbicacionDestinoPadreId] = useState('');
+  const [ubicacionDestinoId, setUbicacionDestinoId] = useState('');
+  
   const [cantidad, setCantidad] = useState('');
   const [precio, setPrecio] = useState('');
   const [notas, setNotas] = useState('');
   const [error, setError] = useState('');
   const [stockActual, setStockActual] = useState<number | null>(null);
+  const [ubicacionesConStock, setUbicacionesConStock] = useState<{ id_ubicacion: string; cantidad: number }[]>([]);
 
   // Filtros
   const [filtros, setFiltros] = useState<FiltrosMovimiento>({
@@ -103,18 +119,30 @@ function MovimientosPage() {
     mutationFn: async () => {
       if (!puedeCrear) throw new Error('No tienes permiso para crear movimientos.');
       if (!productoId) throw new Error('Selecciona un producto.');
-      if (!ubicacionId) throw new Error('Selecciona una ubicación.');
       const cant = Number(cantidad);
       if (!cant || cant <= 0) throw new Error('Introduce una cantidad válida.');
 
-      await crearMovimientoConStock({
-        id_producto: productoId,
-        id_ubicacion: ubicacionId,
-        tipo,
-        cantidad: cant,
-        precio_unitario: precio === '' ? null : Number(precio),
-        notas,
-      });
+      if (tipo === 'traslado') {
+        if (!ubicacionOrigenId) throw new Error('Selecciona la ubicación de origen.');
+        if (!ubicacionDestinoId) throw new Error('Selecciona la ubicación de destino.');
+        await crearTraslado({
+          id_producto: productoId,
+          id_ubicacion_origen: ubicacionOrigenId,
+          id_ubicacion_destino: ubicacionDestinoId,
+          cantidad: cant,
+          notas,
+        });
+      } else {
+        if (!ubicacionId) throw new Error('Selecciona una ubicación.');
+        await crearMovimientoConStock({
+          id_producto: productoId,
+          id_ubicacion: ubicacionId,
+          tipo: tipo as any,
+          cantidad: cant,
+          precio_unitario: precio === '' ? null : Number(precio),
+          notas,
+        });
+      }
     },
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ['inventario', userId] });
@@ -129,12 +157,17 @@ function MovimientosPage() {
     setProductoId('');
     setUbicacionPadreId('');
     setUbicacionId('');
+    setUbicacionOrigenPadreId('');
+    setUbicacionOrigenId('');
+    setUbicacionDestinoPadreId('');
+    setUbicacionDestinoId('');
     setTipo('entrada');
     setCantidad('');
     setPrecio('');
     setNotas('');
     setError('');
     setStockActual(null);
+    setUbicacionesConStock([]);
   }
 
   async function abrirModal() {
@@ -142,14 +175,25 @@ function MovimientosPage() {
     setAbierto(true);
   }
 
+  // Cuando cambia el producto, cargar sus ubicaciones con stock
+  useEffect(() => {
+    if (productoId) {
+      obtenerUbicacionesConStock(productoId).then(setUbicacionesConStock);
+    } else {
+      setUbicacionesConStock([]);
+    }
+  }, [productoId]);
+
   // Cuando cambia la ubicación, cargar stock actual
   useEffect(() => {
-    if (productoId && ubicacionId) {
+    if (productoId && ubicacionId && tipo !== 'traslado') {
       obtenerStockActual(productoId, ubicacionId).then(setStockActual);
+    } else if (productoId && ubicacionOrigenId && tipo === 'traslado') {
+      obtenerStockActual(productoId, ubicacionOrigenId).then(setStockActual);
     } else {
       setStockActual(null);
     }
-  }, [productoId, ubicacionId]);
+  }, [productoId, ubicacionId, ubicacionOrigenId, tipo]);
 
   function seleccionarProductoDesdeEscaneo(codigo: string) {
     const producto = data.productos.find(p => p.codigo_barras === codigo || p.sku === codigo);
@@ -163,7 +207,75 @@ function MovimientosPage() {
   }
 
   const productoSeleccionado = data.productos.find(p => p.id === productoId);
-  const ubicacionSeleccionada = data.ubicaciones.find(u => u.id === ubicacionId);
+
+  // Renderizar selectores de ubicación (reutilizable)
+  function renderSelectoresUbicacion(
+    labelZona: string,
+    labelUbicacion: string,
+    padreId: string,
+    setPadreId: (v: string) => void,
+    ubicacionIdVal: string,
+    setUbicacionIdVal: (v: string) => void,
+    disabled: boolean = false
+  ) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-sm font-medium">1. {labelZona} *</Label>
+          <Select 
+            value={padreId} 
+            onValueChange={(v) => { setPadreId(v); setUbicacionIdVal(v); }}
+            disabled={disabled}
+          >
+            <SelectTrigger><SelectValue placeholder="Elige pasillo o reserva..." /></SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel className="text-xs font-bold text-blue-700">🛣️ PASILLOS</SelectLabel>
+                {data.ubicaciones.filter((u: any) => u.tipo === 'pasillo').map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>🛣️ {p.nombre}</SelectItem>
+                ))}
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel className="text-xs font-bold text-gray-700">🏭 RESERVA</SelectLabel>
+                {data.ubicaciones.filter((u: any) => u.tipo === 'reserva').map((r: any) => (
+                  <SelectItem key={r.id} value={r.id}>🏭 {r.nombre}</SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-sm font-medium">2. {labelUbicacion} *</Label>
+          <Select 
+            value={ubicacionIdVal} 
+            onValueChange={setUbicacionIdVal}
+            disabled={!padreId || disabled}
+          >
+            <SelectTrigger><SelectValue placeholder="Elige ubicación..." /></SelectTrigger>
+            <SelectContent>
+              {padreId && (
+                <>
+                  <SelectItem value={padreId}>
+                    📍 {data.ubicaciones.find((u: any) => u.id === padreId)?.nombre} (General)
+                  </SelectItem>
+                  {data.ubicaciones
+                    .filter((h: any) => h.id_ubicacion_padre === padreId)
+                    .map((h: any) => (
+                      <SelectItem key={h.id} value={h.id}>
+                        <span className="pl-2">
+                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {' '}{h.nombre} ({h.tipo})
+                        </span>
+                      </SelectItem>
+                    ))}
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -200,7 +312,7 @@ function MovimientosPage() {
                 <SelectContent>
                   <SelectItem value="">Todos los tipos</SelectItem>
                   {Object.entries(CONFIG_TIPOS).map(([key, cfg]) => (
-                    <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    <SelectItem key={key} value={key}>{cfg.emoji} {cfg.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -274,11 +386,10 @@ function MovimientosPage() {
               </TableHeader>
               <TableBody>
                 {movimientosFiltrados.map((m: Movimiento) => {
-                  const cfg = CONFIG_TIPOS[m.tipo];
+                  const cfg = CONFIG_TIPOS[m.tipo as keyof typeof CONFIG_TIPOS] || CONFIG_TIPOS.entrada;
                   const Icon = cfg.icon;
                   const producto = data.productos.find(p => p.id === m.id_producto);
                   const ubicacion = data.ubicaciones.find(u => u.id === m.id_ubicacion);
-                  const usuario = data.perfiles.find(p => p.id === m.realizado_por);
                   return (
                     <TableRow key={m.id}>
                       <TableCell className="text-xs whitespace-nowrap">{formatoFecha(m.fecha_movimiento)}</TableCell>
@@ -312,20 +423,20 @@ function MovimientosPage() {
 
       {/* MODAL NUEVO MOVIMIENTO */}
       <Dialog open={abierto} onOpenChange={o => { if (!o && !crear.isPending) { setAbierto(false); resetearFormulario(); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Nuevo movimiento de stock
             </DialogTitle>
             <DialogDescription>
-              Registra una entrada, salida, reposición o ajuste. El stock se actualizará automáticamente.
+              Registra una entrada, salida, traslado o ajuste. El stock se actualizará automáticamente.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={(e: FormEvent) => { e.preventDefault(); crear.mutate(); }} className="space-y-4">
             
-            {/* TIPO DE MOVIMIENTO - Selector visual */}
+            {/* TIPO DE MOVIMIENTO - Selector visual con 4 opciones */}
             <div>
               <Label className="text-sm font-semibold mb-2 block">Tipo de movimiento</Label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -336,14 +447,14 @@ function MovimientosPage() {
                     <button
                       key={key}
                       type="button"
-                      onClick={() => setTipo(key as any)}
+                      onClick={() => setTipo(key as TipoMovimientoForm)}
                       className={`p-3 rounded-lg border-2 transition-all text-left ${
                         activo 
                           ? `${cfg.color} border-current ring-2 ring-offset-1` 
                           : 'bg-background border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <Icon className="h-5 w-5 mb-1" />
+                      <div className="text-2xl mb-1">{cfg.emoji}</div>
                       <div className="font-semibold text-sm">{cfg.label}</div>
                       <div className="text-xs opacity-75">{cfg.descripcion}</div>
                     </button>
@@ -383,72 +494,86 @@ function MovimientosPage() {
               )}
             </div>
 
-            {/* UBICACIÓN - Sistema de 2 selects */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="mov-zona">1. Zona *</Label>
-                <Select 
-                  value={ubicacionPadreId} 
-                  onValueChange={(v) => { setUbicacionPadreId(v); setUbicacionId(v); }}
-                  disabled={crear.isPending}
-                >
-                  <SelectTrigger><SelectValue placeholder="Elige pasillo o reserva..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-bold text-blue-700">🛣️ PASILLOS</SelectLabel>
-                      {data.ubicaciones.filter((u: any) => u.tipo === 'pasillo').map((p: any) => (
-                        <SelectItem key={p.id} value={p.id}>🛣️ {p.nombre}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="text-xs font-bold text-gray-700"> RESERVA</SelectLabel>
-                      {data.ubicaciones.filter((u: any) => u.tipo === 'reserva').map((r: any) => (
-                        <SelectItem key={r.id} value={r.id}>🏭 {r.nombre}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="mov-ubicacion">2. Ubicación específica *</Label>
-                <Select 
-                  value={ubicacionId} 
-                  onValueChange={setUbicacionId}
-                  disabled={!ubicacionPadreId || crear.isPending}
-                >
-                  <SelectTrigger><SelectValue placeholder="Elige ubicación..." /></SelectTrigger>
-                  <SelectContent>
-                    {ubicacionPadreId && (
-                      <>
-                        <SelectItem value={ubicacionPadreId}>
-                          📍 {data.ubicaciones.find((u: any) => u.id === ubicacionPadreId)?.nombre} (General)
-                        </SelectItem>
-                        {data.ubicaciones
-                          .filter((h: any) => h.id_ubicacion_padre === ubicacionPadreId)
-                          .map((h: any) => (
-                            <SelectItem key={h.id} value={h.id}>
-                              <span className="pl-2">
-                                {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
-                                {' '}{h.nombre} ({h.tipo})
-                              </span>
-                            </SelectItem>
-                          ))}
-                      </>
+            {/* UBICACIONES - Diferentes según el tipo */}
+            {tipo === 'traslado' ? (
+              <>
+                {/* Para TRASLADO: Origen y Destino */}
+                <div className="space-y-3">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <Label className="text-sm font-semibold text-red-800 flex items-center gap-2 mb-2">
+                      <ArrowUpFromLine className="h-4 w-4" />
+                      Ubicación de ORIGEN (de dónde se saca)
+                    </Label>
+                    {renderSelectoresUbicacion(
+                      'Zona origen',
+                      'Ubicación origen',
+                      ubicacionOrigenPadreId,
+                      setUbicacionOrigenPadreId,
+                      ubicacionOrigenId,
+                      setUbicacionOrigenId
                     )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  </div>
 
-            {/* STOCK ACTUAL */}
-            {stockActual !== null && ubicacionSeleccionada && productoSeleccionado && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <Label className="text-sm font-semibold text-green-800 flex items-center gap-2 mb-2">
+                      <ArrowDownToLine className="h-4 w-4" />
+                      Ubicación de DESTINO (a dónde se lleva)
+                    </Label>
+                    {renderSelectoresUbicacion(
+                      'Zona destino',
+                      'Ubicación destino',
+                      ubicacionDestinoPadreId,
+                      setUbicacionDestinoPadreId,
+                      ubicacionDestinoId,
+                      setUbicacionDestinoId
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Para ENTRADA/SALIDA/AJUSTE: Una sola ubicación */}
+                {renderSelectoresUbicacion(
+                  'Zona',
+                  'Ubicación específica',
+                  ubicacionPadreId,
+                  setUbicacionPadreId,
+                  ubicacionId,
+                  setUbicacionId
+                )}
+              </>
+            )}
+
+            {/* INFO DE STOCK ACTUAL */}
+            {stockActual !== null && productoSeleccionado && (
               <div className="bg-muted/50 border rounded-md p-3 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  Stock actual de <strong>{productoSeleccionado.nombre}</strong> en <strong>{ubicacionSeleccionada.nombre}</strong>:
+                  {tipo === 'traslado' ? 'Stock en origen:' : 'Stock actual:'}
                 </span>
                 <Badge variant="secondary" className="text-lg px-3 py-1">
                   {stockActual} uds
                 </Badge>
+              </div>
+            )}
+
+            {/* Mostrar ubicaciones donde hay stock del producto (útil para traslado) */}
+            {tipo === 'traslado' && productoId && ubicacionesConStock.length > 0 && (
+              <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                <Label className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Este producto está actualmente en:
+                </Label>
+                <div className="space-y-1">
+                  {ubicacionesConStock.map((item) => {
+                    const ubi = data.ubicaciones.find((u: any) => u.id === item.id_ubicacion);
+                    return (
+                      <div key={item.id_ubicacion} className="flex justify-between text-sm">
+                        <span>{ubi?.nombre || 'Desconocida'}</span>
+                        <Badge variant="outline">{item.cantidad} uds</Badge>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -468,19 +593,21 @@ function MovimientosPage() {
                   placeholder="Ej: 10"
                 />
               </div>
-              <div>
-                <Label htmlFor="mov-precio">Precio unitario (opcional)</Label>
-                <Input 
-                  id="mov-precio"
-                  type="number" 
-                  min="0" 
-                  step="0.01"
-                  value={precio} 
-                  onChange={e => setPrecio(e.target.value)} 
-                  disabled={crear.isPending} 
-                  placeholder="Ej: 3.29"
-                />
-              </div>
+              {tipo !== 'traslado' && (
+                <div>
+                  <Label htmlFor="mov-precio">Precio unitario (opcional)</Label>
+                  <Input 
+                    id="mov-precio"
+                    type="number" 
+                    min="0" 
+                    step="0.01"
+                    value={precio} 
+                    onChange={e => setPrecio(e.target.value)} 
+                    disabled={crear.isPending} 
+                    placeholder="Ej: 3.29"
+                  />
+                </div>
+              )}
             </div>
 
             {/* NOTAS */}
@@ -504,7 +631,7 @@ function MovimientosPage() {
               </Button>
               <Button 
                 type="submit" 
-                disabled={crear.isPending || !productoId || !ubicacionId || !cantidad}
+                disabled={crear.isPending || !productoId || !cantidad || (tipo !== 'traslado' && !ubicacionId) || (tipo === 'traslado' && (!ubicacionOrigenId || !ubicacionDestinoId))}
                 className={CONFIG_TIPOS[tipo].colorBtn}
               >
                 {crear.isPending ? 'Registrando...' : `Registrar ${CONFIG_TIPOS[tipo].label}`}
