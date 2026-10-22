@@ -525,3 +525,72 @@ export async function obtenerUbicacionesConStock(id_producto: string): Promise<{
   if (error) throw error;
   return data || [];
 }
+
+// ============================================
+// LIMPIAR STOCK DE LINEALES (PASILLOS)
+// ============================================
+
+export async function limpiarStockLineales(): Promise<{ productosAfectados: number }> {
+  const user = await usuarioActual();
+  const fecha = new Date().toISOString();
+  
+  // 1. Obtener todas las ubicaciones de tipo 'pasillo' (lineales)
+  const { data: lineales, error: errorLineales } = await supabase
+    .from('ubicaciones')
+    .select('id, nombre')
+    .eq('tipo', 'pasillo')
+    .eq('activo', true);
+  
+  if (errorLineales) throw errorLineales;
+  if (!lineales || lineales.length === 0) {
+    return { productosAfectados: 0 };
+  }
+  
+  const idsLineales = lineales.map(l => l.id);
+  
+  // 2. Obtener todo el stock en esos lineales
+  const { data: stockLineales, error: errorStock } = await supabase
+    .from('stock')
+    .select('id_producto, id_ubicacion, cantidad')
+    .in('id_ubicacion', idsLineales)
+    .gt('cantidad', 0);
+  
+  if (errorStock) throw errorStock;
+  if (!stockLineales || stockLineales.length === 0) {
+    return { productosAfectados: 0 };
+  }
+  
+  let productosAfectados = 0;
+  
+  // 3. Para cada stock en lineal, crear movimiento de ajuste a 0 y actualizar stock
+  for (const stock of stockLineales) {
+    // Crear movimiento de ajuste
+    const { error: movError } = await supabase
+      .from('movimientos')
+      .insert({
+        id_producto: stock.id_producto,
+        id_ubicacion: stock.id_ubicacion,
+        tipo: 'ajuste' as TipoMovimiento,
+        cantidad: 0,
+        precio_unitario: null,
+        notas: `LIMPIEZA AUTOMÁTICA - Stock reseteado a 0 (tenía ${stock.cantidad} uds)`,
+        realizado_por: user.id,
+        fecha_movimiento: fecha
+      });
+    
+    if (movError) throw movError;
+    
+    // Actualizar stock a 0
+    const { error: updateError } = await supabase
+      .from('stock')
+      .update({ cantidad: 0 })
+      .eq('id_producto', stock.id_producto)
+      .eq('id_ubicacion', stock.id_ubicacion);
+    
+    if (updateError) throw updateError;
+    
+    productosAfectados++;
+  }
+  
+  return { productosAfectados };
+}
