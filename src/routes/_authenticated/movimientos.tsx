@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin } from 'lucide-react';
+import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin, LayoutGrid, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -36,7 +36,6 @@ export const Route = createFileRoute('/_authenticated/movimientos')({
   component: MovimientosPage,
 });
 
-// Solo 3 tipos: Entrada, Traslado, Ajuste
 const CONFIG_TIPOS = {
   entrada: { 
     label: 'Entrada', 
@@ -44,7 +43,7 @@ const CONFIG_TIPOS = {
     color: 'bg-green-100 text-green-800 border-green-200',
     colorBtn: 'bg-green-600 hover:bg-green-700',
     descripcion: 'Mercancía nueva del proveedor',
-    emoji: '📥'
+    emoji: ''
   },
   traslado: { 
     label: 'Traslado', 
@@ -65,6 +64,7 @@ const CONFIG_TIPOS = {
 } as const;
 
 type TipoMovimientoForm = 'entrada' | 'traslado' | 'ajuste';
+type VistaActual = 'stock' | 'historial';
 
 function MovimientosPage() {
   const { userId } = Route.useLoaderData();
@@ -74,6 +74,7 @@ function MovimientosPage() {
   const puedeVer = data.puedeVerMovimientos;
   const client = useQueryClient();
 
+  const [vista, setVista] = useState<VistaActual>('stock');
   const [abierto, setAbierto] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   const [productoId, setProductoId] = useState('');
@@ -239,7 +240,7 @@ function MovimientosPage() {
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-gray-700">🏭 RESERVA</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'reserva').map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}> {r.nombre}</SelectItem>
+                  <SelectItem key={r.id} value={r.id}>🏭 {r.nombre}</SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
@@ -264,7 +265,7 @@ function MovimientosPage() {
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -278,6 +279,62 @@ function MovimientosPage() {
     );
   }
 
+  // ✅ NUEVA FUNCIÓN: Calcular stock por ubicación
+  function calcularStockPorUbicacion() {
+    const stockMap = new Map<string, { cantidad: number; ultimoMovimiento?: Movimiento }>();
+    
+    // Inicializar todas las ubicaciones con 0
+    data.ubicaciones.forEach(u => {
+      stockMap.set(u.id, { cantidad: 0 });
+    });
+    
+    // Calcular stock actual basado en movimientos
+    data.movimientos.forEach(m => {
+      const actual = stockMap.get(m.id_ubicacion);
+      if (actual) {
+        if (m.tipo === 'entrada' || m.tipo === 'reposicion') {
+          actual.cantidad += m.cantidad;
+        } else if (m.tipo === 'salida') {
+          actual.cantidad -= m.cantidad;
+        } else if (m.tipo === 'ajuste') {
+          actual.cantidad = m.cantidad;
+        }
+        actual.ultimoMovimiento = m;
+      }
+    });
+    
+    return stockMap;
+  }
+
+  const stockPorUbicacion = calcularStockPorUbicacion();
+
+  // Agrupar stock por pasillo/reserva (padre)
+  function getStockAgrupado() {
+    const padres = data.ubicaciones.filter((u: any) => u.tipo === 'pasillo' || u.tipo === 'reserva');
+    const hijos = data.ubicaciones.filter((u: any) => u.tipo !== 'pasillo' && u.tipo !== 'reserva');
+    
+    return padres.map((padre: any) => {
+      const hijosConStock = hijos
+        .filter((h: any) => h.id_ubicacion_padre === padre.id)
+        .map(hijo => {
+          const stock = stockPorUbicacion.get(hijo.id);
+          return { ...hijo, stock: stock?.cantidad || 0, ultimoMovimiento: stock?.ultimoMovimiento };
+        })
+        .filter(h => h.stock > 0);
+      
+      const stockPadre = stockPorUbicacion.get(padre.id);
+      
+      return {
+        padre,
+        stockPadre: stockPadre?.cantidad || 0,
+        ultimoMovimientoPadre: stockPadre?.ultimoMovimiento,
+        hijos: hijosConStock
+      };
+    }).filter(g => g.stockPadre > 0 || g.hijos.length > 0);
+  }
+
+  const stockAgrupado = getStockAgrupado();
+
   return (
     <>
       <PageHeader 
@@ -290,126 +347,253 @@ function MovimientosPage() {
         ) : undefined} 
       />
 
-      {puedeVer && (
-        <Card className="p-4 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold">Filtros</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* TABS: Stock actual / Historial */}
+      <div className="flex gap-2 mb-4 border-b">
+        <button
+          onClick={() => setVista('stock')}
+          className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+            vista === 'stock' 
+              ? 'border-blue-600 text-blue-600' 
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <LayoutGrid className="h-4 w-4 inline mr-2" />
+          Stock por Ubicación
+        </button>
+        <button
+          onClick={() => setVista('historial')}
+          className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+            vista === 'historial' 
+              ? 'border-blue-600 text-blue-600' 
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <History className="h-4 w-4 inline mr-2" />
+          Historial de Movimientos
+        </button>
+      </div>
+
+      {/* VISTA 1: STOCK POR UBICACIÓN */}
+      {vista === 'stock' && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <Label className="text-xs">Desde</Label>
-              <Input type="date" value={filtros.desde} onChange={e => setFiltros({ ...filtros, desde: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Hasta</Label>
-              <Input type="date" value={filtros.hasta} onChange={e => setFiltros({ ...filtros, hasta: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Select value={filtros.tipo} onValueChange={v => setFiltros({ ...filtros, tipo: v })}>
-                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Todos los tipos</SelectItem>
-                  {Object.entries(CONFIG_TIPOS).map(([key, cfg]) => (
-                    <SelectItem key={key} value={key}>{cfg.emoji} {cfg.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Producto</Label>
-              <Select value={filtros.producto} onValueChange={v => setFiltros({ ...filtros, producto: v })}>
-                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent className="max-h-80">
-                  <SelectItem value="">Todos los productos</SelectItem>
-                  {data.productos.filter(p => p.activo).map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Ubicación</Label>
-              <Select value={filtros.ubicacion} onValueChange={v => setFiltros({ ...filtros, ubicacion: v })}>
-                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-                <SelectContent className="max-h-80">
-                  <SelectItem value="">Todas las ubicaciones</SelectItem>
-                  {data.ubicaciones.map(u => (
-                    <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <h3 className="text-lg font-semibold">Stock actual por ubicación</h3>
+              <p className="text-sm text-muted-foreground">
+                {stockAgrupado.length} ubicaciones con stock · Total: {stockAgrupado.reduce((sum, g) => sum + g.stockPadre + g.hijos.reduce((s, h) => s + h.stock, 0), 0)} unidades
+              </p>
             </div>
           </div>
-          <div className="flex justify-between items-center mt-4 pt-3 border-t">
-            <span className="text-sm text-muted-foreground">
-              {movimientosFiltrados.length} movimiento{movimientosFiltrados.length !== 1 ? 's' : ''}
-            </span>
-            {movimientosFiltrados.length > 0 && (
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => exportarMovimientos('excel', movimientosFiltrados, data)}>
-                  <Download className="h-4 w-4 mr-1" /> Excel
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => exportarMovimientos('pdf', movimientosFiltrados, data)}>
-                  <Download className="h-4 w-4 mr-1" /> PDF
-                </Button>
-              </div>
-            )}
-          </div>
+
+          {stockAgrupado.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No hay stock en ninguna ubicación.</p>
+              <p className="text-xs mt-1">Usa "Nuevo movimiento" → "Entrada" para añadir stock inicial.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {stockAgrupado.map(({ padre, stockPadre, ultimoMovimientoPadre, hijos }) => (
+                <div key={padre.id} className="border rounded-lg overflow-hidden">
+                  {/* Cabecera del pasillo/reserva */}
+                  <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{padre.tipo === 'pasillo' ? '🛣️' : '🏭'}</span>
+                      <div>
+                        <h4 className="font-semibold text-sm">{padre.nombre}</h4>
+                        {padre.descripcion && <p className="text-xs text-muted-foreground">{padre.descripcion}</p>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {stockPadre > 0 && (
+                        <div>
+                          <Badge variant="secondary" className="text-lg px-3 py-1">
+                            {stockPadre} uds
+                          </Badge>
+                          {ultimoMovimientoPadre && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Último: {formatoFecha(ultimoMovimientoPadre.fecha_movimiento)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Hijos con stock */}
+                  {hijos.length > 0 && (
+                    <div className="divide-y">
+                      {hijos.map(hijo => {
+                        const usuario = data.perfiles.find(p => p.id === hijo.ultimoMovimiento?.realizado_por);
+                        return (
+                          <div key={hijo.id} className="px-4 py-3 pl-12 bg-white flex items-center justify-between hover:bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground text-xs">└─</span>
+                              <span className="text-base">
+                                {hijo.tipo === 'armario' ? '🗄️' : hijo.tipo === 'alto' ? '📦' : hijo.tipo === 'cross' ? '🔄' : hijo.tipo === 'caja' ? '💳' : '📍'}
+                              </span>
+                              <div>
+                                <span className="font-medium text-sm">{hijo.nombre}</span>
+                                <Badge variant="outline" className="ml-2 text-xs">{hijo.tipo}</Badge>
+                                {hijo.posicion_lateral && (
+                                  <span className="text-xs text-muted-foreground ml-2">[{hijo.posicion_lateral}]</span>
+                                )}
+                                {hijo.numero && (
+                                  <span className="text-xs text-muted-foreground ml-1">Nº{hijo.numero}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge 
+                                variant={hijo.tipo === 'armario' || hijo.tipo === 'alto' ? 'default' : 'secondary'}
+                                className="text-lg px-3 py-1"
+                              >
+                                {hijo.stock} uds
+                              </Badge>
+                              {hijo.ultimoMovimiento && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  <p>{formatoFecha(hijo.ultimoMovimiento.fecha_movimiento)}</p>
+                                  {usuario && <p>por {usuario.nombre_completo}</p>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 
-      <Card className="p-4">
-        {!puedeVer ? (
-          <div className="text-center py-10 text-muted-foreground">No tienes permisos para ver el historial.</div>
-        ) : movimientosFiltrados.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">No hay movimientos con los filtros actuales.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Ubicación</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead>Notas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movimientosFiltrados.map((m: Movimiento) => {
-                  const cfg = CONFIG_TIPOS[m.tipo as keyof typeof CONFIG_TIPOS] || CONFIG_TIPOS.entrada;
-                  const Icon = cfg.icon;
-                  const producto = data.productos.find(p => p.id === m.id_producto);
-                  const ubicacion = data.ubicaciones.find(u => u.id === m.id_ubicacion);
-                  return (
-                    <TableRow key={m.id}>
-                      <TableCell className="text-xs whitespace-nowrap">{formatoFecha(m.fecha_movimiento)}</TableCell>
-                      <TableCell>
-                        <Badge className={`${cfg.color} border flex items-center gap-1`}>
-                          <Icon className="h-3 w-3" />
-                          {cfg.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate" title={producto?.nombre}>{producto?.nombre || '—'}</TableCell>
-                      <TableCell className="text-xs">{ubicacion?.nombre || '—'}</TableCell>
-                      <TableCell className="text-right font-mono font-semibold">
-                        <span className={m.tipo === 'salida' ? 'text-red-600' : 'text-green-600'}>
-                          {m.tipo === 'salida' ? '-' : '+'}{m.cantidad}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={m.notas || ''}>{m.notas || '—'}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </Card>
+      {/* VISTA 2: HISTORIAL DE MOVIMIENTOS */}
+      {vista === 'historial' && puedeVer && (
+        <>
+          <Card className="p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Filtros</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div>
+                <Label className="text-xs">Desde</Label>
+                <Input type="date" value={filtros.desde} onChange={e => setFiltros({ ...filtros, desde: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-xs">Hasta</Label>
+                <Input type="date" value={filtros.hasta} onChange={e => setFiltros({ ...filtros, hasta: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select value={filtros.tipo} onValueChange={v => setFiltros({ ...filtros, tipo: v })}>
+                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos los tipos</SelectItem>
+                    {Object.entries(CONFIG_TIPOS).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.emoji} {cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Producto</Label>
+                <Select value={filtros.producto} onValueChange={v => setFiltros({ ...filtros, producto: v })}>
+                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="">Todos los productos</SelectItem>
+                    {data.productos.filter(p => p.activo).map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Ubicación</Label>
+                <Select value={filtros.ubicacion} onValueChange={v => setFiltros({ ...filtros, ubicacion: v })}>
+                  <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="">Todas las ubicaciones</SelectItem>
+                    {data.ubicaciones.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-between items-center mt-4 pt-3 border-t">
+              <span className="text-sm text-muted-foreground">
+                {movimientosFiltrados.length} movimiento{movimientosFiltrados.length !== 1 ? 's' : ''}
+              </span>
+              {movimientosFiltrados.length > 0 && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => exportarMovimientos('excel', movimientosFiltrados, data)}>
+                    <Download className="h-4 w-4 mr-1" /> Excel
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => exportarMovimientos('pdf', movimientosFiltrados, data)}>
+                    <Download className="h-4 w-4 mr-1" /> PDF
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
 
+          <Card className="p-4">
+            {movimientosFiltrados.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">No hay movimientos con los filtros actuales.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Ubicación</TableHead>
+                      <TableHead className="text-right">Cantidad</TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Notas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movimientosFiltrados.map((m: Movimiento) => {
+                      const cfg = CONFIG_TIPOS[m.tipo as keyof typeof CONFIG_TIPOS] || CONFIG_TIPOS.entrada;
+                      const Icon = cfg.icon;
+                      const producto = data.productos.find(p => p.id === m.id_producto);
+                      const ubicacion = data.ubicaciones.find(u => u.id === m.id_ubicacion);
+                      const usuario = data.perfiles.find(p => p.id === m.realizado_por);
+                      return (
+                        <TableRow key={m.id}>
+                          <TableCell className="text-xs whitespace-nowrap">{formatoFecha(m.fecha_movimiento)}</TableCell>
+                          <TableCell>
+                            <Badge className={`${cfg.color} border flex items-center gap-1`}>
+                              <Icon className="h-3 w-3" />
+                              {cfg.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate" title={producto?.nombre}>{producto?.nombre || '—'}</TableCell>
+                          <TableCell className="text-xs">{ubicacion?.nombre || '—'}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            <span className={m.tipo === 'salida' ? 'text-red-600' : 'text-green-600'}>
+                              {m.tipo === 'salida' ? '-' : '+'}{m.cantidad}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs">{usuario?.nombre_completo || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={m.notas || ''}>{m.notas || '—'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+
+      {/* MODAL NUEVO MOVIMIENTO */}
       <Dialog open={abierto} onOpenChange={o => { if (!o && !crear.isPending) { setAbierto(false); resetearFormulario(); } }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
