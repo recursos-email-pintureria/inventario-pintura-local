@@ -19,7 +19,7 @@ import { useMyProfile } from '@/hooks/usePermissions';
 import { 
   inventarioQueryOptions, usuarioActual, permisoExplicito, 
   crearMovimientoConStock, crearTraslado, obtenerStockActual, obtenerUbicacionesConStock,
-  limpiarStockLineales,
+  limpiarStockLineales, obtenerStockLineales, ajustarStockLineal,
   errorInventario, formatoPrecio, formatoFecha, 
   filtrarMovimientos, exportarMovimientos,
   type Movimiento, type FiltrosMovimiento 
@@ -45,7 +45,7 @@ const CONFIG_TIPOS = {
     color: 'bg-green-100 text-green-800 border-green-200',
     colorBtn: 'bg-green-600 hover:bg-green-700',
     descripcion: 'Mercancía nueva del proveedor',
-    emoji: '📥'
+    emoji: ''
   },
   traslado: { 
     label: 'Traslado', 
@@ -95,6 +95,12 @@ function MovimientosPage() {
   const [error, setError] = useState('');
   const [stockActual, setStockActual] = useState<number | null>(null);
   const [ubicacionesConStock, setUbicacionesConStock] = useState<{ id_ubicacion: string; cantidad: number; nombre_ubicacion?: string }[]>([]);
+
+  // Estados para ajuste rápido
+  const [modalAjusteAbierto, setModalAjusteAbierto] = useState(false);
+  const [stockLineales, setStockLineales] = useState<any[]>([]);
+  const [cantidadesReales, setCantidadesReales] = useState<Map<string, number>>(new Map());
+  const [ajustando, setAjustando] = useState(false);
 
   const [filtros, setFiltros] = useState<FiltrosMovimiento>({
     desde: new Date().toISOString().split('T')[0],
@@ -156,6 +162,57 @@ function MovimientosPage() {
       toast.error(errorInventario(e));
     },
   });
+
+  async function abrirModalAjuste() {
+    try {
+      const stock = await obtenerStockLineales();
+      setStockLineales(stock);
+      const inicial = new Map<string, number>();
+      stock.forEach(s => inicial.set(`${s.id_producto}-${s.id_ubicacion}`, s.cantidad));
+      setCantidadesReales(inicial);
+      setModalAjusteAbierto(true);
+    } catch (e) {
+      toast.error('Error al cargar stock de lineales');
+    }
+  }
+
+  async function guardarAjustesRapidos() {
+    setAjustando(true);
+    try {
+      let ajustados = 0;
+      let totalDiferencia = 0;
+      
+      for (const [key, cantidadReal] of cantidadesReales.entries()) {
+        const [idProducto, idUbicacion] = key.split('-');
+        const resultado = await ajustarStockLineal({
+          id_producto: idProducto,
+          id_ubicacion: idUbicacion,
+          cantidad_real: cantidadReal,
+        });
+        if (resultado.ajustado) {
+          ajustados++;
+          totalDiferencia += resultado.diferencia;
+        }
+      }
+      
+      await client.invalidateQueries({ queryKey: ['inventario', userId] });
+      setModalAjusteAbierto(false);
+      toast.success(`✅ Ajuste completado: ${ajustados} productos actualizados (diferencia total: ${totalDiferencia > 0 ? '+' : ''}${totalDiferencia})`);
+    } catch (e) {
+      toast.error(errorInventario(e));
+    } finally {
+      setAjustando(false);
+    }
+  }
+
+  function actualizarCantidadReal(idProducto: string, idUbicacion: string, valor: number) {
+    const key = `${idProducto}-${idUbicacion}`;
+    setCantidadesReales(prev => {
+      const nuevo = new Map(prev);
+      nuevo.set(key, valor);
+      return nuevo;
+    });
+  }
 
   function resetearFormulario() {
     setProductoId('');
@@ -256,7 +313,7 @@ function MovimientosPage() {
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-gray-700">🏭 RESERVA</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'reserva').map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}> {r.nombre}</SelectItem>
+                  <SelectItem key={r.id} value={r.id}>🏭 {r.nombre}</SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
@@ -281,7 +338,7 @@ function MovimientosPage() {
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -369,22 +426,22 @@ function MovimientosPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div className="flex items-center gap-2">
                   <Badge className="bg-green-600 text-white px-2 py-1">🟢 Verde</Badge>
-                  <span className="text-blue-800"><strong>100% fiable</strong> - Armarios y altos (stock controlado)</span>
+                  <span className="text-blue-800"><strong>100% fiable</strong> - Armarios y altos</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-yellow-500 text-white px-2 py-1"> Amarillo</Badge>
-                  <span className="text-blue-800"><strong>Estimado</strong> - Lineales (puede estar inflado por ventas no registradas)</span>
+                  <Badge className="bg-yellow-500 text-white px-2 py-1">🟡 Amarillo</Badge>
+                  <span className="text-blue-800"><strong>Estimado</strong> - Lineales (puede estar inflado)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="bg-blue-600 text-white px-2 py-1">🔵 Azul</Badge>
-                  <span className="text-blue-800"><strong>Reserva</strong> - Almacén (stock controlado)</span>
+                  <span className="text-blue-800"><strong>Reserva</strong> - Almacén controlado</span>
                 </div>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* TABS: Stock actual / Historial */}
+        {/* TABS */}
         <div className="flex gap-2 mb-4 border-b">
           <button
             onClick={() => setVista('stock')}
@@ -421,29 +478,48 @@ function MovimientosPage() {
                 </p>
               </div>
               {puedeCrear && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('⚠️ ¿Seguro que quieres limpiar el stock de TODOS los lineales?\n\nEsto pondrá a 0 el stock de todos los pasillos (lineales).\nEl stock de armarios y altos NO se verá afectado.\n\nEsta acción creará un movimiento de ajuste por cada producto afectado.')) {
-                          limpiarLineales.mutate();
-                        }
-                      }}
-                      disabled={limpiarLineales.isPending}
-                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-50"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {limpiarLineales.isPending ? 'Limpiando...' : '🧹 Limpiar lineales'}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <p className="font-semibold mb-1">⚠️ Resetear stock de lineales</p>
-                    <p className="text-xs">Pone a 0 el stock de todos los pasillos (lineales). Útil cuando el stock está muy inflado por ventas no registradas.</p>
-                    <p className="text-xs mt-1 text-yellow-600"><strong>No afecta</strong> al stock de armarios, altos ni reservas.</p>
-                  </TooltipContent>
-                </Tooltip>
+                <div className="flex gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('⚠️ ¿Seguro que quieres limpiar el stock de TODOS los lineales?\n\nEsto pondrá a 0 el stock de todos los pasillos (lineales).\nEl stock de armarios y altos NO se verá afectado.')) {
+                            limpiarLineales.mutate();
+                          }
+                        }}
+                        disabled={limpiarLineales.isPending}
+                        className="text-yellow-700 border-yellow-300 hover:bg-yellow-50"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {limpiarLineales.isPending ? 'Limpiando...' : '🧹 Limpiar'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="font-semibold mb-1">🧹 Resetear a 0</p>
+                      <p className="text-xs">Pone a 0 el stock de todos los lineales. Útil cuando el stock está muy inflado.</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={abrirModalAjuste}
+                        className="text-green-700 border-green-300 hover:bg-green-50"
+                      >
+                        <SlidersHorizontal className="h-4 w-4 mr-2" />
+                        📊 Ajuste rápido
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="font-semibold mb-1">📊 Conteo físico rápido</p>
+                      <p className="text-xs">Recorre la tienda, cuenta el stock real de cada lineal e introdúcelo aquí.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               )}
             </div>
 
@@ -451,7 +527,6 @@ function MovimientosPage() {
               <div className="text-center py-10 text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
                 <p>No hay stock en ninguna ubicación.</p>
-                <p className="text-xs mt-1">Usa "Nuevo movimiento" → "Entrada" para añadir stock inicial.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -461,12 +536,11 @@ function MovimientosPage() {
                   
                   return (
                     <div key={padre.id} className="border rounded-lg overflow-hidden">
-                      {/* Cabecera del pasillo/reserva */}
                       <div className={`px-4 py-3 border-b flex items-center justify-between ${
                         esPasillo ? 'bg-yellow-50' : esReserva ? 'bg-blue-50' : 'bg-gray-50'
                       }`}>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">{esPasillo ? '️' : esReserva ? '' : '📍'}</span>
+                          <span className="text-lg">{esPasillo ? '🛣️' : esReserva ? '🏭' : ''}</span>
                           <div>
                             <h4 className="font-semibold text-sm">{padre.nombre}</h4>
                             {padre.descripcion && <p className="text-xs text-muted-foreground">{padre.descripcion}</p>}
@@ -480,7 +554,7 @@ function MovimientosPage() {
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
                                 <p className="font-semibold mb-1">🟡 Stock NO fiable</p>
-                                <p className="text-xs">Este stock puede estar inflado porque no se registran las ventas de clientes. Usa el botón " Limpiar lineales" para resetearlo periódicamente.</p>
+                                <p className="text-xs">Este stock puede estar inflado porque no se registran las ventas de clientes.</p>
                               </TooltipContent>
                             </Tooltip>
                           )}
@@ -492,8 +566,8 @@ function MovimientosPage() {
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p className="font-semibold mb-1"> Stock 100% fiable</p>
-                                <p className="text-xs">La reserva es un almacén controlado. El stock refleja la realidad.</p>
+                                <p className="font-semibold mb-1">🔵 Stock 100% fiable</p>
+                                <p className="text-xs">La reserva es un almacén controlado.</p>
                               </TooltipContent>
                             </Tooltip>
                           )}
@@ -519,7 +593,6 @@ function MovimientosPage() {
                         </div>
                       </div>
 
-                      {/* Hijos con stock */}
                       {hijos.length > 0 && (
                         <div className="divide-y">
                           {hijos.map(hijo => {
@@ -533,7 +606,7 @@ function MovimientosPage() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground text-xs">└─</span>
                                   <span className="text-base">
-                                    {hijo.tipo === 'armario' ? '🗄️' : hijo.tipo === 'alto' ? '📦' : hijo.tipo === 'cross' ? '🔄' : hijo.tipo === 'caja' ? '💳' : '📍'}
+                                    {hijo.tipo === 'armario' ? '🗄️' : hijo.tipo === 'alto' ? '📦' : hijo.tipo === 'cross' ? '🔄' : hijo.tipo === 'caja' ? '💳' : ''}
                                   </span>
                                   <div>
                                     <span className="font-medium text-sm">{hijo.nombre}</span>
@@ -554,11 +627,11 @@ function MovimientosPage() {
                                       </TooltipTrigger>
                                       <TooltipContent side="top">
                                         <p className="font-semibold mb-1">🟢 Stock 100% fiable</p>
-                                        <p className="text-xs">Armarios y altos tienen stock controlado. Cada entrada y salida se registra.</p>
+                                        <p className="text-xs">Armarios y altos tienen stock controlado.</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   )}
-                                  {esCross && (
+                                  {(esCross || esCaja) && (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
@@ -567,20 +640,7 @@ function MovimientosPage() {
                                       </TooltipTrigger>
                                       <TooltipContent side="top">
                                         <p className="font-semibold mb-1">🟡 Stock NO fiable</p>
-                                        <p className="text-xs">Los cross son zonas de paso. El stock puede variar por ventas no registradas.</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {esCaja && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
-                                          ⚠️ Stock estimado
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="font-semibold mb-1">🟡 Stock NO fiable</p>
-                                        <p className="text-xs">Las cajas están en zona de venta. El stock puede variar por compras de clientes.</p>
+                                        <p className="text-xs">Zonas de venta. El stock puede variar por compras de clientes.</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   )}
@@ -615,7 +675,7 @@ function MovimientosPage() {
           </Card>
         )}
 
-        {/* VISTA 2: HISTORIAL DE MOVIMIENTOS */}
+        {/* VISTA 2: HISTORIAL */}
         {vista === 'historial' && puedeVer && (
           <>
             <Card className="p-4 mb-4">
@@ -753,7 +813,6 @@ function MovimientosPage() {
             </DialogHeader>
 
             <form onSubmit={(e: FormEvent) => { e.preventDefault(); crear.mutate(); }} className="space-y-4">
-              
               <div>
                 <Label className="text-sm font-semibold mb-2 block">Tipo de movimiento</Label>
                 <div className="grid grid-cols-3 gap-2">
@@ -802,12 +861,6 @@ function MovimientosPage() {
                     <ScanBarcode className="h-4 w-4" />
                   </Button>
                 </div>
-                {productoSeleccionado && (
-                  <p className="text-xs text-muted-foreground">
-                    Seleccionado: <strong>{productoSeleccionado.nombre}</strong>
-                    {productoSeleccionado.precio_unitario && ` · ${formatoPrecio(productoSeleccionado.precio_unitario)}`}
-                  </p>
-                )}
               </div>
 
               {productoId && ubicacionesConStock.length > 0 && (
@@ -850,24 +903,12 @@ function MovimientosPage() {
                 </div>
               )}
 
-              {productoId && ubicacionesConStock.length === 0 && tipo === 'ajuste' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-                  <AlertCircle className="h-5 w-5 text-yellow-700 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-yellow-800">⚠️ Producto sin stock</p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Este producto no tiene stock en ninguna ubicación. Usa "Entrada" para añadir stock inicial.
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {tipo === 'traslado' ? (
                 <div className="space-y-3">
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <Label className="text-sm font-semibold text-red-800 flex items-center gap-2 mb-2">
                       <ArrowDownToLine className="h-4 w-4" />
-                      Ubicación de ORIGEN (de dónde se saca)
+                      Ubicación de ORIGEN
                     </Label>
                     {renderSelectoresUbicacion(
                       'Zona origen',
@@ -882,7 +923,7 @@ function MovimientosPage() {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                     <Label className="text-sm font-semibold text-green-800 flex items-center gap-2 mb-2">
                       <ArrowDownToLine className="h-4 w-4" />
-                      Ubicación de DESTINO (a dónde se lleva)
+                      Ubicación de DESTINO
                     </Label>
                     {renderSelectoresUbicacion(
                       'Zona destino',
@@ -910,7 +951,7 @@ function MovimientosPage() {
               {stockActual !== null && productoSeleccionado && (
                 <div className="bg-muted/50 border rounded-md p-3 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">
-                    {tipo === 'traslado' ? 'Stock en origen:' : 'Stock actual en esta ubicación:'}
+                    {tipo === 'traslado' ? 'Stock en origen:' : 'Stock actual:'}
                   </span>
                   <Badge variant="secondary" className="text-lg px-3 py-1">
                     {stockActual} uds
@@ -941,7 +982,7 @@ function MovimientosPage() {
                   value={notas} 
                   onChange={e => setNotas(e.target.value)} 
                   disabled={crear.isPending} 
-                  placeholder="Ej: Albarán #1234, proveedor XYZ..."
+                  placeholder="Ej: Albarán #1234..."
                   rows={2}
                 />
               </div>
@@ -964,6 +1005,7 @@ function MovimientosPage() {
           </DialogContent>
         </Dialog>
 
+        {/* MODAL ESCÁNER */}
         <Dialog open={escaneando} onOpenChange={setEscaneando}>
           <DialogContent>
             <DialogHeader>
@@ -979,9 +1021,110 @@ function MovimientosPage() {
                 }
               }}
             />
-            <p className="text-xs text-muted-foreground">
-              También puedes escribir el código manualmente y pulsar Enter.
-            </p>
+          </DialogContent>
+        </Dialog>
+
+        {/* MODAL DE AJUSTE RÁPIDO DE LINEALES */}
+        <Dialog open={modalAjusteAbierto} onOpenChange={setModalAjusteAbierto}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5" />
+                Ajuste rápido de stock en lineales
+              </DialogTitle>
+              <DialogDescription>
+                Introduce la cantidad REAL que hay físicamente en cada lineal.
+              </DialogDescription>
+            </DialogHeader>
+
+            {stockLineales.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p className="font-semibold">No hay stock en los lineales</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-semibold text-blue-900">
+                      {stockLineales.length} producto{stockLineales.length !== 1 ? 's' : ''} con stock en lineales
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-700">
+                    💡 Cuenta físicamente cada producto e introduce la cantidad real.
+                  </p>
+                </div>
+
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {stockLineales.map((item) => {
+                    const key = `${item.id_producto}-${item.id_ubicacion}`;
+                    const cantidadSistema = item.cantidad;
+                    const cantidadReal = cantidadesReales.get(key) ?? cantidadSistema;
+                    const diferencia = cantidadReal - cantidadSistema;
+                    const hayCambio = diferencia !== 0;
+
+                    return (
+                      <div 
+                        key={key} 
+                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                          hayCambio ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{item.nombre_producto}</p>
+                          <p className="text-xs text-muted-foreground">
+                             {item.nombre_ubicacion}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Sistema</p>
+                            <Badge variant="outline" className="text-sm">{cantidadSistema}</Badge>
+                          </div>
+                          
+                          <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                          
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Real</p>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={cantidadReal}
+                              onChange={(e) => actualizarCantidadReal(item.id_producto, item.id_ubicacion, Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-20 h-8 text-center font-semibold"
+                            />
+                          </div>
+                        </div>
+
+                        {hayCambio && (
+                          <Badge 
+                            variant={diferencia > 0 ? 'default' : 'destructive'}
+                            className="text-xs"
+                          >
+                            {diferencia > 0 ? '+' : ''}{diferencia}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setModalAjusteAbierto(false)}>
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={guardarAjustesRapidos}
+                    disabled={ajustando}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {ajustando ? 'Ajustando...' : '💾 Guardar ajustes'}
+                  </Button>
+                </div>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       </>

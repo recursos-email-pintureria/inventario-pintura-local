@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Pencil, Plus, Search, Power, ScanBarcode, MapPin } from 'lucide-react';
+import { Pencil, Plus, Search, Power, ScanBarcode, MapPin, Sparkles, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/AppLayout';
 import { pageHead } from '@/lib/meta';
 import { useMyProfile } from '@/hooks/usePermissions';
-import { inventarioQueryOptions, usuarioActual, permisoExplicito, guardarProducto, comprobarUnicidad, desactivarRegistro, errorInventario, formatoPrecio, type Producto, cargarUbicacionesProducto, guardarUbicacionesProducto } from '@/lib/inventario';
+import { inventarioQueryOptions, usuarioActual, permisoExplicito, guardarProducto, comprobarUnicidad, desactivarRegistro, errorInventario, formatoPrecio, type Producto, cargarUbicacionesProducto, guardarUbicacionesProducto, buscarProductoPorCodigo } from '@/lib/inventario';
 import { CargandoInventario, ErrorInventario } from '@/components/inventario/EstadoInventario';
 const Escaner = lazy(() => import('@/components/inventario/Escaner'));
 
@@ -66,8 +66,12 @@ function Productos() {
   const [precio, setPrecio] = useState(''); 
   const [error, setError] = useState('');
   
+  // Estados para autocompletado desde base de datos
+  const [productoExistente, setProductoExistente] = useState<Producto | null>(null);
+  const [buscandoCodigo, setBuscandoCodigo] = useState(false);
+  
   const [ubicacionesProducto, setUbicacionesProducto] = useState<any[]>([]);
-  const [nuevaUbicacionPadreId, setNuevaUbicacionPadreId] = useState(''); // NUEVO: Para el primer select
+  const [nuevaUbicacionPadreId, setNuevaUbicacionPadreId] = useState('');
   const [nuevaUbicacionId, setNuevaUbicacionId] = useState('');
   const [nuevoTipoUbicacion, setNuevoTipoUbicacion] = useState<'principal' | 'cross' | 'caja' | 'temporal'>('principal');
   const [nuevaSeccionOrigen, setNuevaSeccionOrigen] = useState('');
@@ -110,6 +114,47 @@ function Productos() {
     onError: e => setError(errorInventario(e)) 
   });
 
+  // ✅ NUEVA FUNCIÓN: Buscar producto existente por código y autocompletar
+  async function buscarYAutocompletar(codigoBuscado: string) {
+    if (!codigoBuscado.trim()) {
+      setProductoExistente(null);
+      return;
+    }
+    
+    setBuscandoCodigo(true);
+    try {
+      const productoEncontrado = await buscarProductoPorCodigo(codigoBuscado);
+      
+      if (productoEncontrado) {
+        setProductoExistente(productoEncontrado);
+        // Autocompletar campos
+        setNombre(productoEncontrado.nombre);
+        setDescripcion(productoEncontrado.descripcion || '');
+        setCategoria(productoEncontrado.id_categoria || 'ninguna');
+        setPrecio(productoEncontrado.precio_unitario != null ? String(productoEncontrado.precio_unitario) : '');
+        
+        toast.success(`✨ Producto encontrado: "${productoEncontrado.nombre}". Datos autocompletados.`);
+      } else {
+        setProductoExistente(null);
+      }
+    } catch (e) {
+      setProductoExistente(null);
+    } finally {
+      setBuscandoCodigo(false);
+    }
+  }
+
+  // Buscar automáticamente cuando cambia el código (con debounce)
+  useEffect(() => {
+    if (!abierto || !codigo.trim() || editando) return;
+    
+    const timer = setTimeout(() => {
+      buscarYAutocompletar(codigo);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [codigo, abierto, editando]);
+
   const abrir = async (p: Producto | null) => { 
     setEditando(p); 
     setCodigo(p?.codigo_barras ?? ''); 
@@ -118,7 +163,8 @@ function Productos() {
     setDescripcion(p?.descripcion ?? ''); 
     setCategoria(p?.id_categoria ?? 'ninguna'); 
     setPrecio(p?.precio_unitario == null ? '' : String(p.precio_unitario)); 
-    setError(''); 
+    setError('');
+    setProductoExistente(null);
     
     if (p) {
       setCargandoUbicaciones(true);
@@ -144,7 +190,6 @@ function Productos() {
   const paginaActual = Math.min(pagina, Math.max(0, Math.ceil(filtrados.length / 20) - 1)); 
   const rows = filtrados.slice(paginaActual * 20, (paginaActual + 1) * 20);
 
-  // Función auxiliar para mostrar la ruta completa de la ubicación
   function obtenerNombreUbicacion(id_ubicacion: string) {
     const ubi = data.ubicaciones.find((u: any) => u.id === id_ubicacion);
     if (!ubi) return 'Desconocida';
@@ -229,24 +274,48 @@ function Productos() {
             <div className="space-y-2">
               <Label htmlFor="producto-codigo">Código de barras</Label>
               <div className="flex gap-2">
-                <Input id="producto-codigo" value={codigo} onChange={e => setCodigo(e.target.value)} required disabled={guardar.isPending} />
-                <Button type="button" variant="outline" disabled={guardar.isPending} onClick={() => setEscaneando(true)}><ScanBarcode className="h-4 w-4" />Escanear</Button>
+                <Input id="producto-codigo" value={codigo} onChange={e => setCodigo(e.target.value)} required disabled={guardar.isPending || buscandoCodigo} placeholder="Escanea o escribe el código..." />
+                <Button type="button" variant="outline" onClick={() => setEscaneando(true)} disabled={guardar.isPending}>
+                  <ScanBarcode className="h-4 w-4" />
+                </Button>
               </div>
+              {buscandoCodigo && (
+                <p className="text-xs text-muted-foreground">🔍 Buscando en base de datos...</p>
+              )}
+              {/* ✅ AVISO DE PRODUCTO EXISTENTE */}
+              {productoExistente && !editando && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
+                  <Sparkles className="h-5 w-5 text-green-700 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-green-800">✨ Producto ya registrado en tu base de datos</p>
+                    <p className="text-xs text-green-700 mt-1">
+                      Hemos autocompletado los datos del producto "<strong>{productoExistente.nombre}</strong>" que registraste anteriormente.
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Puedes modificar cualquier campo si es necesario antes de guardar.
+                    </p>
+                  </div>
+                </div>
+              )}
               <EstadoUnicidad estado={codigoEstado} />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="producto-sku">SKU</Label>
               <Input id="producto-sku" value={sku} onChange={e => setSku(e.target.value)} required disabled={guardar.isPending} />
               <EstadoUnicidad estado={skuEstado} />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="producto-nombre">Nombre</Label>
               <Input id="producto-nombre" value={nombre} onChange={e => setNombre(e.target.value)} required disabled={guardar.isPending} />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="producto-descripcion">Descripción (opcional)</Label>
               <Textarea id="producto-descripcion" value={descripcion} onChange={e => setDescripcion(e.target.value)} disabled={guardar.isPending} />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="producto-categoria">Categoría</Label>
               <Select value={categoria} disabled={guardar.isPending} onValueChange={setCategoria}>
@@ -257,12 +326,13 @@ function Productos() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="producto-precio">Precio unitario</Label>
               <Input id="producto-precio" type="number" min="0" step="0.01" value={precio} onChange={e => setPrecio(e.target.value)} disabled={guardar.isPending} />
             </div>
 
-            {/* ✅ NUEVO: SISTEMA DE DOS SELECTS - PRIMERO PASILLO, LUEGO HIJO */}
+            {/* UBICACIONES DEL PRODUCTO */}
             {editando && (
               <div className="space-y-3 pt-4 border-t mt-4">
                 <Label className="text-base font-semibold flex items-center gap-2">
@@ -294,7 +364,6 @@ function Productos() {
                   )}
                 </div>
 
-                {/* SELECT 1: Elegir Pasillo/Reserva */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor="select-pasillo" className="text-sm font-medium">1. Selecciona zona principal</Label>
@@ -302,7 +371,7 @@ function Productos() {
                       value={nuevaUbicacionPadreId} 
                       onValueChange={(value) => {
                         setNuevaUbicacionPadreId(value);
-                        setNuevaUbicacionId(value); // Por defecto, la ubicación final es el propio pasillo (General)
+                        setNuevaUbicacionId(value);
                       }}
                     >
                       <SelectTrigger id="select-pasillo">
@@ -333,7 +402,6 @@ function Productos() {
                     </Select>
                   </div>
 
-                  {/* SELECT 2: Elegir hijo del pasillo seleccionado */}
                   {nuevaUbicacionPadreId && (
                     <div>
                       <Label htmlFor="select-hijo" className="text-sm font-medium">2. Ubicación específica</Label>
@@ -345,18 +413,15 @@ function Productos() {
                           <SelectValue placeholder="Elige ubicación específica..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {/* Opción: el propio pasillo/reserva (General) */}
                           <SelectItem value={nuevaUbicacionPadreId}>
                             {data.ubicaciones.find((u: any) => u.id === nuevaUbicacionPadreId)?.tipo === 'pasillo' ? '🛣️' : '🏭'} 
                             {' '}{data.ubicaciones.find((u: any) => u.id === nuevaUbicacionPadreId)?.nombre} (General)
                           </SelectItem>
                           
-                          {/* Separador visual */}
                           {data.ubicaciones.filter((h: any) => h.id_ubicacion_padre === nuevaUbicacionPadreId).length > 0 && (
-                            <div className="h-px bg-gray-200 my-1 mx-2" />
+                            <div className="h-px bg-gray-200 my-1" />
                           )}
                           
-                          {/* Hijos disponibles del pasillo seleccionado */}
                           {data.ubicaciones
                             .filter((h: any) => h.id_ubicacion_padre === nuevaUbicacionPadreId && !ubicacionesProducto.some((up: any) => up.id_ubicacion === h.id))
                             .map((hijo: any) => (
@@ -378,7 +443,6 @@ function Productos() {
                   )}
                 </div>
 
-                {/* Select de tipo de ubicación y botón añadir */}
                 {nuevaUbicacionId && (
                   <div className="flex flex-col sm:flex-row gap-2 p-3 bg-background border rounded-md">
                     <Select value={nuevoTipoUbicacion} onValueChange={(v: any) => setNuevoTipoUbicacion(v)}>

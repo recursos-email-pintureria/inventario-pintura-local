@@ -336,7 +336,6 @@ export async function crearMovimientoConStock(datos: {
   
   const user = await usuarioActual();
   
-  // 1. Crear el movimiento (historial) - SIN precio_total
   const { error: movError } = await supabase
     .from('movimientos')
     .insert({ 
@@ -350,7 +349,6 @@ export async function crearMovimientoConStock(datos: {
     });
   if (movError) throw movError;
 
-  // 2. Actualizar stock según el tipo
   const { data: stockActual, error: stockError } = await supabase
     .from('stock')
     .select('cantidad')
@@ -377,7 +375,6 @@ export async function crearMovimientoConStock(datos: {
     }
   }
 
-  // 3. Insertar o actualizar stock
   if (stockActual) {
     const { error: updateError } = await supabase
       .from('stock')
@@ -399,7 +396,6 @@ export async function crearMovimientoConStock(datos: {
   return { nuevaCantidad };
 }
 
-// Traslado entre ubicaciones (SIN PRECIO)
 export async function crearTraslado(datos: { 
   id_producto: string; 
   id_ubicacion_origen: string; 
@@ -418,7 +414,6 @@ export async function crearTraslado(datos: {
   const user = await usuarioActual();
   const fecha = new Date().toISOString();
   
-  // 1. Verificar stock en origen
   const { data: stockOrigen, error: errorOrigen } = await supabase
     .from('stock')
     .select('cantidad')
@@ -433,7 +428,6 @@ export async function crearTraslado(datos: {
     throw new Error(`No hay stock suficiente en origen. Stock actual: ${cantidadEnOrigen}`);
   }
   
-  // 2. Crear movimiento de SALIDA del origen - SIN precio
   const { error: movSalida } = await supabase
     .from('movimientos')
     .insert({ 
@@ -448,7 +442,6 @@ export async function crearTraslado(datos: {
     });
   if (movSalida) throw movSalida;
   
-  // 3. Crear movimiento de ENTRADA en el destino - SIN precio
   const { error: movEntrada } = await supabase
     .from('movimientos')
     .insert({ 
@@ -463,7 +456,6 @@ export async function crearTraslado(datos: {
     });
   if (movEntrada) throw movEntrada;
   
-  // 4. Restar del origen
   const nuevaCantidadOrigen = cantidadEnOrigen - datos.cantidad;
   const { error: updateOrigen } = await supabase
     .from('stock')
@@ -472,7 +464,6 @@ export async function crearTraslado(datos: {
     .eq('id_ubicacion', datos.id_ubicacion_origen);
   if (updateOrigen) throw updateOrigen;
   
-  // 5. Sumar en el destino
   const { data: stockDestino } = await supabase
     .from('stock')
     .select('cantidad')
@@ -514,7 +505,6 @@ export async function obtenerStockActual(id_producto: string, id_ubicacion: stri
   return data?.cantidad || 0;
 }
 
-// Obtener todas las ubicaciones donde hay stock de un producto
 export async function obtenerUbicacionesConStock(id_producto: string): Promise<{ id_ubicacion: string; cantidad: number }[]> {
   const { data, error } = await supabase
     .from('stock')
@@ -534,7 +524,6 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
   const user = await usuarioActual();
   const fecha = new Date().toISOString();
   
-  // 1. Obtener todas las ubicaciones de tipo 'pasillo' (lineales)
   const { data: lineales, error: errorLineales } = await supabase
     .from('ubicaciones')
     .select('id, nombre')
@@ -548,7 +537,6 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
   
   const idsLineales = lineales.map(l => l.id);
   
-  // 2. Obtener todo el stock en esos lineales
   const { data: stockLineales, error: errorStock } = await supabase
     .from('stock')
     .select('id_producto, id_ubicacion, cantidad')
@@ -562,9 +550,7 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
   
   let productosAfectados = 0;
   
-  // 3. Para cada stock en lineal, crear movimiento de ajuste a 0 y actualizar stock
   for (const stock of stockLineales) {
-    // Crear movimiento de ajuste
     const { error: movError } = await supabase
       .from('movimientos')
       .insert({
@@ -580,7 +566,6 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
     
     if (movError) throw movError;
     
-    // Actualizar stock a 0
     const { error: updateError } = await supabase
       .from('stock')
       .update({ cantidad: 0 })
@@ -593,4 +578,138 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
   }
   
   return { productosAfectados };
+}
+
+// ============================================
+// AJUSTE RÁPIDO DE STOCK EN LINEALES
+// ============================================
+
+export async function obtenerStockLineales(): Promise<{
+  id_producto: string;
+  id_ubicacion: string;
+  cantidad: number;
+  nombre_producto?: string;
+  nombre_ubicacion?: string;
+}[]> {
+  const { data: lineales, error: errorLineales } = await supabase
+    .from('ubicaciones')
+    .select('id, nombre')
+    .eq('tipo', 'pasillo')
+    .eq('activo', true);
+  
+  if (errorLineales) throw errorLineales;
+  if (!lineales || lineales.length === 0) return [];
+  
+  const idsLineales = lineales.map(l => l.id);
+  
+  const { data: stockLineales, error: errorStock } = await supabase
+    .from('stock')
+    .select('id_producto, id_ubicacion, cantidad')
+    .in('id_ubicacion', idsLineales)
+    .gt('cantidad', 0);
+  
+  if (errorStock) throw errorStock;
+  if (!stockLineales || stockLineales.length === 0) return [];
+  
+  const idsProductos = [...new Set(stockLineales.map(s => s.id_producto))];
+  const { data: productos } = await supabase
+    .from('productos')
+    .select('id, nombre')
+    .in('id', idsProductos);
+  
+  const productosMap = new Map((productos || []).map(p => [p.id, p.nombre]));
+  const linealesMap = new Map(lineales.map(l => [l.id, l.nombre]));
+  
+  return stockLineales.map(s => ({
+    ...s,
+    nombre_producto: productosMap.get(s.id_producto) || 'Desconocido',
+    nombre_ubicacion: linealesMap.get(s.id_ubicacion) || 'Desconocida',
+  }));
+}
+
+export async function ajustarStockLineal(datos: {
+  id_producto: string;
+  id_ubicacion: string;
+  cantidad_real: number;
+}) {
+  const user = await usuarioActual();
+  const fecha = new Date().toISOString();
+  
+  const { data: stockActual, error: stockError } = await supabase
+    .from('stock')
+    .select('cantidad')
+    .eq('id_producto', datos.id_producto)
+    .eq('id_ubicacion', datos.id_ubicacion)
+    .maybeSingle();
+  
+  if (stockError) throw stockError;
+  
+  const cantidadSistema = stockActual?.cantidad || 0;
+  
+  if (cantidadSistema === datos.cantidad_real) {
+    return { ajustado: false, diferencia: 0 };
+  }
+  
+  const { error: movError } = await supabase
+    .from('movimientos')
+    .insert({
+      id_producto: datos.id_producto,
+      id_ubicacion: datos.id_ubicacion,
+      tipo: 'ajuste' as TipoMovimiento,
+      cantidad: datos.cantidad_real,
+      precio_unitario: null,
+      notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${datos.cantidad_real - cantidadSistema})`,
+      realizado_por: user.id,
+      fecha_movimiento: fecha
+    });
+  
+  if (movError) throw movError;
+  
+  if (datos.cantidad_real > 0) {
+    if (stockActual) {
+      const { error: updateError } = await supabase
+        .from('stock')
+        .update({ cantidad: datos.cantidad_real })
+        .eq('id_producto', datos.id_producto)
+        .eq('id_ubicacion', datos.id_ubicacion);
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('stock')
+        .insert({
+          id_producto: datos.id_producto,
+          id_ubicacion: datos.id_ubicacion,
+          cantidad: datos.cantidad_real
+        });
+      if (insertError) throw insertError;
+    }
+  } else {
+    const { error: deleteError } = await supabase
+      .from('stock')
+      .delete()
+      .eq('id_producto', datos.id_producto)
+      .eq('id_ubicacion', datos.id_ubicacion);
+    if (deleteError) throw deleteError;
+  }
+  
+  return { ajustado: true, diferencia: datos.cantidad_real - cantidadSistema };
+}
+
+// ============================================
+// BÚSQUEDA DE PRODUCTO POR CÓDIGO DE BARRAS (AUTOCOMPLETADO)
+// ============================================
+
+export async function buscarProductoPorCodigo(codigo: string): Promise<Producto | null> {
+  if (!codigo.trim()) return null;
+  
+  // Buscar en productos activos primero
+  const { data, error } = await supabase
+    .from('productos')
+    .select('*')
+    .eq('codigo_barras', codigo.trim())
+    .limit(1)
+    .single();
+  
+  if (error) return null;
+  return data as Producto;
 }
