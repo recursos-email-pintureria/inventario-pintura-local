@@ -183,12 +183,7 @@ export interface UbicacionJerarquica {
 }
 
 export async function obtenerSecciones(): Promise<Seccion[]> {
-  const { data, error } = await supabase
-    .from('secciones')
-    .select('*')
-    .eq('activo', true)
-    .order('nombre');
-  
+  const { data, error } = await supabase.from('secciones').select('*').eq('activo', true).order('nombre');
   if (error) throw error;
   return data || [];
 }
@@ -196,18 +191,12 @@ export async function obtenerSecciones(): Promise<Seccion[]> {
 export async function obtenerUbicaciones(): Promise<UbicacionJerarquica[]> {
   const { data, error } = await supabase
     .from('ubicaciones')
-    .select(`
-      *,
-      seccion:seccion(id, nombre),
-      seccion_origen:seccion_origen(id, nombre),
-      ubicacion_padre:id_ubicacion_padre(id, nombre, tipo)
-    `)
+    .select(`*, seccion:seccion(id, nombre), seccion_origen:seccion_origen(id, nombre), ubicacion_padre:id_ubicacion_padre(id, nombre, tipo)`)
     .eq('activo', true)
     .order('tipo')
     .order('nombre');
   
   if (error) throw error;
-  
   return (data || []).map((u: any) => ({
     ...u,
     seccion_nombre: u.seccion?.nombre || null,
@@ -227,12 +216,7 @@ export async function crearUbicacion(ubicacion: {
   numero?: number | null;
   descripcion?: string | null;
 }) {
-  const { data, error } = await supabase
-    .from('ubicaciones')
-    .insert([ubicacion])
-    .select()
-    .single();
-  
+  const { data, error } = await supabase.from('ubicaciones').insert([ubicacion]).select().single();
   if (error) throw error;
   return data;
 }
@@ -249,74 +233,34 @@ export async function actualizarUbicacion(id: string, ubicacion: Partial<{
   descripcion?: string | null;
   activo?: boolean;
 }>) {
-  const { data, error } = await supabase
-    .from('ubicaciones')
-    .update(ubicacion)
-    .eq('id', id)
-    .select()
-    .single();
-  
+  const { data, error } = await supabase.from('ubicaciones').update(ubicacion).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function desactivarUbicacion(id: string) {
-  const { error } = await supabase
-    .from('ubicaciones')
-    .update({ activo: false })
-    .eq('id', id);
-  
+  const { error } = await supabase.from('ubicaciones').update({ activo: false }).eq('id', id);
   if (error) throw error;
 }
 
 export async function borrarUbicacionDefinitivamente(id: string) {
-  const { data: stock, error: stockError } = await supabase
-    .from('stock')
-    .select('id')
-    .eq('id_ubicacion', id)
-    .limit(1);
-  
+  const { data: stock, error: stockError } = await supabase.from('stock').select('id').eq('id_ubicacion', id).limit(1);
   if (stockError) throw stockError;
-  if (stock && stock.length > 0) {
-    throw new Error('No se puede borrar: la ubicación tiene stock asociado. Desactívala en su lugar.');
-  }
+  if (stock && stock.length > 0) throw new Error('No se puede borrar: la ubicación tiene stock asociado. Desactívala en su lugar.');
 
-  const { data: movimientos, error: movError } = await supabase
-    .from('movimientos')
-    .select('id')
-    .eq('id_ubicacion', id)
-    .limit(1);
-  
+  const { data: movimientos, error: movError } = await supabase.from('movimientos').select('id').eq('id_ubicacion', id).limit(1);
   if (movError) throw movError;
-  if (movimientos && movimientos.length > 0) {
-    throw new Error('No se puede borrar: la ubicación tiene movimientos históricos. Desactívala en su lugar.');
-  }
+  if (movimientos && movimientos.length > 0) throw new Error('No se puede borrar: la ubicación tiene movimientos históricos. Desactívala en su lugar.');
 
-  const { error } = await supabase
-    .from('ubicaciones')
-    .delete()
-    .eq('id', id);
-  
+  const { error } = await supabase.from('ubicaciones').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function sePuedeBorrarDefinitivamente(id: string): Promise<boolean> {
-  const { data: stock } = await supabase
-    .from('stock')
-    .select('id')
-    .eq('id_ubicacion', id)
-    .limit(1);
-  
+  const { data: stock } = await supabase.from('stock').select('id').eq('id_ubicacion', id).limit(1);
   if (stock && stock.length > 0) return false;
-
-  const { data: movimientos } = await supabase
-    .from('movimientos')
-    .select('id')
-    .eq('id_ubicacion', id)
-    .limit(1);
-  
+  const { data: movimientos } = await supabase.from('movimientos').select('id').eq('id_ubicacion', id).limit(1);
   if (movimientos && movimientos.length > 0) return false;
-
   return true;
 }
 
@@ -335,27 +279,18 @@ export async function crearMovimientoConStock(datos: {
   if (!datos.id_producto || !datos.id_ubicacion) throw new Error('Selecciona producto y ubicación.');
   
   const user = await usuarioActual();
-  
-  const { error: movError } = await supabase
-    .from('movimientos')
-    .insert({ 
-      id_producto: datos.id_producto,
-      id_ubicacion: datos.id_ubicacion,
-      tipo: datos.tipo,
-      cantidad: datos.cantidad,
-      precio_unitario: null,
-      notas: datos.notas.trim() || null, 
-      realizado_por: user.id
-    });
+  const { error: movError } = await supabase.from('movimientos').insert({ 
+    id_producto: datos.id_producto,
+    id_ubicacion: datos.id_ubicacion,
+    tipo: datos.tipo,
+    cantidad: datos.cantidad,
+    precio_unitario: null,
+    notas: datos.notas.trim() || null, 
+    realizado_por: user.id
+  });
   if (movError) throw movError;
 
-  const { data: stockActual, error: stockError } = await supabase
-    .from('stock')
-    .select('cantidad')
-    .eq('id_producto', datos.id_producto)
-    .eq('id_ubicacion', datos.id_ubicacion)
-    .maybeSingle();
-  
+  const { data: stockActual, error: stockError } = await supabase.from('stock').select('cantidad').eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion).maybeSingle();
   if (stockError) throw stockError;
 
   const cantidadActual = stockActual?.cantidad || 0;
@@ -365,34 +300,19 @@ export async function crearMovimientoConStock(datos: {
     nuevaCantidad = cantidadActual + datos.cantidad;
   } else if (datos.tipo === 'salida') {
     nuevaCantidad = cantidadActual - datos.cantidad;
-    if (nuevaCantidad < 0) {
-      throw new Error(`No hay stock suficiente. Stock actual: ${cantidadActual}`);
-    }
+    if (nuevaCantidad < 0) throw new Error(`No hay stock suficiente. Stock actual: ${cantidadActual}`);
   } else if (datos.tipo === 'ajuste') {
     nuevaCantidad = datos.cantidad;
-    if (nuevaCantidad < 0) {
-      throw new Error('La cantidad de ajuste no puede ser negativa.');
-    }
+    if (nuevaCantidad < 0) throw new Error('La cantidad de ajuste no puede ser negativa.');
   }
 
   if (stockActual) {
-    const { error: updateError } = await supabase
-      .from('stock')
-      .update({ cantidad: nuevaCantidad })
-      .eq('id_producto', datos.id_producto)
-      .eq('id_ubicacion', datos.id_ubicacion);
+    const { error: updateError } = await supabase.from('stock').update({ cantidad: nuevaCantidad }).eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion);
     if (updateError) throw updateError;
   } else if (nuevaCantidad > 0) {
-    const { error: insertError } = await supabase
-      .from('stock')
-      .insert({ 
-        id_producto: datos.id_producto, 
-        id_ubicacion: datos.id_ubicacion, 
-        cantidad: nuevaCantidad 
-      });
+    const { error: insertError } = await supabase.from('stock').insert({ id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion, cantidad: nuevaCantidad });
     if (insertError) throw insertError;
   }
-
   return { nuevaCantidad };
 }
 
@@ -404,227 +324,80 @@ export async function crearTraslado(datos: {
   notas: string 
 }) {
   validarCantidad(datos.cantidad);
-  if (!datos.id_producto) throw new Error('Selecciona un producto.');
-  if (!datos.id_ubicacion_origen) throw new Error('Selecciona la ubicación de origen.');
-  if (!datos.id_ubicacion_destino) throw new Error('Selecciona la ubicación de destino.');
-  if (datos.id_ubicacion_origen === datos.id_ubicacion_destino) {
-    throw new Error('La ubicación de origen y destino no pueden ser la misma.');
-  }
+  if (!datos.id_producto || !datos.id_ubicacion_origen || !datos.id_ubicacion_destino) throw new Error('Selecciona producto y ubicaciones.');
+  if (datos.id_ubicacion_origen === datos.id_ubicacion_destino) throw new Error('Origen y destino no pueden ser iguales.');
   
   const user = await usuarioActual();
   const fecha = new Date().toISOString();
   
-  const { data: stockOrigen, error: errorOrigen } = await supabase
-    .from('stock')
-    .select('cantidad')
-    .eq('id_producto', datos.id_producto)
-    .eq('id_ubicacion', datos.id_ubicacion_origen)
-    .maybeSingle();
-  
+  const { data: stockOrigen, error: errorOrigen } = await supabase.from('stock').select('cantidad').eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion_origen).maybeSingle();
   if (errorOrigen) throw errorOrigen;
   
   const cantidadEnOrigen = stockOrigen?.cantidad || 0;
-  if (cantidadEnOrigen < datos.cantidad) {
-    throw new Error(`No hay stock suficiente en origen. Stock actual: ${cantidadEnOrigen}`);
-  }
+  if (cantidadEnOrigen < datos.cantidad) throw new Error(`No hay stock suficiente en origen. Stock actual: ${cantidadEnOrigen}`);
   
-  const { error: movSalida } = await supabase
-    .from('movimientos')
-    .insert({ 
-      id_producto: datos.id_producto,
-      id_ubicacion: datos.id_ubicacion_origen,
-      tipo: 'salida' as TipoMovimiento,
-      cantidad: datos.cantidad,
-      precio_unitario: null,
-      notas: `TRASLADO → ${datos.notas || 'Sin notas'}`,
-      realizado_por: user.id,
-      fecha_movimiento: fecha
-    });
-  if (movSalida) throw movSalida;
+  await supabase.from('movimientos').insert({ 
+    id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion_origen, tipo: 'salida' as TipoMovimiento, cantidad: datos.cantidad,
+    precio_unitario: null, notas: `TRASLADO → ${datos.notas || 'Sin notas'}`, realizado_por: user.id, fecha_movimiento: fecha
+  });
   
-  const { error: movEntrada } = await supabase
-    .from('movimientos')
-    .insert({ 
-      id_producto: datos.id_producto,
-      id_ubicacion: datos.id_ubicacion_destino,
-      tipo: 'entrada' as TipoMovimiento,
-      cantidad: datos.cantidad,
-      precio_unitario: null,
-      notas: `TRASLADO desde origen → ${datos.notas || 'Sin notas'}`,
-      realizado_por: user.id,
-      fecha_movimiento: fecha
-    });
-  if (movEntrada) throw movEntrada;
+  await supabase.from('movimientos').insert({ 
+    id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion_destino, tipo: 'entrada' as TipoMovimiento, cantidad: datos.cantidad,
+    precio_unitario: null, notas: `TRASLADO desde origen → ${datos.notas || 'Sin notas'}`, realizado_por: user.id, fecha_movimiento: fecha
+  });
   
-  const nuevaCantidadOrigen = cantidadEnOrigen - datos.cantidad;
-  const { error: updateOrigen } = await supabase
-    .from('stock')
-    .update({ cantidad: nuevaCantidadOrigen })
-    .eq('id_producto', datos.id_producto)
-    .eq('id_ubicacion', datos.id_ubicacion_origen);
-  if (updateOrigen) throw updateOrigen;
+  await supabase.from('stock').update({ cantidad: cantidadEnOrigen - datos.cantidad }).eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion_origen);
   
-  const { data: stockDestino } = await supabase
-    .from('stock')
-    .select('cantidad')
-    .eq('id_producto', datos.id_producto)
-    .eq('id_ubicacion', datos.id_ubicacion_destino)
-    .maybeSingle();
-  
+  const { data: stockDestino } = await supabase.from('stock').select('cantidad').eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion_destino).maybeSingle();
   const cantidadEnDestino = stockDestino?.cantidad || 0;
-  const nuevaCantidadDestino = cantidadEnDestino + datos.cantidad;
   
   if (stockDestino) {
-    const { error: updateDestino } = await supabase
-      .from('stock')
-      .update({ cantidad: nuevaCantidadDestino })
-      .eq('id_producto', datos.id_producto)
-      .eq('id_ubicacion', datos.id_ubicacion_destino);
-    if (updateDestino) throw updateDestino;
+    await supabase.from('stock').update({ cantidad: cantidadEnDestino + datos.cantidad }).eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion_destino);
   } else {
-    const { error: insertDestino } = await supabase
-      .from('stock')
-      .insert({ 
-        id_producto: datos.id_producto, 
-        id_ubicacion: datos.id_ubicacion_destino, 
-        cantidad: nuevaCantidadDestino 
-      });
-    if (insertDestino) throw insertDestino;
+    await supabase.from('stock').insert({ id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion_destino, cantidad: cantidadEnDestino + datos.cantidad });
   }
   
-  return { nuevaCantidadOrigen, nuevaCantidadDestino };
+  return { nuevaCantidadOrigen: cantidadEnOrigen - datos.cantidad, nuevaCantidadDestino: cantidadEnDestino + datos.cantidad };
 }
 
 export async function obtenerStockActual(id_producto: string, id_ubicacion: string): Promise<number> {
-  const { data } = await supabase
-    .from('stock')
-    .select('cantidad')
-    .eq('id_producto', id_producto)
-    .eq('id_ubicacion', id_ubicacion)
-    .maybeSingle();
+  const { data } = await supabase.from('stock').select('cantidad').eq('id_producto', id_producto).eq('id_ubicacion', id_ubicacion).maybeSingle();
   return data?.cantidad || 0;
 }
 
 export async function obtenerUbicacionesConStock(id_producto: string): Promise<{ id_ubicacion: string; cantidad: number }[]> {
-  const { data, error } = await supabase
-    .from('stock')
-    .select('id_ubicacion, cantidad')
-    .eq('id_producto', id_producto)
-    .gt('cantidad', 0);
-  
+  const { data, error } = await supabase.from('stock').select('id_ubicacion, cantidad').eq('id_producto', id_producto).gt('cantidad', 0);
   if (error) throw error;
   return data || [];
 }
 
 // ============================================
-// LIMPIAR STOCK DE LINEALES (PASILLOS)
+// LIMPIAR Y AJUSTAR STOCK DE LINEALES (PASILLOS)
 // ============================================
 
 export async function limpiarStockLineales(): Promise<{ productosAfectados: number }> {
   const user = await usuarioActual();
   const fecha = new Date().toISOString();
   
-  const { data: lineales, error: errorLineales } = await supabase
-    .from('ubicaciones')
-    .select('id, nombre')
-    .eq('tipo', 'pasillo')
-    .eq('activo', true);
-  
+  const { data: lineales, error: errorLineales } = await supabase.from('ubicaciones').select('id').eq('tipo', 'pasillo').eq('activo', true);
   if (errorLineales) throw errorLineales;
-  if (!lineales || lineales.length === 0) {
-    return { productosAfectados: 0 };
-  }
+  if (!lineales || lineales.length === 0) return { productosAfectados: 0 };
   
   const idsLineales = lineales.map(l => l.id);
-  
-  const { data: stockLineales, error: errorStock } = await supabase
-    .from('stock')
-    .select('id_producto, id_ubicacion, cantidad')
-    .in('id_ubicacion', idsLineales)
-    .gt('cantidad', 0);
-  
+  const { data: stockLineales, error: errorStock } = await supabase.from('stock').select('id_producto, id_ubicacion, cantidad').in('id_ubicacion', idsLineales).gt('cantidad', 0);
   if (errorStock) throw errorStock;
-  if (!stockLineales || stockLineales.length === 0) {
-    return { productosAfectados: 0 };
-  }
+  if (!stockLineales || stockLineales.length === 0) return { productosAfectados: 0 };
   
   let productosAfectados = 0;
-  
   for (const stock of stockLineales) {
-    // ✅ Usamos SALIDA con la cantidad actual (no 0) para respetar el constraint cantidad > 0
-    const { error: movError } = await supabase
-      .from('movimientos')
-      .insert({
-        id_producto: stock.id_producto,
-        id_ubicacion: stock.id_ubicacion,
-        tipo: 'salida' as TipoMovimiento,
-        cantidad: stock.cantidad,
-        precio_unitario: null,
-        notas: `LIMPIEZA AUTOMÁTICA - Stock reseteado a 0 (tenía ${stock.cantidad} uds)`,
-        realizado_por: user.id,
-        fecha_movimiento: fecha
-      });
-    
-    if (movError) throw movError;
-    
-    const { error: updateError } = await supabase
-      .from('stock')
-      .update({ cantidad: 0 })
-      .eq('id_producto', stock.id_producto)
-      .eq('id_ubicacion', stock.id_ubicacion);
-    
-    if (updateError) throw updateError;
-    
+    await supabase.from('movimientos').insert({
+      id_producto: stock.id_producto, id_ubicacion: stock.id_ubicacion, tipo: 'salida' as TipoMovimiento, cantidad: stock.cantidad,
+      precio_unitario: null, notas: `LIMPIEZA AUTOMÁTICA - Stock reseteado a 0 (tenía ${stock.cantidad} uds)`, realizado_por: user.id, fecha_movimiento: fecha
+    });
+    await supabase.from('stock').update({ cantidad: 0 }).eq('id_producto', stock.id_producto).eq('id_ubicacion', stock.id_ubicacion);
     productosAfectados++;
   }
-  
   return { productosAfectados };
-}
-
-// ============================================
-// AJUSTE RÁPIDO DE STOCK EN LINEALES
-// ============================================
-
-export async function obtenerStockLineales(): Promise<{
-  id_producto: string;
-  id_ubicacion: string;
-  cantidad: number;
-  nombre_producto?: string;
-  nombre_ubicacion?: string;
-}[]> {
-  try {
-    // Consulta simplificada: obtener stock con JOIN a productos y ubicaciones
-    const { data, error } = await supabase
-      .from('stock')
-      .select(`
-        id_producto,
-        id_ubicacion,
-        cantidad,
-        producto:productos(nombre),
-        ubicacion:ubicaciones(nombre, tipo)
-      `)
-      .eq('ubicaciones.tipo', 'pasillo')
-      .eq('ubicaciones.activo', true)
-      .gt('cantidad', 0);
-    
-    if (error) {
-      console.error('Error obteniendo stock de lineales:', error);
-      return [];
-    }
-    
-    if (!data || data.length === 0) return [];
-    
-    return data.map((item: any) => ({
-      id_producto: item.id_producto,
-      id_ubicacion: item.id_ubicacion,
-      cantidad: item.cantidad,
-      nombre_producto: item.producto?.nombre || 'Desconocido',
-      nombre_ubicacion: item.ubicacion?.nombre || 'Desconocida',
-    }));
-  } catch (e) {
-    console.error('Error en obtenerStockLineales:', e);
-    return [];
-  }
 }
 
 export async function obtenerStockLineales(): Promise<{
@@ -642,12 +415,7 @@ export async function obtenerStockLineales(): Promise<{
       .eq('tipo', 'pasillo')
       .eq('activo', true);
     
-    if (errorLineales) {
-      console.error('Error obteniendo lineales:', errorLineales);
-      return [];
-    }
-    
-    if (!lineales || lineales.length === 0) return [];
+    if (errorLineales || !lineales || lineales.length === 0) return [];
     
     const idsLineales = lineales.map(l => l.id);
     const linealesMap = new Map(lineales.map(l => [l.id, l.nombre]));
@@ -659,25 +427,11 @@ export async function obtenerStockLineales(): Promise<{
       .in('id_ubicacion', idsLineales)
       .gt('cantidad', 0);
     
-    if (errorStock) {
-      console.error('Error obteniendo stock:', errorStock);
-      return [];
-    }
-    
-    if (!stockLineales || stockLineales.length === 0) return [];
+    if (errorStock || !stockLineales || stockLineales.length === 0) return [];
     
     // Paso 3: Obtener nombres de productos
     const idsProductos = [...new Set(stockLineales.map(s => s.id_producto))];
-    const { data: productos, error: errorProductos } = await supabase
-      .from('productos')
-      .select('id, nombre')
-      .in('id', idsProductos);
-    
-    if (errorProductos) {
-      console.error('Error obteniendo productos:', errorProductos);
-      return [];
-    }
-    
+    const { data: productos } = await supabase.from('productos').select('id, nombre').in('id', idsProductos);
     const productosMap = new Map((productos || []).map(p => [p.id, p.nombre]));
     
     // Paso 4: Combinar todo
@@ -692,7 +446,10 @@ export async function obtenerStockLineales(): Promise<{
     console.error('Error en obtenerStockLineales:', e);
     return [];
   }
-}  id_producto: string;
+}
+
+export async function ajustarStockLineal(datos: {
+  id_producto: string;
   id_ubicacion: string;
   cantidad_real: number;
 }) {
@@ -709,76 +466,36 @@ export async function obtenerStockLineales(): Promise<{
   if (stockError) throw stockError;
   
   const cantidadSistema = stockActual?.cantidad || 0;
-  
-  if (cantidadSistema === datos.cantidad_real) {
-    return { ajustado: false, diferencia: 0 };
-  }
+  if (cantidadSistema === datos.cantidad_real) return { ajustado: false, diferencia: 0 };
   
   const diferencia = datos.cantidad_real - cantidadSistema;
   
-  // ✅ Si la cantidad real es menor o igual: hacer SALIDA con la diferencia
   if (datos.cantidad_real <= cantidadSistema) {
     const cantidadASacar = cantidadSistema - datos.cantidad_real;
     if (cantidadASacar > 0) {
-      const { error: movError } = await supabase
-        .from('movimientos')
-        .insert({
-          id_producto: datos.id_producto,
-          id_ubicacion: datos.id_ubicacion,
-          tipo: 'salida' as TipoMovimiento,
-          cantidad: cantidadASacar,
-          precio_unitario: null,
-          notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${diferencia})`,
-          realizado_por: user.id,
-          fecha_movimiento: fecha
-        });
-      if (movError) throw movError;
+      await supabase.from('movimientos').insert({
+        id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion, tipo: 'salida' as TipoMovimiento, cantidad: cantidadASacar,
+        precio_unitario: null, notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${diferencia})`,
+        realizado_por: user.id, fecha_movimiento: fecha
+      });
     }
   } else {
-    // ✅ Si la cantidad real es mayor: hacer ENTRADA con la diferencia
     const cantidadAAñadir = datos.cantidad_real - cantidadSistema;
-    const { error: movError } = await supabase
-      .from('movimientos')
-      .insert({
-        id_producto: datos.id_producto,
-        id_ubicacion: datos.id_ubicacion,
-        tipo: 'entrada' as TipoMovimiento,
-        cantidad: cantidadAAñadir,
-        precio_unitario: null,
-        notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: +${diferencia})`,
-        realizado_por: user.id,
-        fecha_movimiento: fecha
-      });
-    if (movError) throw movError;
+    await supabase.from('movimientos').insert({
+      id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion, tipo: 'entrada' as TipoMovimiento, cantidad: cantidadAAñadir,
+      precio_unitario: null, notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: +${diferencia})`,
+      realizado_por: user.id, fecha_movimiento: fecha
+    });
   }
   
-  // Actualizar stock al valor real
   if (datos.cantidad_real > 0) {
     if (stockActual) {
-      const { error: updateError } = await supabase
-        .from('stock')
-        .update({ cantidad: datos.cantidad_real })
-        .eq('id_producto', datos.id_producto)
-        .eq('id_ubicacion', datos.id_ubicacion);
-      if (updateError) throw updateError;
+      await supabase.from('stock').update({ cantidad: datos.cantidad_real }).eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion);
     } else {
-      const { error: insertError } = await supabase
-        .from('stock')
-        .insert({
-          id_producto: datos.id_producto,
-          id_ubicacion: datos.id_ubicacion,
-          cantidad: datos.cantidad_real
-        });
-      if (insertError) throw insertError;
+      await supabase.from('stock').insert({ id_producto: datos.id_producto, id_ubicacion: datos.id_ubicacion, cantidad: datos.cantidad_real });
     }
   } else {
-    // Si cantidad_real es 0, eliminar el registro de stock
-    const { error: deleteError } = await supabase
-      .from('stock')
-      .delete()
-      .eq('id_producto', datos.id_producto)
-      .eq('id_ubicacion', datos.id_ubicacion);
-    if (deleteError) throw deleteError;
+    await supabase.from('stock').delete().eq('id_producto', datos.id_producto).eq('id_ubicacion', datos.id_ubicacion);
   }
   
   return { ajustado: true, diferencia };
@@ -790,14 +507,7 @@ export async function obtenerStockLineales(): Promise<{
 
 export async function buscarProductoPorCodigo(codigo: string): Promise<Producto | null> {
   if (!codigo.trim()) return null;
-  
-  const { data, error } = await supabase
-    .from('productos')
-    .select('*')
-    .eq('codigo_barras', codigo.trim())
-    .limit(1)
-    .single();
-  
+  const { data, error } = await supabase.from('productos').select('*').eq('codigo_barras', codigo.trim()).limit(1).single();
   if (error) return null;
   return data as Producto;
 }
