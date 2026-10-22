@@ -88,7 +88,6 @@ function MovimientosPage() {
   const [ubicacionDestinoId, setUbicacionDestinoId] = useState('');
   
   const [cantidad, setCantidad] = useState('');
-  const [precio, setPrecio] = useState('');
   const [notas, setNotas] = useState('');
   const [error, setError] = useState('');
   const [stockActual, setStockActual] = useState<number | null>(null);
@@ -128,7 +127,6 @@ function MovimientosPage() {
           id_ubicacion: ubicacionId,
           tipo: tipo as any,
           cantidad: cant,
-          precio_unitario: precio === '' ? null : Number(precio),
           notas,
         });
       }
@@ -152,7 +150,6 @@ function MovimientosPage() {
     setUbicacionDestinoId('');
     setTipo('entrada');
     setCantidad('');
-    setPrecio('');
     setNotas('');
     setError('');
     setStockActual(null);
@@ -240,9 +237,9 @@ function MovimientosPage() {
                 ))}
               </SelectGroup>
               <SelectGroup>
-                <SelectLabel className="text-xs font-bold text-gray-700"> RESERVA</SelectLabel>
+                <SelectLabel className="text-xs font-bold text-gray-700">🏭 RESERVA</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'reserva').map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}>🏭 {r.nombre}</SelectItem>
+                  <SelectItem key={r.id} value={r.id}> {r.nombre}</SelectItem>
                 ))}
               </SelectGroup>
             </SelectContent>
@@ -260,14 +257,14 @@ function MovimientosPage() {
               {padreId && (
                 <>
                   <SelectItem value={padreId}>
-                     {data.ubicaciones.find((u: any) => u.id === padreId)?.nombre} (General/Lineal)
+                    📍 {data.ubicaciones.find((u: any) => u.id === padreId)?.nombre} (General/Lineal)
                   </SelectItem>
                   {data.ubicaciones
                     .filter((h: any) => h.id_ubicacion_padre === padreId)
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : ''}
+                          {h.tipo === 'armario' ? '️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -378,7 +375,6 @@ function MovimientosPage() {
                   <TableHead>Producto</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="text-right">Precio</TableHead>
                   <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
@@ -404,7 +400,6 @@ function MovimientosPage() {
                           {m.tipo === 'salida' ? '-' : '+'}{m.cantidad}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right text-xs">{formatoPrecio(m.precio_unitario)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={m.notas || ''}>{m.notas || '—'}</TableCell>
                     </TableRow>
                   );
@@ -593,36 +588,20 @@ function MovimientosPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="mov-cantidad">Cantidad *</Label>
-                <Input 
-                  id="mov-cantidad"
-                  type="number" 
-                  min="1" 
-                  step="1"
-                  value={cantidad} 
-                  onChange={e => setCantidad(e.target.value)} 
-                  required 
-                  disabled={crear.isPending}
-                  placeholder="Ej: 10"
-                />
-              </div>
-              {tipo !== 'traslado' && (
-                <div>
-                  <Label htmlFor="mov-precio">Precio unitario (opcional)</Label>
-                  <Input 
-                    id="mov-precio"
-                    type="number" 
-                    min="0" 
-                    step="0.01"
-                    value={precio} 
-                    onChange={e => setPrecio(e.target.value)} 
-                    disabled={crear.isPending} 
-                    placeholder="Ej: 3.29"
-                  />
-                </div>
-              )}
+            <div>
+              <Label htmlFor="mov-cantidad">Cantidad *</Label>
+              <Input 
+                id="mov-cantidad"
+                type="number" 
+                min="1" 
+                step="1"
+                value={cantidad} 
+                onChange={e => setCantidad(e.target.value)} 
+                required 
+                disabled={crear.isPending}
+                placeholder="Ej: 10"
+                className="max-w-xs"
+              />
             </div>
 
             <div>

@@ -321,7 +321,7 @@ export async function sePuedeBorrarDefinitivamente(id: string): Promise<boolean>
 }
 
 // ============================================
-// MOVIMIENTOS CON ACTUALIZACIÓN AUTOMÁTICA DE STOCK
+// MOVIMIENTOS CON ACTUALIZACIÓN AUTOMÁTICA DE STOCK (SIN PRECIO)
 // ============================================
 
 export async function crearMovimientoConStock(datos: { 
@@ -329,7 +329,6 @@ export async function crearMovimientoConStock(datos: {
   id_ubicacion: string; 
   tipo: TipoMovimiento; 
   cantidad: number; 
-  precio_unitario: number | null; 
   notas: string 
 }) {
   validarCantidad(datos.cantidad);
@@ -337,14 +336,17 @@ export async function crearMovimientoConStock(datos: {
   
   const user = await usuarioActual();
   
-  // 1. Crear el movimiento (historial)
+  // 1. Crear el movimiento (historial) - SIN precio_total
   const { error: movError } = await supabase
     .from('movimientos')
     .insert({ 
-      ...datos, 
+      id_producto: datos.id_producto,
+      id_ubicacion: datos.id_ubicacion,
+      tipo: datos.tipo,
+      cantidad: datos.cantidad,
+      precio_unitario: null,
       notas: datos.notas.trim() || null, 
-      realizado_por: user.id,
-      precio_total: datos.precio_unitario ? datos.precio_unitario * datos.cantidad : null
+      realizado_por: user.id
     });
   if (movError) throw movError;
 
@@ -369,7 +371,6 @@ export async function crearMovimientoConStock(datos: {
       throw new Error(`No hay stock suficiente. Stock actual: ${cantidadActual}`);
     }
   } else if (datos.tipo === 'ajuste') {
-    // Ajuste: la cantidad es la nueva cantidad absoluta
     nuevaCantidad = datos.cantidad;
     if (nuevaCantidad < 0) {
       throw new Error('La cantidad de ajuste no puede ser negativa.');
@@ -398,7 +399,7 @@ export async function crearMovimientoConStock(datos: {
   return { nuevaCantidad };
 }
 
-// NUEVA FUNCIÓN: Traslado entre ubicaciones (resta de origen y suma en destino en 1 paso)
+// Traslado entre ubicaciones (SIN PRECIO)
 export async function crearTraslado(datos: { 
   id_producto: string; 
   id_ubicacion_origen: string; 
@@ -432,7 +433,7 @@ export async function crearTraslado(datos: {
     throw new Error(`No hay stock suficiente en origen. Stock actual: ${cantidadEnOrigen}`);
   }
   
-  // 2. Crear movimiento de SALIDA del origen
+  // 2. Crear movimiento de SALIDA del origen - SIN precio
   const { error: movSalida } = await supabase
     .from('movimientos')
     .insert({ 
@@ -441,14 +442,13 @@ export async function crearTraslado(datos: {
       tipo: 'salida' as TipoMovimiento,
       cantidad: datos.cantidad,
       precio_unitario: null,
-      precio_total: null,
       notas: `TRASLADO → ${datos.notas || 'Sin notas'}`,
       realizado_por: user.id,
       fecha_movimiento: fecha
     });
   if (movSalida) throw movSalida;
   
-  // 3. Crear movimiento de ENTRADA en el destino
+  // 3. Crear movimiento de ENTRADA en el destino - SIN precio
   const { error: movEntrada } = await supabase
     .from('movimientos')
     .insert({ 
@@ -457,7 +457,6 @@ export async function crearTraslado(datos: {
       tipo: 'entrada' as TipoMovimiento,
       cantidad: datos.cantidad,
       precio_unitario: null,
-      precio_total: null,
       notas: `TRASLADO desde origen → ${datos.notas || 'Sin notas'}`,
       realizado_por: user.id,
       fecha_movimiento: fecha
