@@ -45,7 +45,7 @@ const CONFIG_TIPOS = {
     color: 'bg-green-100 text-green-800 border-green-200',
     colorBtn: 'bg-green-600 hover:bg-green-700',
     descripcion: 'Mercancía nueva del proveedor',
-    emoji: ''
+    emoji: '📥'
   },
   traslado: { 
     label: 'Traslado', 
@@ -168,7 +168,7 @@ function MovimientosPage() {
       const stock = await obtenerStockLineales();
       setStockLineales(stock);
       const inicial = new Map<string, number>();
-      stock.forEach(s => inicial.set(`${s.id_producto}-${s.id_ubicacion}`, s.cantidad));
+      stock.forEach(s => inicial.set(`${s.id_producto}::${s.id_ubicacion}`, s.cantidad));
       setCantidadesReales(inicial);
       setModalAjusteAbierto(true);
     } catch (e) {
@@ -183,7 +183,7 @@ function MovimientosPage() {
       let totalDiferencia = 0;
       
       for (const [key, cantidadReal] of cantidadesReales.entries()) {
-        const [idProducto, idUbicacion] = key.split('-');
+        const [idProducto, idUbicacion] = key.split('::');
         const resultado = await ajustarStockLineal({
           id_producto: idProducto,
           id_ubicacion: idUbicacion,
@@ -206,7 +206,7 @@ function MovimientosPage() {
   }
 
   function actualizarCantidadReal(idProducto: string, idUbicacion: string, valor: number) {
-    const key = `${idProducto}-${idUbicacion}`;
+    const key = `${idProducto}::${idUbicacion}`;
     setCantidadesReales(prev => {
       const nuevo = new Map(prev);
       nuevo.set(key, valor);
@@ -307,7 +307,7 @@ function MovimientosPage() {
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-blue-700">🛣️ PASILLOS</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'pasillo').map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>🛣️ {p.nombre}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>️ {p.nombre}</SelectItem>
                 ))}
               </SelectGroup>
               <SelectGroup>
@@ -338,7 +338,7 @@ function MovimientosPage() {
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {h.tipo === 'armario' ? '️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -553,7 +553,7 @@ function MovimientosPage() {
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
-                                <p className="font-semibold mb-1">🟡 Stock NO fiable</p>
+                                <p className="font-semibold mb-1"> Stock NO fiable</p>
                                 <p className="text-xs">Este stock puede estar inflado porque no se registran las ventas de clientes.</p>
                               </TooltipContent>
                             </Tooltip>
@@ -566,7 +566,7 @@ function MovimientosPage() {
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p className="font-semibold mb-1">🔵 Stock 100% fiable</p>
+                                <p className="font-semibold mb-1"> Stock 100% fiable</p>
                                 <p className="text-xs">La reserva es un almacén controlado.</p>
                               </TooltipContent>
                             </Tooltip>
@@ -635,11 +635,11 @@ function MovimientosPage() {
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
-                                          ️ Stock estimado
+                                          ⚠️ Stock estimado
                                         </Badge>
                                       </TooltipTrigger>
                                       <TooltipContent side="top">
-                                        <p className="font-semibold mb-1">🟡 Stock NO fiable</p>
+                                        <p className="font-semibold mb-1"> Stock NO fiable</p>
                                         <p className="text-xs">Zonas de venta. El stock puede variar por compras de clientes.</p>
                                       </TooltipContent>
                                     </Tooltip>
@@ -1058,7 +1058,7 @@ function MovimientosPage() {
 
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                   {stockLineales.map((item) => {
-                    const key = `${item.id_producto}-${item.id_ubicacion}`;
+                    const key = `${item.id_producto}::${item.id_ubicacion}`;
                     const cantidadSistema = item.cantidad;
                     const cantidadReal = cantidadesReales.get(key) ?? cantidadSistema;
                     const diferencia = cantidadReal - cantidadSistema;
@@ -1074,7 +1074,7 @@ function MovimientosPage() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{item.nombre_producto}</p>
                           <p className="text-xs text-muted-foreground">
-                             {item.nombre_ubicacion}
+                            📍 {item.nombre_ubicacion}
                           </p>
                         </div>
                         

@@ -321,7 +321,7 @@ export async function sePuedeBorrarDefinitivamente(id: string): Promise<boolean>
 }
 
 // ============================================
-// MOVIMIENTOS CON ACTUALIZACIÓN AUTOMÁTICA DE STOCK (SIN PRECIO)
+// MOVIMIENTOS CON ACTUALIZACIÓN AUTOMÁTICA DE STOCK
 // ============================================
 
 export async function crearMovimientoConStock(datos: { 
@@ -551,13 +551,14 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
   let productosAfectados = 0;
   
   for (const stock of stockLineales) {
+    // ✅ Usamos SALIDA con la cantidad actual (no 0) para respetar el constraint cantidad > 0
     const { error: movError } = await supabase
       .from('movimientos')
       .insert({
         id_producto: stock.id_producto,
         id_ubicacion: stock.id_ubicacion,
-        tipo: 'ajuste' as TipoMovimiento,
-        cantidad: 0,
+        tipo: 'salida' as TipoMovimiento,
+        cantidad: stock.cantidad,
         precio_unitario: null,
         notas: `LIMPIEZA AUTOMÁTICA - Stock reseteado a 0 (tenía ${stock.cantidad} uds)`,
         realizado_por: user.id,
@@ -650,21 +651,45 @@ export async function ajustarStockLineal(datos: {
     return { ajustado: false, diferencia: 0 };
   }
   
-  const { error: movError } = await supabase
-    .from('movimientos')
-    .insert({
-      id_producto: datos.id_producto,
-      id_ubicacion: datos.id_ubicacion,
-      tipo: 'ajuste' as TipoMovimiento,
-      cantidad: datos.cantidad_real,
-      precio_unitario: null,
-      notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${datos.cantidad_real - cantidadSistema})`,
-      realizado_por: user.id,
-      fecha_movimiento: fecha
-    });
+  const diferencia = datos.cantidad_real - cantidadSistema;
   
-  if (movError) throw movError;
+  // ✅ Si la cantidad real es menor o igual: hacer SALIDA con la diferencia
+  if (datos.cantidad_real <= cantidadSistema) {
+    const cantidadASacar = cantidadSistema - datos.cantidad_real;
+    if (cantidadASacar > 0) {
+      const { error: movError } = await supabase
+        .from('movimientos')
+        .insert({
+          id_producto: datos.id_producto,
+          id_ubicacion: datos.id_ubicacion,
+          tipo: 'salida' as TipoMovimiento,
+          cantidad: cantidadASacar,
+          precio_unitario: null,
+          notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${diferencia})`,
+          realizado_por: user.id,
+          fecha_movimiento: fecha
+        });
+      if (movError) throw movError;
+    }
+  } else {
+    // ✅ Si la cantidad real es mayor: hacer ENTRADA con la diferencia
+    const cantidadAAñadir = datos.cantidad_real - cantidadSistema;
+    const { error: movError } = await supabase
+      .from('movimientos')
+      .insert({
+        id_producto: datos.id_producto,
+        id_ubicacion: datos.id_ubicacion,
+        tipo: 'entrada' as TipoMovimiento,
+        cantidad: cantidadAAñadir,
+        precio_unitario: null,
+        notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: +${diferencia})`,
+        realizado_por: user.id,
+        fecha_movimiento: fecha
+      });
+    if (movError) throw movError;
+  }
   
+  // Actualizar stock al valor real
   if (datos.cantidad_real > 0) {
     if (stockActual) {
       const { error: updateError } = await supabase
@@ -684,6 +709,7 @@ export async function ajustarStockLineal(datos: {
       if (insertError) throw insertError;
     }
   } else {
+    // Si cantidad_real es 0, eliminar el registro de stock
     const { error: deleteError } = await supabase
       .from('stock')
       .delete()
@@ -692,7 +718,7 @@ export async function ajustarStockLineal(datos: {
     if (deleteError) throw deleteError;
   }
   
-  return { ajustado: true, diferencia: datos.cantidad_real - cantidadSistema };
+  return { ajustado: true, diferencia };
 }
 
 // ============================================
@@ -702,7 +728,6 @@ export async function ajustarStockLineal(datos: {
 export async function buscarProductoPorCodigo(codigo: string): Promise<Producto | null> {
   if (!codigo.trim()) return null;
   
-  // Buscar en productos activos primero
   const { data, error } = await supabase
     .from('productos')
     .select('*')
