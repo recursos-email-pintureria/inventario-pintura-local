@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Plus, Search, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowUpFromLine, RotateCcw, SlidersHorizontal, ArrowRightLeft, AlertCircle, MapPin } from 'lucide-react';
+import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,7 +25,7 @@ import {
 import { CargandoInventario, ErrorInventario } from '@/components/inventario/EstadoInventario';
 
 export const Route = createFileRoute('/_authenticated/movimientos')({
-  head: () => pageHead('Movimientos', 'Registro de entradas, salidas, traslados y ajustes de stock.'),
+  head: () => pageHead('Movimientos', 'Gestión de stock en armarios y ubicaciones.'),
   loader: async ({ context }) => { 
     const user = await usuarioActual(); 
     await context.queryClient.ensureQueryData(inventarioQueryOptions(user.id)); 
@@ -36,23 +36,15 @@ export const Route = createFileRoute('/_authenticated/movimientos')({
   component: MovimientosPage,
 });
 
-// Configuración visual de tipos de movimiento
+// Solo 3 tipos: Entrada, Traslado, Ajuste
 const CONFIG_TIPOS = {
   entrada: { 
     label: 'Entrada', 
     icon: ArrowDownToLine, 
     color: 'bg-green-100 text-green-800 border-green-200',
     colorBtn: 'bg-green-600 hover:bg-green-700',
-    descripcion: 'Mercancía recibida',
+    descripcion: 'Mercancía nueva del proveedor',
     emoji: '📥'
-  },
-  salida: { 
-    label: 'Salida', 
-    icon: ArrowUpFromLine, 
-    color: 'bg-red-100 text-red-800 border-red-200',
-    colorBtn: 'bg-red-600 hover:bg-red-700',
-    descripcion: 'Venta o consumo',
-    emoji: ''
   },
   traslado: { 
     label: 'Traslado', 
@@ -72,7 +64,7 @@ const CONFIG_TIPOS = {
   },
 } as const;
 
-type TipoMovimientoForm = 'entrada' | 'salida' | 'traslado' | 'ajuste';
+type TipoMovimientoForm = 'entrada' | 'traslado' | 'ajuste';
 
 function MovimientosPage() {
   const { userId } = Route.useLoaderData();
@@ -87,11 +79,9 @@ function MovimientosPage() {
   const [productoId, setProductoId] = useState('');
   const [tipo, setTipo] = useState<TipoMovimientoForm>('entrada');
   
-  // Para entrada/salida/ajuste: una sola ubicación
   const [ubicacionPadreId, setUbicacionPadreId] = useState('');
   const [ubicacionId, setUbicacionId] = useState('');
   
-  // Para traslado: origen y destino
   const [ubicacionOrigenPadreId, setUbicacionOrigenPadreId] = useState('');
   const [ubicacionOrigenId, setUbicacionOrigenId] = useState('');
   const [ubicacionDestinoPadreId, setUbicacionDestinoPadreId] = useState('');
@@ -104,7 +94,6 @@ function MovimientosPage() {
   const [stockActual, setStockActual] = useState<number | null>(null);
   const [ubicacionesConStock, setUbicacionesConStock] = useState<{ id_ubicacion: string; cantidad: number; nombre_ubicacion?: string }[]>([]);
 
-  // Filtros
   const [filtros, setFiltros] = useState<FiltrosMovimiento>({
     desde: new Date().toISOString().split('T')[0],
     hasta: new Date().toISOString().split('T')[0],
@@ -175,33 +164,25 @@ function MovimientosPage() {
     setAbierto(true);
   }
 
-  // ✅ CUANDO CAMBIA EL PRODUCTO: cargar automáticamente dónde hay stock
   useEffect(() => {
     if (productoId) {
       obtenerUbicacionesConStock(productoId).then((ubicaciones) => {
-        // Añadir nombres de ubicaciones
         const ubicacionesConNombres = ubicaciones.map(u => ({
           ...u,
           nombre_ubicacion: data.ubicaciones.find((loc: any) => loc.id === u.id_ubicacion)?.nombre || 'Desconocida'
         }));
         setUbicacionesConStock(ubicacionesConNombres);
         
-        // Si es SALIDA y hay ubicaciones con stock, pre-seleccionar la primera o mostrar alerta
-        if (tipo === 'salida' && ubicacionesConNombres.length > 0) {
+        if (tipo === 'ajuste' && ubicacionesConNombres.length > 0) {
           const primeraUbicacion = ubicacionesConNombres[0];
           setUbicacionId(primeraUbicacion.id_ubicacion);
-          
-          // Encontrar el padre de esta ubicación
           const ubicacionCompleta = data.ubicaciones.find((u: any) => u.id === primeraUbicacion.id_ubicacion);
           if (ubicacionCompleta?.id_ubicacion_padre) {
             setUbicacionPadreId(ubicacionCompleta.id_ubicacion_padre);
           } else {
             setUbicacionPadreId(primeraUbicacion.id_ubicacion);
           }
-          
           obtenerStockActual(productoId, primeraUbicacion.id_ubicacion).then(setStockActual);
-        } else if (tipo === 'salida' && ubicacionesConNombres.length === 0) {
-          toast.warning('Este producto no tiene stock en ninguna ubicación');
         }
       });
     } else {
@@ -209,7 +190,6 @@ function MovimientosPage() {
     }
   }, [productoId, tipo, data.ubicaciones]);
 
-  // Cuando cambia la ubicación, cargar stock actual
   useEffect(() => {
     if (productoId && ubicacionId && tipo !== 'traslado') {
       obtenerStockActual(productoId, ubicacionId).then(setStockActual);
@@ -233,7 +213,6 @@ function MovimientosPage() {
 
   const productoSeleccionado = data.productos.find(p => p.id === productoId);
 
-  // Renderizar selectores de ubicación (reutilizable)
   function renderSelectoresUbicacion(
     labelZona: string,
     labelUbicacion: string,
@@ -257,11 +236,11 @@ function MovimientosPage() {
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-blue-700">🛣️ PASILLOS</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'pasillo').map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>️ {p.nombre}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>🛣️ {p.nombre}</SelectItem>
                 ))}
               </SelectGroup>
               <SelectGroup>
-                <SelectLabel className="text-xs font-bold text-gray-700">🏭 RESERVA</SelectLabel>
+                <SelectLabel className="text-xs font-bold text-gray-700"> RESERVA</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'reserva').map((r: any) => (
                   <SelectItem key={r.id} value={r.id}>🏭 {r.nombre}</SelectItem>
                 ))}
@@ -281,14 +260,14 @@ function MovimientosPage() {
               {padreId && (
                 <>
                   <SelectItem value={padreId}>
-                    📍 {data.ubicaciones.find((u: any) => u.id === padreId)?.nombre} (General)
+                     {data.ubicaciones.find((u: any) => u.id === padreId)?.nombre} (General/Lineal)
                   </SelectItem>
                   {data.ubicaciones
                     .filter((h: any) => h.id_ubicacion_padre === padreId)
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : ''}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -314,7 +293,6 @@ function MovimientosPage() {
         ) : undefined} 
       />
 
-      {/* FILTROS */}
       {puedeVer && (
         <Card className="p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
@@ -385,16 +363,11 @@ function MovimientosPage() {
         </Card>
       )}
 
-      {/* TABLA DE MOVIMIENTOS */}
       <Card className="p-4">
         {!puedeVer ? (
-          <div className="text-center py-10 text-muted-foreground">
-            No tienes permisos para ver el historial de movimientos.
-          </div>
+          <div className="text-center py-10 text-muted-foreground">No tienes permisos para ver el historial.</div>
         ) : movimientosFiltrados.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            No hay movimientos con los filtros actuales.
-          </div>
+          <div className="text-center py-10 text-muted-foreground">No hay movimientos con los filtros actuales.</div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -424,9 +397,7 @@ function MovimientosPage() {
                           {cfg.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-xs truncate" title={producto?.nombre}>
-                        {producto?.nombre || '—'}
-                      </TableCell>
+                      <TableCell className="max-w-xs truncate" title={producto?.nombre}>{producto?.nombre || '—'}</TableCell>
                       <TableCell className="text-xs">{ubicacion?.nombre || '—'}</TableCell>
                       <TableCell className="text-right font-mono font-semibold">
                         <span className={m.tipo === 'salida' ? 'text-red-600' : 'text-green-600'}>
@@ -434,9 +405,7 @@ function MovimientosPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right text-xs">{formatoPrecio(m.precio_unitario)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={m.notas || ''}>
-                        {m.notas || '—'}
-                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={m.notas || ''}>{m.notas || '—'}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -446,7 +415,6 @@ function MovimientosPage() {
         )}
       </Card>
 
-      {/* MODAL NUEVO MOVIMIENTO */}
       <Dialog open={abierto} onOpenChange={o => { if (!o && !crear.isPending) { setAbierto(false); resetearFormulario(); } }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -455,16 +423,15 @@ function MovimientosPage() {
               Nuevo movimiento de stock
             </DialogTitle>
             <DialogDescription>
-              Registra una entrada, salida, traslado o ajuste. El stock se actualizará automáticamente.
+              Gestiona el stock de armarios y ubicaciones. El stock se actualizará automáticamente.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={(e: FormEvent) => { e.preventDefault(); crear.mutate(); }} className="space-y-4">
             
-            {/* TIPO DE MOVIMIENTO - Selector visual con 4 opciones */}
             <div>
               <Label className="text-sm font-semibold mb-2 block">Tipo de movimiento</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {Object.entries(CONFIG_TIPOS).map(([key, cfg]) => {
                   const Icon = cfg.icon;
                   const activo = tipo === key;
@@ -488,7 +455,6 @@ function MovimientosPage() {
               </div>
             </div>
 
-            {/* PRODUCTO - Con escaneo */}
             <div className="space-y-2">
               <Label htmlFor="mov-producto">Producto *</Label>
               <div className="flex gap-2">
@@ -519,13 +485,12 @@ function MovimientosPage() {
               )}
             </div>
 
-            {/* ✅ MOSTRAR DÓNDE HAY STOCK DEL PRODUCTO */}
             {productoId && ubicacionesConStock.length > 0 && (
-              <div className={`rounded-lg border p-3 ${tipo === 'salida' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+              <div className={`rounded-lg border p-3 ${tipo === 'ajuste' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'}`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <MapPin className={`h-4 w-4 ${tipo === 'salida' ? 'text-red-700' : 'text-blue-700'}`} />
-                  <Label className={`text-sm font-semibold ${tipo === 'salida' ? 'text-red-800' : 'text-blue-800'}`}>
-                    {tipo === 'salida' ? '📍 Stock disponible para salida:' : '📍 Ubicaciones con stock:'}
+                  <MapPin className={`h-4 w-4 ${tipo === 'ajuste' ? 'text-blue-700' : 'text-purple-700'}`} />
+                  <Label className={`text-sm font-semibold ${tipo === 'ajuste' ? 'text-blue-800' : 'text-purple-800'}`}>
+                    📍 Stock actual del producto:
                   </Label>
                 </div>
                 <div className="space-y-1">
@@ -534,89 +499,79 @@ function MovimientosPage() {
                     const padre = ubicacionCompleta?.id_ubicacion_padre 
                       ? data.ubicaciones.find((u: any) => u.id === ubicacionCompleta.id_ubicacion_padre)
                       : null;
+                    const esArmarioOAlto = ubicacionCompleta?.tipo === 'armario' || ubicacionCompleta?.tipo === 'alto';
                     
                     return (
                       <div 
                         key={item.id_ubicacion} 
                         className={`flex justify-between items-center p-2 rounded ${
                           ubicacionId === item.id_ubicacion 
-                            ? 'bg-white border border-current' 
+                            ? 'bg-white border-2 border-current' 
                             : 'bg-white/50'
-                        } ${tipo === 'salida' ? 'border-red-200' : 'border-blue-200'}`}
+                        } ${esArmarioOAlto ? 'border-green-300' : 'border-gray-200'}`}
                       >
                         <div className="text-sm">
                           {padre && <span className="text-xs text-muted-foreground">{padre.nombre} → </span>}
                           <span className="font-medium">{item.nombre_ubicacion}</span>
+                          {esArmarioOAlto && <Badge variant="outline" className="ml-2 text-xs">Stock controlado</Badge>}
                         </div>
-                        <Badge variant={tipo === 'salida' ? 'destructive' : 'secondary'} className="text-base px-3 py-1">
+                        <Badge variant={esArmarioOAlto ? 'default' : 'secondary'} className="text-base px-3 py-1">
                           {item.cantidad} uds
                         </Badge>
                       </div>
                     );
                   })}
                 </div>
-                {tipo === 'salida' && (
-                  <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    Se ha pre-seleccionado la primera ubicación con stock. Puedes cambiarla si es necesario.
-                  </p>
-                )}
               </div>
             )}
 
-            {/* Alerta si no hay stock y es salida */}
-            {productoId && tipo === 'salida' && ubicacionesConStock.length === 0 && (
+            {productoId && ubicacionesConStock.length === 0 && tipo === 'ajuste' && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
                 <AlertCircle className="h-5 w-5 text-yellow-700 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-yellow-800">⚠️ Producto sin stock</p>
                   <p className="text-xs text-yellow-700 mt-1">
-                    Este producto no tiene stock en ninguna ubicación. No puedes registrar una salida.
+                    Este producto no tiene stock en ninguna ubicación. Usa "Entrada" para añadir stock inicial.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* UBICACIONES - Diferentes según el tipo */}
             {tipo === 'traslado' ? (
-              <>
-                {/* Para TRASLADO: Origen y Destino */}
-                <div className="space-y-3">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <Label className="text-sm font-semibold text-red-800 flex items-center gap-2 mb-2">
-                      <ArrowUpFromLine className="h-4 w-4" />
-                      Ubicación de ORIGEN (de dónde se saca)
-                    </Label>
-                    {renderSelectoresUbicacion(
-                      'Zona origen',
-                      'Ubicación origen',
-                      ubicacionOrigenPadreId,
-                      setUbicacionOrigenPadreId,
-                      ubicacionOrigenId,
-                      setUbicacionOrigenId
-                    )}
-                  </div>
-
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <Label className="text-sm font-semibold text-green-800 flex items-center gap-2 mb-2">
-                      <ArrowDownToLine className="h-4 w-4" />
-                      Ubicación de DESTINO (a dónde se lleva)
-                    </Label>
-                    {renderSelectoresUbicacion(
-                      'Zona destino',
-                      'Ubicación destino',
-                      ubicacionDestinoPadreId,
-                      setUbicacionDestinoPadreId,
-                      ubicacionDestinoId,
-                      setUbicacionDestinoId
-                    )}
-                  </div>
+              <div className="space-y-3">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <Label className="text-sm font-semibold text-red-800 flex items-center gap-2 mb-2">
+                    <ArrowDownToLine className="h-4 w-4" />
+                    Ubicación de ORIGEN (de dónde se saca)
+                  </Label>
+                  {renderSelectoresUbicacion(
+                    'Zona origen',
+                    'Ubicación origen',
+                    ubicacionOrigenPadreId,
+                    setUbicacionOrigenPadreId,
+                    ubicacionOrigenId,
+                    setUbicacionOrigenId
+                  )}
                 </div>
-              </>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <Label className="text-sm font-semibold text-green-800 flex items-center gap-2 mb-2">
+                    <ArrowDownToLine className="h-4 w-4" />
+                    Ubicación de DESTINO (a dónde se lleva)
+                  </Label>
+                  {renderSelectoresUbicacion(
+                    'Zona destino',
+                    'Ubicación destino',
+                    ubicacionDestinoPadreId,
+                    setUbicacionDestinoPadreId,
+                    ubicacionDestinoId,
+                    setUbicacionDestinoId
+                  )}
+                </div>
+              </div>
             ) : (
               <>
-                {/* Para ENTRADA/SALIDA/AJUSTE: Una sola ubicación */}
-                {tipo !== 'salida' && renderSelectoresUbicacion(
+                {renderSelectoresUbicacion(
                   'Zona',
                   'Ubicación específica',
                   ubicacionPadreId,
@@ -627,7 +582,6 @@ function MovimientosPage() {
               </>
             )}
 
-            {/* INFO DE STOCK ACTUAL */}
             {stockActual !== null && productoSeleccionado && (
               <div className="bg-muted/50 border rounded-md p-3 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
@@ -639,7 +593,6 @@ function MovimientosPage() {
               </div>
             )}
 
-            {/* CANTIDAD Y PRECIO */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="mov-cantidad">Cantidad *</Label>
@@ -651,14 +604,9 @@ function MovimientosPage() {
                   value={cantidad} 
                   onChange={e => setCantidad(e.target.value)} 
                   required 
-                  disabled={crear.isPending || (tipo === 'salida' && stockActual !== null && Number(cantidad) > stockActual)}
+                  disabled={crear.isPending}
                   placeholder="Ej: 10"
                 />
-                {tipo === 'salida' && stockActual !== null && Number(cantidad) > stockActual && (
-                  <p className="text-xs text-red-600 mt-1">
-                    ⚠️ No hay stock suficiente (máximo: {stockActual})
-                  </p>
-                )}
               </div>
               {tipo !== 'traslado' && (
                 <div>
@@ -677,7 +625,6 @@ function MovimientosPage() {
               )}
             </div>
 
-            {/* NOTAS */}
             <div>
               <Label htmlFor="mov-notas">Notas (opcional)</Label>
               <Textarea 
@@ -698,7 +645,7 @@ function MovimientosPage() {
               </Button>
               <Button 
                 type="submit" 
-                disabled={crear.isPending || !productoId || !cantidad || (tipo !== 'traslado' && !ubicacionId && tipo !== 'salida') || (tipo === 'traslado' && (!ubicacionOrigenId || !ubicacionDestinoId)) || (tipo === 'salida' && ubicacionesConStock.length === 0)}
+                disabled={crear.isPending || !productoId || !cantidad || (tipo !== 'traslado' && !ubicacionId) || (tipo === 'traslado' && (!ubicacionOrigenId || !ubicacionDestinoId))}
                 className={CONFIG_TIPOS[tipo].colorBtn}
               >
                 {crear.isPending ? 'Registrando...' : `Registrar ${CONFIG_TIPOS[tipo].label}`}
@@ -708,7 +655,6 @@ function MovimientosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL ESCÁNER */}
       <Dialog open={escaneando} onOpenChange={setEscaneando}>
         <DialogContent>
           <DialogHeader>
