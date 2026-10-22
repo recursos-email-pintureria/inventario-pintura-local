@@ -208,7 +208,6 @@ export async function obtenerUbicaciones(): Promise<UbicacionJerarquica[]> {
   
   if (error) throw error;
   
-  // CORREGIDO: Eliminado el return duplicado que causaba código inalcanzable
   return (data || []).map((u: any) => ({
     ...u,
     seccion_nombre: u.seccion?.nombre || null,
@@ -270,7 +269,6 @@ export async function desactivarUbicacion(id: string) {
   if (error) throw error;
 }
 
-// Borrar ubicación definitivamente (solo si no tiene movimientos ni stock)
 export async function borrarUbicacionDefinitivamente(id: string) {
   const { data: stock, error: stockError } = await supabase
     .from('stock')
@@ -302,7 +300,6 @@ export async function borrarUbicacionDefinitivamente(id: string) {
   if (error) throw error;
 }
 
-// Verificar si una ubicación se puede borrar definitivamente
 export async function sePuedeBorrarDefinitivamente(id: string): Promise<boolean> {
   const { data: stock } = await supabase
     .from('stock')
@@ -321,4 +318,92 @@ export async function sePuedeBorrarDefinitivamente(id: string): Promise<boolean>
   if (movimientos && movimientos.length > 0) return false;
 
   return true;
+}
+
+// ============================================
+// MOVIMIENTOS CON ACTUALIZACIÓN AUTOMÁTICA DE STOCK
+// ============================================
+
+export async function crearMovimientoConStock(datos: { 
+  id_producto: string; 
+  id_ubicacion: string; 
+  tipo: TipoMovimiento; 
+  cantidad: number; 
+  precio_unitario: number | null; 
+  notas: string 
+}) {
+  validarCantidad(datos.cantidad);
+  if (!datos.id_producto || !datos.id_ubicacion) throw new Error('Selecciona producto y ubicación.');
+  
+  const user = await usuarioActual();
+  
+  // 1. Crear el movimiento (historial)
+  const { error: movError } = await supabase
+    .from('movimientos')
+    .insert({ 
+      ...datos, 
+      notas: datos.notas.trim() || null, 
+      realizado_por: user.id,
+      precio_total: datos.precio_unitario ? datos.precio_unitario * datos.cantidad : null
+    });
+  if (movError) throw movError;
+
+  // 2. Actualizar stock según el tipo
+  const { data: stockActual, error: stockError } = await supabase
+    .from('stock')
+    .select('cantidad')
+    .eq('id_producto', datos.id_producto)
+    .eq('id_ubicacion', datos.id_ubicacion)
+    .maybeSingle();
+  
+  if (stockError) throw stockError;
+
+  const cantidadActual = stockActual?.cantidad || 0;
+  let nuevaCantidad = cantidadActual;
+
+  if (datos.tipo === 'entrada' || datos.tipo === 'reposicion') {
+    nuevaCantidad = cantidadActual + datos.cantidad;
+  } else if (datos.tipo === 'salida') {
+    nuevaCantidad = cantidadActual - datos.cantidad;
+    if (nuevaCantidad < 0) {
+      throw new Error(`No hay stock suficiente. Stock actual: ${cantidadActual}`);
+    }
+  } else if (datos.tipo === 'ajuste') {
+    // Ajuste: la cantidad es la nueva cantidad absoluta
+    nuevaCantidad = datos.cantidad;
+    if (nuevaCantidad < 0) {
+      throw new Error('La cantidad de ajuste no puede ser negativa.');
+    }
+  }
+
+  // 3. Insertar o actualizar stock
+  if (stockActual) {
+    const { error: updateError } = await supabase
+      .from('stock')
+      .update({ cantidad: nuevaCantidad })
+      .eq('id_producto', datos.id_producto)
+      .eq('id_ubicacion', datos.id_ubicacion);
+    if (updateError) throw updateError;
+  } else if (nuevaCantidad > 0) {
+    const { error: insertError } = await supabase
+      .from('stock')
+      .insert({ 
+        id_producto: datos.id_producto, 
+        id_ubicacion: datos.id_ubicacion, 
+        cantidad: nuevaCantidad 
+      });
+    if (insertError) throw insertError;
+  }
+
+  return { nuevaCantidad };
+}
+
+export async function obtenerStockActual(id_producto: string, id_ubicacion: string): Promise<number> {
+  const { data } = await supabase
+    .from('stock')
+    .select('cantidad')
+    .eq('id_producto', id_producto)
+    .eq('id_ubicacion', id_ubicacion)
+    .maybeSingle();
+  return data?.cantidad || 0;
 }
