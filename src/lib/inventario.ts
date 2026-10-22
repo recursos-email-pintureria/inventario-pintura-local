@@ -627,8 +627,72 @@ export async function obtenerStockLineales(): Promise<{
   }
 }
 
-export async function ajustarStockLineal(datos: {
+export async function obtenerStockLineales(): Promise<{
   id_producto: string;
+  id_ubicacion: string;
+  cantidad: number;
+  nombre_producto?: string;
+  nombre_ubicacion?: string;
+}[]> {
+  try {
+    // Paso 1: Obtener ubicaciones de tipo pasillo
+    const { data: lineales, error: errorLineales } = await supabase
+      .from('ubicaciones')
+      .select('id, nombre')
+      .eq('tipo', 'pasillo')
+      .eq('activo', true);
+    
+    if (errorLineales) {
+      console.error('Error obteniendo lineales:', errorLineales);
+      return [];
+    }
+    
+    if (!lineales || lineales.length === 0) return [];
+    
+    const idsLineales = lineales.map(l => l.id);
+    const linealesMap = new Map(lineales.map(l => [l.id, l.nombre]));
+    
+    // Paso 2: Obtener stock en esos lineales
+    const { data: stockLineales, error: errorStock } = await supabase
+      .from('stock')
+      .select('id_producto, id_ubicacion, cantidad')
+      .in('id_ubicacion', idsLineales)
+      .gt('cantidad', 0);
+    
+    if (errorStock) {
+      console.error('Error obteniendo stock:', errorStock);
+      return [];
+    }
+    
+    if (!stockLineales || stockLineales.length === 0) return [];
+    
+    // Paso 3: Obtener nombres de productos
+    const idsProductos = [...new Set(stockLineales.map(s => s.id_producto))];
+    const { data: productos, error: errorProductos } = await supabase
+      .from('productos')
+      .select('id, nombre')
+      .in('id', idsProductos);
+    
+    if (errorProductos) {
+      console.error('Error obteniendo productos:', errorProductos);
+      return [];
+    }
+    
+    const productosMap = new Map((productos || []).map(p => [p.id, p.nombre]));
+    
+    // Paso 4: Combinar todo
+    return stockLineales.map(s => ({
+      id_producto: s.id_producto,
+      id_ubicacion: s.id_ubicacion,
+      cantidad: s.cantidad,
+      nombre_producto: productosMap.get(s.id_producto) || 'Desconocido',
+      nombre_ubicacion: linealesMap.get(s.id_ubicacion) || 'Desconocida',
+    }));
+  } catch (e) {
+    console.error('Error en obtenerStockLineales:', e);
+    return [];
+  }
+}  id_producto: string;
   id_ubicacion: string;
   cantidad_real: number;
 }) {
