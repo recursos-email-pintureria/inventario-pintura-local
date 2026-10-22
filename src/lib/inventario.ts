@@ -592,40 +592,39 @@ export async function obtenerStockLineales(): Promise<{
   nombre_producto?: string;
   nombre_ubicacion?: string;
 }[]> {
-  const { data: lineales, error: errorLineales } = await supabase
-    .from('ubicaciones')
-    .select('id, nombre')
-    .eq('tipo', 'pasillo')
-    .eq('activo', true);
-  
-  if (errorLineales) throw errorLineales;
-  if (!lineales || lineales.length === 0) return [];
-  
-  const idsLineales = lineales.map(l => l.id);
-  
-  const { data: stockLineales, error: errorStock } = await supabase
-    .from('stock')
-    .select('id_producto, id_ubicacion, cantidad')
-    .in('id_ubicacion', idsLineales)
-    .gt('cantidad', 0);
-  
-  if (errorStock) throw errorStock;
-  if (!stockLineales || stockLineales.length === 0) return [];
-  
-  const idsProductos = [...new Set(stockLineales.map(s => s.id_producto))];
-  const { data: productos } = await supabase
-    .from('productos')
-    .select('id, nombre')
-    .in('id', idsProductos);
-  
-  const productosMap = new Map((productos || []).map(p => [p.id, p.nombre]));
-  const linealesMap = new Map(lineales.map(l => [l.id, l.nombre]));
-  
-  return stockLineales.map(s => ({
-    ...s,
-    nombre_producto: productosMap.get(s.id_producto) || 'Desconocido',
-    nombre_ubicacion: linealesMap.get(s.id_ubicacion) || 'Desconocida',
-  }));
+  try {
+    // Consulta simplificada: obtener stock con JOIN a productos y ubicaciones
+    const { data, error } = await supabase
+      .from('stock')
+      .select(`
+        id_producto,
+        id_ubicacion,
+        cantidad,
+        producto:productos(nombre),
+        ubicacion:ubicaciones(nombre, tipo)
+      `)
+      .eq('ubicaciones.tipo', 'pasillo')
+      .eq('ubicaciones.activo', true)
+      .gt('cantidad', 0);
+    
+    if (error) {
+      console.error('Error obteniendo stock de lineales:', error);
+      return [];
+    }
+    
+    if (!data || data.length === 0) return [];
+    
+    return data.map((item: any) => ({
+      id_producto: item.id_producto,
+      id_ubicacion: item.id_ubicacion,
+      cantidad: item.cantidad,
+      nombre_producto: item.producto?.nombre || 'Desconocido',
+      nombre_ubicacion: item.ubicacion?.nombre || 'Desconocida',
+    }));
+  } catch (e) {
+    console.error('Error en obtenerStockLineales:', e);
+    return [];
+  }
 }
 
 export async function ajustarStockLineal(datos: {
