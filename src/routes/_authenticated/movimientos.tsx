@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Plus, Search, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowUpFromLine, RotateCcw, SlidersHorizontal, ArrowRightLeft, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowUpFromLine, RotateCcw, SlidersHorizontal, ArrowRightLeft, AlertCircle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -44,7 +44,7 @@ const CONFIG_TIPOS = {
     color: 'bg-green-100 text-green-800 border-green-200',
     colorBtn: 'bg-green-600 hover:bg-green-700',
     descripcion: 'Mercancía recibida',
-    emoji: ''
+    emoji: '📥'
   },
   salida: { 
     label: 'Salida', 
@@ -52,7 +52,7 @@ const CONFIG_TIPOS = {
     color: 'bg-red-100 text-red-800 border-red-200',
     colorBtn: 'bg-red-600 hover:bg-red-700',
     descripcion: 'Venta o consumo',
-    emoji: '📤'
+    emoji: ''
   },
   traslado: { 
     label: 'Traslado', 
@@ -102,7 +102,7 @@ function MovimientosPage() {
   const [notas, setNotas] = useState('');
   const [error, setError] = useState('');
   const [stockActual, setStockActual] = useState<number | null>(null);
-  const [ubicacionesConStock, setUbicacionesConStock] = useState<{ id_ubicacion: string; cantidad: number }[]>([]);
+  const [ubicacionesConStock, setUbicacionesConStock] = useState<{ id_ubicacion: string; cantidad: number; nombre_ubicacion?: string }[]>([]);
 
   // Filtros
   const [filtros, setFiltros] = useState<FiltrosMovimiento>({
@@ -175,14 +175,39 @@ function MovimientosPage() {
     setAbierto(true);
   }
 
-  // Cuando cambia el producto, cargar sus ubicaciones con stock
+  // ✅ CUANDO CAMBIA EL PRODUCTO: cargar automáticamente dónde hay stock
   useEffect(() => {
     if (productoId) {
-      obtenerUbicacionesConStock(productoId).then(setUbicacionesConStock);
+      obtenerUbicacionesConStock(productoId).then((ubicaciones) => {
+        // Añadir nombres de ubicaciones
+        const ubicacionesConNombres = ubicaciones.map(u => ({
+          ...u,
+          nombre_ubicacion: data.ubicaciones.find((loc: any) => loc.id === u.id_ubicacion)?.nombre || 'Desconocida'
+        }));
+        setUbicacionesConStock(ubicacionesConNombres);
+        
+        // Si es SALIDA y hay ubicaciones con stock, pre-seleccionar la primera o mostrar alerta
+        if (tipo === 'salida' && ubicacionesConNombres.length > 0) {
+          const primeraUbicacion = ubicacionesConNombres[0];
+          setUbicacionId(primeraUbicacion.id_ubicacion);
+          
+          // Encontrar el padre de esta ubicación
+          const ubicacionCompleta = data.ubicaciones.find((u: any) => u.id === primeraUbicacion.id_ubicacion);
+          if (ubicacionCompleta?.id_ubicacion_padre) {
+            setUbicacionPadreId(ubicacionCompleta.id_ubicacion_padre);
+          } else {
+            setUbicacionPadreId(primeraUbicacion.id_ubicacion);
+          }
+          
+          obtenerStockActual(productoId, primeraUbicacion.id_ubicacion).then(setStockActual);
+        } else if (tipo === 'salida' && ubicacionesConNombres.length === 0) {
+          toast.warning('Este producto no tiene stock en ninguna ubicación');
+        }
+      });
     } else {
       setUbicacionesConStock([]);
     }
-  }, [productoId]);
+  }, [productoId, tipo, data.ubicaciones]);
 
   // Cuando cambia la ubicación, cargar stock actual
   useEffect(() => {
@@ -232,7 +257,7 @@ function MovimientosPage() {
               <SelectGroup>
                 <SelectLabel className="text-xs font-bold text-blue-700">🛣️ PASILLOS</SelectLabel>
                 {data.ubicaciones.filter((u: any) => u.tipo === 'pasillo').map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>🛣️ {p.nombre}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>️ {p.nombre}</SelectItem>
                 ))}
               </SelectGroup>
               <SelectGroup>
@@ -263,7 +288,7 @@ function MovimientosPage() {
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -494,6 +519,64 @@ function MovimientosPage() {
               )}
             </div>
 
+            {/* ✅ MOSTRAR DÓNDE HAY STOCK DEL PRODUCTO */}
+            {productoId && ubicacionesConStock.length > 0 && (
+              <div className={`rounded-lg border p-3 ${tipo === 'salida' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className={`h-4 w-4 ${tipo === 'salida' ? 'text-red-700' : 'text-blue-700'}`} />
+                  <Label className={`text-sm font-semibold ${tipo === 'salida' ? 'text-red-800' : 'text-blue-800'}`}>
+                    {tipo === 'salida' ? '📍 Stock disponible para salida:' : '📍 Ubicaciones con stock:'}
+                  </Label>
+                </div>
+                <div className="space-y-1">
+                  {ubicacionesConStock.map((item) => {
+                    const ubicacionCompleta = data.ubicaciones.find((u: any) => u.id === item.id_ubicacion);
+                    const padre = ubicacionCompleta?.id_ubicacion_padre 
+                      ? data.ubicaciones.find((u: any) => u.id === ubicacionCompleta.id_ubicacion_padre)
+                      : null;
+                    
+                    return (
+                      <div 
+                        key={item.id_ubicacion} 
+                        className={`flex justify-between items-center p-2 rounded ${
+                          ubicacionId === item.id_ubicacion 
+                            ? 'bg-white border border-current' 
+                            : 'bg-white/50'
+                        } ${tipo === 'salida' ? 'border-red-200' : 'border-blue-200'}`}
+                      >
+                        <div className="text-sm">
+                          {padre && <span className="text-xs text-muted-foreground">{padre.nombre} → </span>}
+                          <span className="font-medium">{item.nombre_ubicacion}</span>
+                        </div>
+                        <Badge variant={tipo === 'salida' ? 'destructive' : 'secondary'} className="text-base px-3 py-1">
+                          {item.cantidad} uds
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+                {tipo === 'salida' && (
+                  <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Se ha pre-seleccionado la primera ubicación con stock. Puedes cambiarla si es necesario.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Alerta si no hay stock y es salida */}
+            {productoId && tipo === 'salida' && ubicacionesConStock.length === 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-700 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-800">⚠️ Producto sin stock</p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Este producto no tiene stock en ninguna ubicación. No puedes registrar una salida.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* UBICACIONES - Diferentes según el tipo */}
             {tipo === 'traslado' ? (
               <>
@@ -533,7 +616,7 @@ function MovimientosPage() {
             ) : (
               <>
                 {/* Para ENTRADA/SALIDA/AJUSTE: Una sola ubicación */}
-                {renderSelectoresUbicacion(
+                {tipo !== 'salida' && renderSelectoresUbicacion(
                   'Zona',
                   'Ubicación específica',
                   ubicacionPadreId,
@@ -548,32 +631,11 @@ function MovimientosPage() {
             {stockActual !== null && productoSeleccionado && (
               <div className="bg-muted/50 border rounded-md p-3 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  {tipo === 'traslado' ? 'Stock en origen:' : 'Stock actual:'}
+                  {tipo === 'traslado' ? 'Stock en origen:' : 'Stock actual en esta ubicación:'}
                 </span>
                 <Badge variant="secondary" className="text-lg px-3 py-1">
                   {stockActual} uds
                 </Badge>
-              </div>
-            )}
-
-            {/* Mostrar ubicaciones donde hay stock del producto (útil para traslado) */}
-            {tipo === 'traslado' && productoId && ubicacionesConStock.length > 0 && (
-              <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
-                <Label className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Este producto está actualmente en:
-                </Label>
-                <div className="space-y-1">
-                  {ubicacionesConStock.map((item) => {
-                    const ubi = data.ubicaciones.find((u: any) => u.id === item.id_ubicacion);
-                    return (
-                      <div key={item.id_ubicacion} className="flex justify-between text-sm">
-                        <span>{ubi?.nombre || 'Desconocida'}</span>
-                        <Badge variant="outline">{item.cantidad} uds</Badge>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
 
@@ -589,9 +651,14 @@ function MovimientosPage() {
                   value={cantidad} 
                   onChange={e => setCantidad(e.target.value)} 
                   required 
-                  disabled={crear.isPending} 
+                  disabled={crear.isPending || (tipo === 'salida' && stockActual !== null && Number(cantidad) > stockActual)}
                   placeholder="Ej: 10"
                 />
+                {tipo === 'salida' && stockActual !== null && Number(cantidad) > stockActual && (
+                  <p className="text-xs text-red-600 mt-1">
+                    ⚠️ No hay stock suficiente (máximo: {stockActual})
+                  </p>
+                )}
               </div>
               {tipo !== 'traslado' && (
                 <div>
@@ -631,7 +698,7 @@ function MovimientosPage() {
               </Button>
               <Button 
                 type="submit" 
-                disabled={crear.isPending || !productoId || !cantidad || (tipo !== 'traslado' && !ubicacionId) || (tipo === 'traslado' && (!ubicacionOrigenId || !ubicacionDestinoId))}
+                disabled={crear.isPending || !productoId || !cantidad || (tipo !== 'traslado' && !ubicacionId && tipo !== 'salida') || (tipo === 'traslado' && (!ubicacionOrigenId || !ubicacionDestinoId)) || (tipo === 'salida' && ubicacionesConStock.length === 0)}
                 className={CONFIG_TIPOS[tipo].colorBtn}
               >
                 {crear.isPending ? 'Registrando...' : `Registrar ${CONFIG_TIPOS[tipo].label}`}
