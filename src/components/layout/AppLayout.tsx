@@ -1,120 +1,136 @@
-/** Main app shell: fixed sidebar (sheet on mobile), sticky header, scrollable content. */
-import { useState, type ReactNode } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import {
-  ArrowLeftRight, DoorOpen, FolderTree, LayoutDashboard, LogOut, MapPin, Menu, Package,
-  PaintRoller, Settings, Users,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { useAuth } from "@/contexts/AuthContext";
-import { useMyProfile } from "@/hooks/usePermissions";
-import { cn } from "@/lib/utils";
+import { Link, useLocation } from '@tanstack/react-router';
+import { 
+  LayoutDashboard, 
+  Package, 
+  MapPin, 
+  ArrowRightLeft, 
+  LogOut, 
+  Boxes,
+  Settings
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useMyProfile, cerrarSesion } from '@/hooks/usePermissions';
+import { cn } from '@/lib/utils';
 
-const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/productos", label: "Productos", icon: Package },
-  { to: "/categorias", label: "Categorías", icon: FolderTree },
-  { to: "/ubicaciones", label: "Ubicaciones", icon: MapPin },
-  { to: "/movimientos", label: "Movimientos", icon: ArrowLeftRight },
-  { to: "/usuarios", label: "Usuarios", icon: Users, adminOnly: true },
-  { to: "/configuracion", label: "Configuración", icon: Settings },
-] as const;
+const menuItems = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/productos', label: 'Productos', icon: Package },
+  { to: '/ubicaciones', label: 'Ubicaciones', icon: MapPin },
+  { to: '/movimientos', label: 'Movimientos', icon: ArrowRightLeft },
+];
 
-function SidebarBody({ isAdmin, onNavigate, onSignOut }: { isAdmin: boolean; onNavigate?: () => void; onSignOut: () => void }) {
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5 font-bold">
-        <PaintRoller className="h-5 w-5 text-sidebar-primary" />
-        <span className="truncate">Inventario Pintura - LM</span>
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const { perfil, loading } = useMyProfile();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV.filter((i) => !("adminOnly" in i) || isAdmin).map((item) => {
-          const active = path === item.to || path.startsWith(item.to + "/");
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="border-t border-sidebar-border p-3">
-        <button
-          onClick={onSignOut}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        >
-          <LogOut className="h-4 w-4" /> Cerrar sesión
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function AppLayout({ children }: { children: ReactNode }) {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const path = useRouterState({ select: (s) => s.location.pathname });
-
-  // Rol y nombre desde la base de datos (perfiles_usuario), no de metadatos.
-  const { perfil, isAdmin } = useMyProfile();
-  const name = perfil?.nombre_completo || (user?.email?.split("@")[0] ?? "Usuario");
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate({ to: "/login", replace: true });
-  };
+    );
+  }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-app-content">
-      <aside className="hidden w-[250px] shrink-0 md:block">
-        <SidebarBody isAdmin={isAdmin} onSignOut={handleSignOut} />
-      </aside>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-[250px] border-none p-0">
-          <SheetTitle className="sr-only">Menú</SheetTitle>
-          <SidebarBody isAdmin={isAdmin} onNavigate={() => setOpen(false)} onSignOut={handleSignOut} />
-        </SheetContent>
-      </Sheet>
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 bg-card px-4 shadow-soft sm:px-6">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Abrir menú">
-            <Menu className="h-5 w-5" />
-          </Button>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="text-right leading-tight">
-              <p className="text-sm font-semibold">{name}</p>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
-            </div>
-            <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Cerrar sesión">
-              <DoorOpen className="h-5 w-5" />
-            </Button>
+    <div className="flex h-screen bg-background">
+      {/* ========================================== */}
+      {/* BARRA LATERAL (SIDEBAR)                    */}
+      {/* ========================================== */}
+      <aside className="flex w-64 flex-col border-r bg-card">
+        {/* 🎯 LOGO Y VERSIÓN DE LA APP */}
+        <div className="flex items-center gap-3 px-5 py-6 border-b border-border">
+          <div className="bg-primary text-primary-foreground p-2.5 rounded-xl shadow-sm">
+            <Boxes className="h-6 w-6" /> {/* Icono chulo de inventario */}
           </div>
-        </header>
-        <main key={path} className="flex-1 p-6 animate-in fade-in duration-300">
-          {children}
-        </main>
-      </div>
+          <div className="flex flex-col">
+            <h1 className="font-bold text-lg leading-tight text-foreground">
+              Inventario LM
+            </h1>
+            <span className="text-[10px] font-mono font-semibold bg-muted text-muted-foreground px-1.5 py-0.5 rounded border w-fit mt-1">
+              v1.0.0-beta
+            </span>
+          </div>
+        </div>
+
+        {/* MENÚ DE NAVEGACIÓN */}
+        <nav className="flex-1 space-y-1 px-3 py-4">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.to;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* PIE DE PÁGINA DEL SIDEBAR (USUARIO Y SALIR) */}
+        <div className="border-t border-border p-4 space-y-3">
+          <div className="flex items-center gap-3 px-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
+              {perfil?.nombre_completo?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div className="flex flex-col overflow-hidden">
+              <span className="truncate text-sm font-medium">
+                {perfil?.nombre_completo || 'Usuario'}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {perfil?.email || 'Sin email'}
+              </span>
+            </div>
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            onClick={cerrarSesion}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Cerrar sesión
+          </Button>
+        </div>
+      </aside>
+
+      {/* ========================================== */}
+      {/* CONTENIDO PRINCIPAL                        */}
+      {/* ========================================== */}
+      <main className="flex-1 overflow-auto bg-muted/30">
+        {children}
+      </main>
     </div>
   );
 }
 
-export function PageHeader({ title, action }: { title: string; action?: ReactNode }) {
+// Componente PageHeader para usar en las páginas internas
+export function PageHeader({ 
+  title, 
+  description, 
+  action 
+}: { 
+  title: string; 
+  description?: string; 
+  action?: React.ReactNode 
+}) {
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      {action}
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
+        {description && (
+          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+        )}
+      </div>
+      {action && <div>{action}</div>}
     </div>
   );
 }
