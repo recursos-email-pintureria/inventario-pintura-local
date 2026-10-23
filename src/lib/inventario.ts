@@ -886,15 +886,26 @@ export async function buscarProductoPorCodigo(codigo: string): Promise<Producto 
 }
 
 /** Primeros N productos activos ordenados por nombre (para autocompletado inicial). */
-export async function obtenerTodosProductos(limit = 100): Promise<Producto[]> {
-  const { data, error } = await supabase
+/**
+ * Catálogo paginado de productos activos.
+ * pagina empieza en 1; tamPagina = nº de items por página (ej. 50).
+ */
+export async function obtenerTodosProductos(
+  limit = 100,
+  pagina = 1,
+  tamPagina?: number,
+): Promise<{ productos: Producto[]; total: number }> {
+  const size = tamPagina ?? limit;
+  const desde = (pagina - 1) * size;
+  const hasta = desde + size - 1;
+  const { data, error, count } = await supabase
     .from("productos")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("activo", true)
     .order("nombre", { ascending: true })
-    .limit(limit);
+    .range(desde, hasta);
   if (error) throw error;
-  return (data || []) as Producto[];
+  return { productos: (data || []) as Producto[], total: count ?? 0 };
 }
 
 /** Lista de coincidencias por código de barras exacto o parcial (nombre/SKU). */

@@ -140,7 +140,11 @@ function UbicacionesPage() {
   const [buscandoProductos, setBuscandoProductos] = useState(false);
   const [sinResultados, setSinResultados] = useState(false);
   const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>([]);
+  const [totalCatalogo, setTotalCatalogo] = useState(0);
+  const [paginaCatalogo, setPaginaCatalogo] = useState(1);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const TAM_PAGINA_PRODUCTOS = 50;
 
   const [tipo, setTipo] = useState<string>("pasillo");
   const [nombre, setNombre] = useState("");
@@ -156,17 +160,25 @@ function UbicacionesPage() {
     cargarDatos();
   }, []);
 
-  // Al abrir el formulario "Añadir producto", cargar AUTOMÁTICAMENTE la lista
-  // completa de productos (tabla `productos`) para mostrarla sin esperar escritura.
+  // Al abrir el formulario "Añadir producto", cargar AUTOMÁTICAMENTE la primera
+  // página del catálogo (tabla `productos`) para mostrarla sin esperar escritura.
   useEffect(() => {
     if (modalMode !== "anadir" || catalogoProductos.length > 0) return;
     let cancelado = false;
     (async () => {
       try {
         setBuscandoProductos(true);
-        const todos = await obtenerTodosProductos(100);
-        console.log("[autocompletar] catálogo inicial cargado:", todos.length, "productos");
-        if (!cancelado) setCatalogoProductos(todos);
+        const { productos, total } = await obtenerTodosProductos(
+          TAM_PAGINA_PRODUCTOS,
+          1,
+          TAM_PAGINA_PRODUCTOS,
+        );
+        console.log("[autocompletar] catálogo inicial cargado:", productos.length, "de", total);
+        if (!cancelado) {
+          setCatalogoProductos(productos);
+          setTotalCatalogo(total);
+          setPaginaCatalogo(1);
+        }
       } catch (err: any) {
         console.error("[autocompletar] ERROR cargando catálogo:", err);
         if (!cancelado) toast.error(errorInventario(err));
@@ -179,6 +191,31 @@ function UbicacionesPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalMode]);
+
+  // Scroll infinito: al llegar al final de la lista, cargar 50 productos más.
+  async function cargarMasProductos() {
+    if (cargandoMas || catalogoProductos.length >= totalCatalogo) return;
+    try {
+      setCargandoMas(true);
+      const siguiente = paginaCatalogo + 1;
+      const { productos, total } = await obtenerTodosProductos(
+        TAM_PAGINA_PRODUCTOS,
+        siguiente,
+        TAM_PAGINA_PRODUCTOS,
+      );
+      setCatalogoProductos((prev) => [...prev, ...productos]);
+      setTotalCatalogo(total);
+      setPaginaCatalogo(siguiente);
+      setResultadosBusqueda((prev) => {
+        const nuevos = productos.filter((p) => !prev.some((x) => x.id === p.id));
+        return [...prev, ...nuevos];
+      });
+    } catch (err: any) {
+      toast.error(errorInventario(err));
+    } finally {
+      setCargandoMas(false);
+    }
+  }
 
   async function cargarDatos() {
     try {
@@ -382,7 +419,7 @@ function UbicacionesPage() {
     const q = texto.trim();
     setSinResultados(false);
     if (!q) {
-      setResultadosBusqueda(catalogoProductos.slice(0, 8));
+      setResultadosBusqueda(catalogoProductos);
       setBuscandoProductos(false);
       return;
     }
@@ -396,7 +433,7 @@ function UbicacionesPage() {
         setBuscandoProductos(true);
         const coincidencias = await buscarProductosPorCodigo(q);
         console.log("[autocompletar] resultadosBusqueda:", coincidencias.length);
-        setResultadosBusqueda(coincidencias.slice(0, 8));
+        setResultadosBusqueda(coincidencias);
         setSinResultados(coincidencias.length === 0);
       } catch (err: any) {
         toast.error(errorInventario(err));
@@ -1171,7 +1208,7 @@ function UbicacionesPage() {
                 size="sm"
                 onClick={() => {
                   setModalMode("anadir");
-                  setResultadosBusqueda(catalogoProductos.slice(0, 8));
+                  setResultadosBusqueda(catalogoProductos);
                   setSinResultados(false);
                   setScanError("");
                 }}
@@ -1210,7 +1247,7 @@ function UbicacionesPage() {
                     value={nuevoCodigoBarras}
                     onFocus={() => {
                       if (!nuevoCodigoBarras.trim() && !productoEscaneado) {
-                        setResultadosBusqueda(catalogoProductos.slice(0, 8));
+                        setResultadosBusqueda(catalogoProductos);
                         setSinResultados(false);
                       }
                     }}
@@ -1230,25 +1267,56 @@ function UbicacionesPage() {
                   />
                   {/* Desplegable de resultados (búsqueda global en productos) */}
                   {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
-                    <div className="border border-blue-200 rounded-md bg-white shadow-sm max-h-48 overflow-y-auto divide-y divide-gray-100">
+                    <div
+                      className="relative z-50 border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]"
+                      onScroll={(e) => {
+                        const el = e.currentTarget;
+                        // Scroll infinito: al acercarse al final, cargar 50 más.
+                        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+                          cargarMasProductos();
+                        }
+                      }}
+                    >
                       {buscandoProductos ? (
                         <p className="px-3 py-2 text-sm text-gray-500 animate-pulse">
                           Buscando en todos los productos…
                         </p>
                       ) : resultadosBusqueda.length > 0 ? (
-                        resultadosBusqueda.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => seleccionarProductoBusqueda(p)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
-                          >
-                            <span className="font-medium truncate">{p.nombre}</span>
-                            <span className="text-xs text-gray-500 font-mono shrink-0">
-                              {p.sku} · {p.codigo_barras}
-                            </span>
-                          </button>
-                        ))
+                        <>
+                          <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0">
+                            Mostrando {resultadosBusqueda.length} de{" "}
+                            {totalCatalogo || resultadosBusqueda.length} productos
+                          </p>
+                          {resultadosBusqueda.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => seleccionarProductoBusqueda(p)}
+                              className="w-full text-left px-3 py-3 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                            >
+                              <span className="font-semibold truncate">{p.nombre}</span>
+                              <span className="text-xs text-gray-500 font-mono shrink-0">
+                                {p.sku} · {p.codigo_barras}
+                              </span>
+                            </button>
+                          ))}
+                          {catalogoProductos.length < totalCatalogo && (
+                            <div className="sticky bottom-0 bg-white p-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                disabled={cargandoMas}
+                                onClick={cargarMasProductos}
+                              >
+                                {cargandoMas
+                                  ? "Cargando…"
+                                  : `Cargar más (${totalCatalogo - catalogoProductos.length} restantes)`}
+                              </Button>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <p className="px-3 py-2 text-sm text-gray-500">
                           No se encontraron productos
@@ -1271,7 +1339,7 @@ function UbicacionesPage() {
                     variant="secondary"
                     onClick={() => {
                       if (!nuevoCodigoBarras.trim()) {
-                        setResultadosBusqueda(catalogoProductos.slice(0, 8));
+                        setResultadosBusqueda(catalogoProductos);
                         setSinResultados(false);
                         setScanError("");
                       } else {
