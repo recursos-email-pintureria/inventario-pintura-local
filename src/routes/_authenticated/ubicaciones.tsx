@@ -30,7 +30,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Archive, Layers, Route as IconRoute, Crosshair } from "lucide-react";
+import {
+  Archive,
+  Layers,
+  Route as IconRoute,
+  Crosshair,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import Escaner from "@/components/inventario/Escaner";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
@@ -54,12 +61,12 @@ function getTipoLabel(tipo: string): string {
   return tipo.toUpperCase();
 }
 
-// ✅ ICONOS LUCIDE POR TIPO (mobile-first, columna de ubicación)
-const COLORES_TIPO: Record<string, { iconoColor: string; borde: string }> = {
-  armario: { iconoColor: "text-emerald-500", borde: "border-l-emerald-500" },
-  alto: { iconoColor: "text-blue-500", borde: "border-l-blue-500" },
-  pasillo: { iconoColor: "text-amber-500", borde: "border-l-amber-500" },
-  cross: { iconoColor: "text-purple-500", borde: "border-l-purple-500" },
+// ✅ ICONOS LUCIDE POR TIPO (círculo con fondo de color + borde izquierdo sutil)
+const COLORES_TIPO: Record<string, { circulo: string; borde: string }> = {
+  armario: { circulo: "bg-emerald-100 text-emerald-600", borde: "border-l-emerald-500" },
+  alto: { circulo: "bg-blue-100 text-blue-600", borde: "border-l-blue-500" },
+  pasillo: { circulo: "bg-amber-100 text-amber-600", borde: "border-l-amber-500" },
+  cross: { circulo: "bg-purple-100 text-purple-600", borde: "border-l-purple-500" },
 };
 
 function getIconoComponente(tipo: string) {
@@ -857,63 +864,83 @@ function UbicacionesPage() {
 
     return (
       <div
-        className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${
-          esHijo ? "pl-12 bg-gray-50" : "hover:bg-blue-50"
-        } border-l-2 ${colores ? colores.borde : "border-l-gray-300"}`}
+        className={`bg-white rounded-xl shadow-sm border border-gray-100 border-l-2 ${
+          colores ? colores.borde : "border-l-gray-300"
+        } p-3 md:p-4 mb-2 hover:shadow-md hover:border-gray-200 transition-all duration-200 ${
+          esHijo ? "ml-6 md:ml-10" : ""
+        }`}
       >
-        {/* Columna ubicación mobile-first: [Icono] [Nombre / Detalles] */}
-        <div className="col-span-7 md:col-span-5 flex items-start gap-2">
-          {esHijo && <span className="text-gray-400 text-xs mt-1.5">─</span>}
-          {IconoTipo ? (
-            <IconoTipo
-              className={`w-5 h-5 md:w-4 md:h-4 shrink-0 mt-0.5 ${colores?.iconoColor ?? "text-gray-500"}`}
-              aria-hidden="true"
-            />
-          ) : (
-            <span className="text-base leading-none mt-0.5">{getIconoTipo(ubicacion.tipo)}</span>
-          )}
-          <div className="flex flex-col md:flex-row md:items-baseline md:gap-2 min-w-0">
-            <span className={`truncate ${esHijo ? "text-sm font-medium" : "text-sm font-semibold"}`}>
-              {ubicacion.nombre}
-            </span>
-            <span className="text-xs text-gray-500 truncate">{detalles}</span>
+        {/* Layout: móvil en columnas (botones abajo), desktop en una línea */}
+        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+          {/* ZONA IZQUIERDA: icono circular + nombre + detalles */}
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            {esHijo && (
+              <span className="text-gray-400 text-xs mt-3 shrink-0" aria-hidden="true">
+                ─
+              </span>
+            )}
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                colores ? colores.circulo : "bg-gray-100 text-gray-500"
+              }`}
+              title={getTipoLabel(ubicacion.tipo)}
+            >
+              {IconoTipo ? (
+                <IconoTipo className="w-5 h-5" aria-hidden="true" />
+              ) : (
+                <span className="text-base leading-none">{getIconoTipo(ubicacion.tipo)}</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-gray-900 truncate">
+                {ubicacion.nombre}
+                <span className="md:hidden text-xs font-normal text-gray-500 ml-2">
+                  · {getSeccionReal(ubicacion)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 truncate">{detalles}</div>
+            </div>
           </div>
-        </div>
-        <div className="hidden md:block md:col-span-3 text-sm text-gray-600">
-          {getSeccionReal(ubicacion)}
-        </div>
-        <div className="col-span-5 md:col-span-4 flex justify-end gap-1">
-          <button
-            onClick={() => abrirStockUbicacion(ubicacion)}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-medium ${numProductos > 0 ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-            title="Gestionar productos de esta ubicación"
-          >
-            {numProductos > 0 ? `${numProductos} prod.` : "+ prod."}
-          </button>
-          <button
-            onClick={() => editarUbicacion(ubicacion)}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded"
-            title={`Editar (${getTipoLabel(ubicacion.tipo)})`}
-          >
-            ✏️
-          </button>
-          {numProductos > 0 || tieneHijos ? (
+
+          {/* Sección (solo desktop, misma línea) */}
+          <div className="hidden md:block text-sm text-gray-600 w-36 shrink-0 truncate">
+            {getSeccionReal(ubicacion)}
+          </div>
+
+          {/* ZONA DERECHA: acciones */}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
             <button
-              onClick={() => desactivarUbicacionHandler(ubicacion.id)}
-              className="text-orange-600 hover:text-orange-800 p-1 rounded"
-              title={`Desactivar (${getTipoLabel(ubicacion.tipo)})`}
+              onClick={() => abrirStockUbicacion(ubicacion)}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg px-3 py-1.5 hover:scale-105 transition-transform"
+              title={`Gestionar productos (${getTipoLabel(ubicacion.tipo)})`}
             >
-              ⏸️
+              {numProductos > 0 ? `${numProductos} prod.` : "+ prod."}
             </button>
-          ) : (
             <button
-              onClick={() => borrarDefinitivamente(ubicacion.id)}
-              className="text-red-600 hover:text-red-800 p-1 rounded"
-              title={`Borrar (${getTipoLabel(ubicacion.tipo)})`}
+              onClick={() => editarUbicacion(ubicacion)}
+              className="bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg p-2 hover:scale-105 transition-transform"
+              title={`Editar (${getTipoLabel(ubicacion.tipo)})`}
             >
-              🗑️
+              <Pencil className="w-4 h-4" aria-hidden="true" />
             </button>
-          )}
+            {numProductos > 0 || tieneHijos ? (
+              <button
+                onClick={() => desactivarUbicacionHandler(ubicacion.id)}
+                className="bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg p-2 hover:scale-105 transition-transform"
+                title={`Desactivar (${getTipoLabel(ubicacion.tipo)})`}
+              >
+                ⏸️
+              </button>
+            ) : (
+              <button
+                onClick={() => borrarDefinitivamente(ubicacion.id)}
+                className="bg-red-50 hover:bg-red-100 text-red-600 rounded-lg p-2 hover:scale-105 transition-transform"
+                title={`Borrar (${getTipoLabel(ubicacion.tipo)})`}
+              >
+                <Trash2 className="w-4 h-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -923,7 +950,7 @@ function UbicacionesPage() {
     if (cargando) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
     if (ubicaciones.length === 0) {
       return (
-        <div className="text-center py-12 bg-white rounded-lg border">
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-100 shadow-sm">
           <p className="text-gray-500">No hay ubicaciones.</p>
         </div>
       );
@@ -932,47 +959,45 @@ function UbicacionesPage() {
     const agrupadas = getUbicacionesAgrupadas();
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
+      <div className="animate-in fade-in duration-300">
+        <div className="flex justify-between items-center mb-3 px-1">
           <div className="text-sm text-gray-600">
             <strong>{ubicaciones.length}</strong> ubicaciones
           </div>
           <div className="flex gap-2">
-            <button onClick={expandirTodos} className="text-xs bg-white border px-3 py-1 rounded">
+            <button
+              onClick={expandirTodos}
+              className="text-xs text-gray-600 hover:text-gray-900 px-3 py-1 rounded-lg hover:bg-gray-100 transition-colors"
+            >
               ▼ Expandir
             </button>
-            <button onClick={colapsarTodos} className="text-xs bg-white border px-3 py-1 rounded">
+            <button
+              onClick={colapsarTodos}
+              className="text-xs text-gray-600 hover:text-gray-900 px-3 py-1 rounded-lg hover:bg-gray-100 transition-colors"
+            >
               ▶ Colapsar
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
-          <div className="col-span-7 md:col-span-5">Ubicación</div>
-          <div className="hidden md:block md:col-span-3">Sección</div>
-          <div className="col-span-5 md:col-span-4 text-right">Acciones</div>
-        </div>
-
-        <div className="divide-y divide-gray-100">
-          {agrupadas.map(({ padre, hijos }: any) => {
-            const estaExpandido = expandidos.has(padre.id);
-            const tieneHijos = hijos.length > 0;
-            return (
-              <div key={padre.id}>
-                <div
-                  className={tieneHijos ? "cursor-pointer" : ""}
-                  onClick={() => tieneHijos && toggleExpandir(padre.id)}
-                >
-                  <FilaUbicacion ubicacion={padre} esHijo={false} />
-                </div>
-                {estaExpandido &&
-                  hijos.map((hijo: any) => (
-                    <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
-                  ))}
+        {agrupadas.map(({ padre, hijos }: any) => {
+          const estaExpandido = expandidos.has(padre.id);
+          const tieneHijos = hijos.length > 0;
+          return (
+            <div key={padre.id}>
+              <div
+                className={tieneHijos ? "cursor-pointer" : ""}
+                onClick={() => tieneHijos && toggleExpandir(padre.id)}
+              >
+                <FilaUbicacion ubicacion={padre} esHijo={false} />
               </div>
-            );
-          })}
-        </div>
+              {estaExpandido &&
+                hijos.map((hijo: any) => (
+                  <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
+                ))}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -1396,20 +1421,18 @@ function UbicacionesPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ubicaciones</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Gestiona la estructura jerárquica de tu tienda.
-          </p>
+          <p className="text-sm text-gray-500 mt-1">{ubicaciones.length} ubicaciones</p>
         </div>
         <button
           onClick={() => {
             resetearFormulario();
             setMostrarFormulario(true);
           }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 shadow-sm hover:scale-105 transition-transform self-start sm:self-auto"
         >
           + Nueva ubicación
         </button>
