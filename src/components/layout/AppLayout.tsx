@@ -6,7 +6,8 @@ import {
   ArrowRightLeft, 
   LogOut, 
   Boxes,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMyProfile, cerrarSesion } from '@/hooks/usePermissions';
@@ -17,6 +18,7 @@ const menuItems = [
   { to: '/productos', label: 'Productos', icon: Package },
   { to: '/ubicaciones', label: 'Ubicaciones', icon: MapPin },
   { to: '/movimientos', label: 'Movimientos', icon: ArrowRightLeft },
+  { to: '/usuarios', label: 'Usuarios', icon: Users },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

@@ -303,9 +303,18 @@ function UbicacionesPage() {
       return;
     try {
       setGuardando(true);
-      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0);
+      // Misma lógica que ✏️: se inserta un movimiento y el trigger fija la
+      // cantidad. 'salida' + cantidad final 0 deja el armario sin ese producto.
+      const { sinCambios } = await actualizarStock(producto.id, ubicacionStockAbierta.id, 0, {
+        tipo: "salida",
+        notas: `SALIDA - Producto retirado de ${ubicacionStockAbierta.nombre}`,
+      });
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
+      if (sinCambios) {
+        toast.info(`"${producto.nombre}" ya estaba a 0 en esta ubicación`);
+      } else {
+        toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
+      }
     } catch (err: any) {
       toast.error(errorInventario(err));
     } finally {
@@ -313,51 +322,17 @@ function UbicacionesPage() {
     }
   }
 
-  function abrirAjusteRapido(producto: ProductoConCantidad) {
-    setAjusteRapido(producto);
-    setNuevaCantidadAjuste(producto.cantidad);
+  function abrirAjusteRapido(_producto: ProductoConCantidad) {
+    // Botón ⚡ eliminado (refactor previo): se mantiene el setter para no
+    // romper referencias antiguas del mini-modal.
+    setAjusteRapido(null);
+    setNuevaCantidadAjuste("");
   }
 
   async function guardarAjusteRapido() {
-    if (!ubicacionStockAbierta || !ajusteRapido) return;
-    if (
-      nuevaCantidadAjuste === "" ||
-      !Number.isInteger(nuevaCantidadAjuste) ||
-      nuevaCantidadAjuste < 0
-    ) {
-      toast.error("Introduce una cantidad entera ≥ 0.");
-      return;
-    }
-    try {
-      setGuardando(true);
-      const { data: actual } = await supabase
-        .from("stock")
-        .select("cantidad")
-        .eq("id_producto", ajusteRapido.id)
-        .eq("id_ubicacion", ubicacionStockAbierta.id)
-        .maybeSingle();
-      const cantidadSistema = actual?.cantidad ?? ajusteRapido.cantidad;
-      const diferencia = Math.abs(nuevaCantidadAjuste - cantidadSistema);
-      if (diferencia > 0) {
-        await crearMovimientoConStock({
-          id_producto: ajusteRapido.id,
-          id_ubicacion: ubicacionStockAbierta.id,
-          tipo: "ajuste",
-          cantidad: nuevaCantidadAjuste,
-          notas: `AJUSTE RÁPIDO DESDE ARMARIO - Sistema: ${cantidadSistema} → Real: ${nuevaCantidadAjuste}`,
-        });
-      } else {
-        await actualizarStock(ajusteRapido.id, ubicacionStockAbierta.id, nuevaCantidadAjuste);
-      }
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
-      setAjusteRapido(null);
-      setNuevaCantidadAjuste("");
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setGuardando(false);
-    }
+    // Obsoleto: sustituido por ✏️ (crearMovimientoConStock 'ajuste').
+    setAjusteRapido(null);
+    setNuevaCantidadAjuste("");
   }
 
   // CORRECCIÓN BUG 3: Acepta código manual para que el escáner pueda disparar la búsqueda
@@ -377,8 +352,8 @@ function UbicacionesPage() {
       setBuscandoProductos(true);
       const coincidencias = await buscarProductosPorCodigo(codigo);
       if (coincidencias.length === 1) {
-        seleccionarProductoBusqueda(coincidencias[0]);
-        toast.success(`Producto encontrado: ${coincidencias[0].nombre}`);
+        seleccionarProductoBusqueda(coincidencias[0]!);
+        toast.success(`Producto encontrado: ${coincidencias[0]!.nombre}`);
       } else if (coincidencias.length > 1) {
         setResultadosBusqueda(coincidencias);
         toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
@@ -1439,16 +1414,6 @@ function UbicacionesPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="text-amber-600 hover:text-amber-800 h-8 px-2"
-                              onClick={() => abrirAjusteRapido(p)}
-                              disabled={modalMode !== "ver" || !!ajusteRapido}
-                              title="Ajuste rápido"
-                            >
-                              ⚡
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
                               className="text-red-600 hover:text-red-800 h-8 px-2"
                               onClick={() => eliminarProducto(p)}
                               disabled={modalMode !== "ver" || !!ajusteRapido}
@@ -1472,68 +1437,6 @@ function UbicacionesPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* MINI-MODAL: AJUSTE RÁPIDO */}
-      {ajusteRapido && (
-        <div 
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setAjusteRapido(null);
-              setNuevaCantidadAjuste("");
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setAjusteRapido(null);
-              setNuevaCantidadAjuste("");
-            }
-          }}
-          tabIndex={-1}
-        >
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">⚡ Ajuste rápido</h3>
-            <p className="text-sm text-gray-600">
-              {ajusteRapido.nombre}
-              <span className="text-xs text-gray-500">
-                {" "}
-                (SKU {ajusteRapido.sku}) · actual: {ajusteRapido.cantidad} uds
-              </span>
-            </p>
-            <div className="space-y-1">
-              <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
-              <Input
-                id="cantidad-ajuste-rapido"
-                type="number"
-                min={0}
-                autoFocus
-                value={nuevaCantidadAjuste}
-                onChange={(e) =>
-                  setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
-                }
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAjusteRapido(null);
-                  setNuevaCantidadAjuste("");
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={guardarAjusteRapido}
-                disabled={guardando}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {guardando ? "Guardando..." : "Guardar ajuste"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (CORREGIDO BUG 2 y 3) */}
       {escanerAbierto && (
