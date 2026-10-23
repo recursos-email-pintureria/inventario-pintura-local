@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   obtenerSecciones,
   obtenerUbicaciones,
@@ -12,9 +12,11 @@ import {
   actualizarStock,
   crearMovimientoConStock,
   buscarProductoPorCodigo,
+  buscarProductosPorCodigo, // <-- AÑADIDO
+  descargarCatalogoCompleto, // <-- AÑADIDO
   guardarProducto,
 } from "../../lib/inventario";
-import type { ProductoConCantidad } from "../../lib/inventario";
+import type { Producto, ProductoConCantidad } from "../../lib/inventario"; // <-- AÑADIDO Producto
 import { supabase } from "../../lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -53,18 +55,17 @@ function getTipoLabel(tipo: string): string {
   return tipo.toUpperCase();
 }
 
-// ✅ ICONOS POR TIPO: se usan códigos Unicode explícitos (\u{...})
-// para evitar que los emojis se corrompan al copiar el código desde chats de IA.
+// ✅ ICONOS POR TIPO
 function getIconoTipo(tipo: string): string {
   const iconos: Record<string, string> = {
-    pasillo: "\u{1F6E3}\u{FE0F}", // señal de carretera
-    armario: "\u{1F5C4}\u{FE0F}", // archivador
-    alto: "\u{1F4E6}", // paquete
-    cross: "\u{1F504}", // flechas cruzadas
-    caja: "\u{1F4B3}", // tarjeta
-    reserva: "\u{1F3ED}", // fábrica
+    pasillo: "\u{1F6E3}\u{FE0F}",
+    armario: "\u{1F5C4}\u{FE0F}",
+    alto: "\u{1F4E6}",
+    cross: "\u{1F504}",
+    caja: "\u{1F4B3}",
+    reserva: "\u{1F3ED}",
   };
-  return iconos[tipo] || "\u{1F4CD}"; // chincheta (por defecto)
+  return iconos[tipo] || "\u{1F4CD}";
 }
 
 type ModalMode = "ver" | "anadir" | "editar";
@@ -108,6 +109,16 @@ function UbicacionesPage() {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevaCantidad, setNuevaCantidad] = useState<number | "">(1);
 
+  // ESTADOS PARA AUTOCOMPLETADO (Reintroducidos y corregidos)
+  const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>([]);
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([]);
+  const [buscandoProductos, setBuscandoProductos] = useState(false);
+  const [sinResultados, setSinResultados] = useState(false);
+  const [totalRealesTabla, setTotalRealesTabla] = useState<number | null>(null);
+  const [visiblesLista, setVisiblesLista] = useState(25);
+  const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const TAM_PAGINA_PRODUCTOS = 1000; // Optimizado para cargar más rápido
+
   const [tipo, setTipo] = useState<string>("pasillo");
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -120,6 +131,38 @@ function UbicacionesPage() {
 
   useEffect(() => {
     cargarDatos();
+  }, []);
+
+  // Cargar catálogo al abrir el formulario de añadir
+  useEffect(() => {
+    if (modalMode !== "anadir" || catalogoProductos.length > 0) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        setBuscandoProductos(true);
+        const productos = await descargarCatalogoCompleto(TAM_PAGINA_PRODUCTOS);
+        if (!cancelado) {
+          setCatalogoProductos(productos);
+          setResultadosBusqueda(productos);
+        }
+      } catch (err: any) {
+        if (!cancelado) toast.error(errorInventario(err));
+      } finally {
+        if (!cancelado) setBuscandoProductos(false);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [modalMode]);
+
+  // Contar total de productos reales en la tabla
+  useEffect(() => {
+    if (totalRealesTabla !== null) return;
+    (async () => {
+      const { count, error } = await supabase
+        .from("productos")
+        .select("id", { count: "exact", head: true });
+      if (!error) setTotalRealesTabla(count ?? 0);
+    })();
   }, []);
 
   async function cargarDatos() {
@@ -178,6 +221,7 @@ function UbicacionesPage() {
   }
 
   function resetearModalForms() {
+    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     setModalMode("ver");
     setBusqueda("");
     setProductoEditando(null);
@@ -190,6 +234,9 @@ function UbicacionesPage() {
     setNuevaCantidad(1);
     setAjusteRapido(null);
     setNuevaCantidadAjuste("");
+    setResultadosBusqueda([]);
+    setSinResultados(false);
+    setVisiblesLista(25);
   }
 
   async function abrirStockUbicacion(ubicacion: any) {
@@ -238,7 +285,7 @@ function UbicacionesPage() {
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`Cantidad actualizada: ${productoEditando.nombre} → ${cantidadEdicion} uds`);
       resetearModalForms();
-      setUbicacionStockAbierta(ubicacionStockAbierta); // mantener el modal abierto
+      setUbicacionStockAbierta(ubicacionStockAbierta);
     } catch (err: any) {
       toast.error(errorInventario(err));
     } finally {
@@ -256,7 +303,7 @@ function UbicacionesPage() {
       return;
     try {
       setGuardando(true);
-      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0); // registra movimiento tipo 'salida'
+      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0);
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
     } catch (err: any) {
@@ -313,30 +360,81 @@ function UbicacionesPage() {
     }
   }
 
-  // Escáner / búsqueda por código de barras: si existe, se añade a la ubicación;
-  // si no, permite crear el producto nuevo con ese código.
-  async function escanearCodigo() {
+  // CORRECCIÓN BUG 3: Acepta código manual para que el escáner pueda disparar la búsqueda
+  async function escanearCodigo(codigoManual?: string) {
+    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
+    const codigo = (codigoManual ?? nuevoCodigoBarras).trim();
     setScanError("");
     setProductoEscaneado(null);
-    if (!nuevoCodigoBarras.trim()) {
+    setSinResultados(false);
+    
+    if (!codigo) {
+      setResultadosBusqueda([]);
       setScanError("Introduce o escanea un código de barras.");
       return;
     }
     try {
-      setGuardando(true);
-      const existente = await buscarProductoPorCodigo(nuevoCodigoBarras);
-      if (existente) {
-        setProductoEscaneado({ id: existente.id, sku: existente.sku, nombre: existente.nombre });
-        toast.success(`Producto encontrado: ${existente.nombre}`);
+      setBuscandoProductos(true);
+      const coincidencias = await buscarProductosPorCodigo(codigo);
+      if (coincidencias.length === 1) {
+        seleccionarProductoBusqueda(coincidencias[0]);
+        toast.success(`Producto encontrado: ${coincidencias[0].nombre}`);
+      } else if (coincidencias.length > 1) {
+        setResultadosBusqueda(coincidencias);
+        toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
       } else {
+        setResultadosBusqueda([]);
+        setSinResultados(true);
         setNuevoSku("");
         setNuevoNombre("");
         toast.info("No existe ningún producto con ese código. Complétalo para crearlo.");
       }
     } catch (err: any) {
       setScanError(errorInventario(err));
+      toast.error(errorInventario(err));
     } finally {
-      setGuardando(false);
+      setBuscandoProductos(false);
+    }
+  }
+
+  function seleccionarProductoBusqueda(p: Producto) {
+    setProductoEscaneado({ id: p.id, sku: p.sku, nombre: p.nombre });
+    setNuevoCodigoBarras(p.codigo_barras);
+    setResultadosBusqueda([]);
+    setSinResultados(false);
+    setScanError("");
+  }
+
+  function autocompletarProductos(texto: string) {
+    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
+    const q = texto.trim().toLowerCase();
+    setSinResultados(false);
+    
+    const locales = catalogoProductos.filter(
+      (p) =>
+        p.nombre.toLowerCase().includes(q) ||
+        (p.sku || "").toLowerCase().includes(q) ||
+        (p.codigo_barras || "").toLowerCase().includes(q)
+    );
+    
+    setResultadosBusqueda(locales);
+    setVisiblesLista(25);
+    
+    if (!q) return;
+    
+    if (locales.length === 0 && catalogoProductos.length > 0) {
+      debounceBusquedaRef.current = setTimeout(async () => {
+        try {
+          setBuscandoProductos(true);
+          const coincidencias = await buscarProductosPorCodigo(texto);
+          setResultadosBusqueda(coincidencias);
+          setSinResultados(coincidencias.length === 0);
+        } catch (err: any) {
+          toast.error(errorInventario(err));
+        } finally {
+          setBuscandoProductos(false);
+        }
+      }, 250);
     }
   }
 
@@ -355,7 +453,6 @@ function UbicacionesPage() {
       setScanError("");
       let idProducto = productoEscaneado?.id;
       if (!idProducto) {
-        // Crear producto nuevo reutilizando la función existente de inventario.ts
         if (!nuevoNombre.trim() || !nuevoSku.trim()) {
           setScanError("Completa SKU y nombre para crear el producto nuevo.");
           return;
@@ -368,6 +465,9 @@ function UbicacionesPage() {
           id_categoria: null,
           precio_unitario: null,
         });
+        // CORRECCIÓN BUG 5: Invalidar caché al crear producto nuevo
+        setCatalogoProductos([]);
+        setTotalRealesTabla(null);
       }
       const yaExiste = productosUbicacion.some((p) => p.id === idProducto);
       const sumaBase = productosUbicacion.find((p) => p.id === idProducto)?.cantidad || 0;
@@ -383,7 +483,7 @@ function UbicacionesPage() {
           : `"${productoEscaneado?.nombre || nuevoNombre}" añadido a ${ubicacionStockAbierta.nombre} (${nuevaCantidad} uds)`,
       );
       resetearModalForms();
-      setUbicacionStockAbierta(ubicacionStockAbierta); // mantener el modal abierto
+      setUbicacionStockAbierta(ubicacionStockAbierta);
     } catch (err: any) {
       setScanError(errorInventario(err));
     } finally {
@@ -588,7 +688,6 @@ function UbicacionesPage() {
     }
   }
 
-  // ✅ PROBLEMA 1: los pasillos ahora muestran descripción o secciones asociadas
   function getDetalles(ubicacion: any): string {
     if (ubicacion.tipo === "pasillo") {
       const partes: string[] = [];
@@ -995,7 +1094,13 @@ function UbicacionesPage() {
           if (!open) cerrarModal();
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        {/* CORRECCIÓN BUG 1 y 4: Prevenir cierre si el escáner está abierto */}
+        <DialogContent 
+          className="max-w-3xl max-h-[85vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            if (escanerAbierto) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex flex-wrap items-center gap-2">
               <span
@@ -1014,7 +1119,6 @@ function UbicacionesPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {/* Barra de acciones: buscador + añadir */}
           <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
             <Input
               placeholder="Buscar por nombre, SKU o código de barras..."
@@ -1026,7 +1130,12 @@ function UbicacionesPage() {
             {modalMode === "ver" && (
               <Button
                 size="sm"
-                onClick={() => setModalMode("anadir")}
+                onClick={() => {
+                  setModalMode("anadir");
+                  setResultadosBusqueda(catalogoProductos);
+                  setSinResultados(false);
+                  setScanError("");
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 + Añadir producto
@@ -1046,24 +1155,30 @@ function UbicacionesPage() {
             )}
           </div>
 
-          {/* FORMULARIO INLINE: AÑADIR PRODUCTO */}
           {modalMode === "anadir" && (
             <div className="border border-blue-200 bg-blue-50/50 rounded-lg p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-800">
                 Añadir producto a {ubicacionStockAbierta?.nombre}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <Label htmlFor="scan-codigo">Código de barras (escáner o manual)</Label>
                   <Input
                     id="scan-codigo"
                     autoFocus
-                    placeholder="Escanea o escribe el código y pulsa Buscar"
+                    placeholder="Busca por nombre, SKU o código (o selecciona de la lista)"
                     value={nuevoCodigoBarras}
+                    onFocus={() => {
+                      if (!nuevoCodigoBarras.trim() && !productoEscaneado) {
+                        setResultadosBusqueda(catalogoProductos);
+                        setSinResultados(false);
+                      }
+                    }}
                     onChange={(e) => {
                       setNuevoCodigoBarras(e.target.value);
                       setProductoEscaneado(null);
                       setScanError("");
+                      autocompletarProductos(e.target.value);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -1072,6 +1187,60 @@ function UbicacionesPage() {
                       }
                     }}
                   />
+                  
+                  {/* LISTA DESPLEGABLE DE AUTOCOMPLETADO (CORREGIDA) */}
+                  {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
+                    <div className="absolute top-full left-0 z-50 mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]">
+                      {buscandoProductos ? (
+                        <p className="px-3 py-2 text-sm text-gray-500 animate-pulse">
+                          Buscando en todos los productos…
+                        </p>
+                      ) : resultadosBusqueda.length > 0 ? (
+                        <>
+                          <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0 z-10">
+                            Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
+                            {resultadosBusqueda.length} productos
+                            {totalRealesTabla !== null && totalRealesTabla > catalogoProductos.length && (
+                              <span className="text-amber-600">
+                                {" "}
+                                · {totalRealesTabla} en total
+                              </span>
+                            )}
+                          </p>
+                          {resultadosBusqueda.slice(0, visiblesLista).map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => seleccionarProductoBusqueda(p)}
+                              className="w-full text-left px-3 py-3 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                            >
+                              <span className="font-semibold truncate">{p.nombre}</span>
+                              <span className="text-xs text-gray-500 font-mono shrink-0">
+                                {p.sku} · {p.codigo_barras}
+                              </span>
+                            </button>
+                          ))}
+                          {visiblesLista < resultadosBusqueda.length && (
+                            <div className="sticky bottom-0 bg-white p-2 z-10">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setVisiblesLista((v) => v + 25)}
+                              >
+                                Ver más ({resultadosBusqueda.length - visiblesLista} restantes)
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="px-3 py-2 text-sm text-gray-500">
+                          No se encontraron productos
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-end gap-2">
                   <Button
@@ -1085,7 +1254,7 @@ function UbicacionesPage() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={escanearCodigo}
+                    onClick={() => escanearCodigo()}
                     disabled={guardando}
                   >
                     🔍 Buscar
@@ -1173,7 +1342,6 @@ function UbicacionesPage() {
             </div>
           )}
 
-          {/* FILA INLINE: EDITAR CANTIDAD */}
           {modalMode === "editar" && productoEditando && (
             <div className="border border-amber-200 bg-amber-50/60 rounded-lg p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-800">
@@ -1218,7 +1386,6 @@ function UbicacionesPage() {
             </div>
           )}
 
-          {/* TABLA DE PRODUCTOS */}
           {cargandoStock ? (
             <div className="py-8 text-center text-gray-500">Cargando...</div>
           ) : productosUbicacion.length === 0 ? (
@@ -1305,9 +1472,25 @@ function UbicacionesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
       {/* MINI-MODAL: AJUSTE RÁPIDO */}
       {ajusteRapido && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setAjusteRapido(null);
+              setNuevaCantidadAjuste("");
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setAjusteRapido(null);
+              setNuevaCantidadAjuste("");
+            }
+          }}
+          tabIndex={-1}
+        >
           <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg space-y-4">
             <h3 className="text-base font-semibold text-gray-900">⚡ Ajuste rápido</h3>
             <p className="text-sm text-gray-600">
@@ -1328,16 +1511,6 @@ function UbicacionesPage() {
                 onChange={(e) =>
                   setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
                 }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    guardarAjusteRapido();
-                  }
-                  if (e.key === "Escape") {
-                    setAjusteRapido(null);
-                    setNuevaCantidadAjuste("");
-                  }
-                }}
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -1362,10 +1535,18 @@ function UbicacionesPage() {
         </div>
       )}
 
-
-      {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (html5-qrcode) */}
+      {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (CORREGIDO BUG 2 y 3) */}
       {escanerAbierto && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEscanerAbierto(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setEscanerAbierto(false);
+          }}
+          tabIndex={-1}
+        >
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg space-y-4">
             <h2 className="text-lg font-semibold">{"\u{1F4F7} Escanear código de barras"}</h2>
             <Escaner
@@ -1374,6 +1555,7 @@ function UbicacionesPage() {
                 setProductoEscaneado(null);
                 setScanError("");
                 setEscanerAbierto(false);
+                escanearCodigo(codigo); // <-- CORRECCIÓN: Dispara la búsqueda automáticamente
               }}
               onCerrar={() => setEscanerAbierto(false)}
             />

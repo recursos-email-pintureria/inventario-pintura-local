@@ -13,6 +13,7 @@ export interface Categoria {
   descripcion: string | null;
   activo: boolean;
 }
+
 export interface Producto {
   id: string;
   codigo_barras: string;
@@ -23,12 +24,15 @@ export interface Producto {
   precio_unitario: number | null;
   activo: boolean;
 }
+
 export interface Stock {
   id_producto: string;
   id_ubicacion: string;
   cantidad: number;
 }
+
 export type TipoMovimiento = "entrada" | "salida" | "reposicion" | "ajuste";
+
 export interface Movimiento {
   id: string;
   id_producto: string;
@@ -41,6 +45,7 @@ export interface Movimiento {
   realizado_por: string;
   fecha_movimiento: string;
 }
+
 export interface Inventario {
   categorias: Categoria[];
   productos: Producto[];
@@ -109,20 +114,25 @@ export function permisoExplicito(
 ) {
   return permisos?.[key] === true;
 }
+
 export function stockProducto(stock: Stock[], id: string) {
   return stock.filter((s) => s.id_producto === id).reduce((n, s) => n + s.cantidad, 0);
 }
+
 export function productosEnUbicacion(stock: Stock[], id: string) {
   return new Set(
     stock.filter((s) => s.id_ubicacion === id && s.cantidad > 0).map((s) => s.id_producto),
   ).size;
 }
+
 export function productosStockBajo(productos: Producto[], stock: Stock[]) {
   return productos.filter((p) => p.activo && stockProducto(stock, p.id) < 10).length;
 }
+
 export function movimientosHoy(items: Movimiento[], hoy = new Date()) {
   return items.filter((m) => isSameDay(new Date(m.fecha_movimiento), hoy)).length;
 }
+
 export function actividadReciente(items: Movimiento[]) {
   return [...items]
     .sort((a, b) => new Date(b.fecha_movimiento).getTime() - new Date(a.fecha_movimiento).getTime())
@@ -136,6 +146,7 @@ export interface FiltrosMovimiento {
   producto: string;
   ubicacion: string;
 }
+
 export function filtrarMovimientos(items: Movimiento[], f: FiltrosMovimiento) {
   const desde = f.desde ? new Date(`${f.desde}T00:00:00`).getTime() : -Infinity;
   const hasta = f.hasta ? new Date(`${f.hasta}T23:59:59.999`).getTime() : Infinity;
@@ -278,6 +289,7 @@ export const formatoPrecio = (n: number | null) =>
     : new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
         n,
       );
+
 export const formatoFecha = (s: string) =>
   new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short" }).format(new Date(s));
 
@@ -407,7 +419,6 @@ export async function crearUbicacion(ubicacion: {
   numero?: number | null;
   descripcion?: string | null;
 }) {
-  // ✅ Validar unicidad SOLO dentro del mismo pasillo padre
   if (ubicacion.id_ubicacion_padre) {
     const { data: existe } = await supabase
       .from("ubicaciones")
@@ -420,7 +431,6 @@ export async function crearUbicacion(ubicacion: {
       throw new Error(`Ya existe "${ubicacion.nombre}" en este pasillo.`);
     }
   } else {
-    // Para pasillos/reservas (sin padre), validar nombre único global
     const { data: existe } = await supabase
       .from("ubicaciones")
       .select("id")
@@ -665,11 +675,6 @@ export async function crearTraslado(datos: {
 
 // ============================================
 // PRODUCTOS EN UNA UBICACIÓN CONCRETA (MODAL DE GESTIÓN)
-// Equivalente a:
-//   SELECT p.*, s.cantidad
-//   FROM productos p
-//   JOIN stock s ON p.id = s.id_producto
-//   WHERE s.id_ubicacion = 'ID_UBICACION'
 // ============================================
 
 export interface ProductoConCantidad extends Producto {
@@ -690,8 +695,6 @@ export async function obtenerProductosPorUbicacion(
     .map((row: any) => ({ ...(row.producto as Producto), cantidad: row.cantidad as number }));
 }
 
-// Ajusta el stock de un producto en una ubicación y registra el movimiento
-// correspondiente (entrada si sube, salida si baja). Cantidad 0 elimina la fila.
 export async function actualizarStock(
   id_producto: string,
   id_ubicacion: string,
@@ -834,7 +837,6 @@ export async function obtenerStockLineales(): Promise<
   }[]
 > {
   try {
-    // Paso 1: Obtener ubicaciones de tipo pasillo
     const { data: lineales, error: errorLineales } = await supabase
       .from("ubicaciones")
       .select("id, nombre")
@@ -846,7 +848,6 @@ export async function obtenerStockLineales(): Promise<
     const idsLineales = lineales.map((l) => l.id);
     const linealesMap = new Map(lineales.map((l) => [l.id, l.nombre]));
 
-    // Paso 2: Obtener stock en esos lineales
     const { data: stockLineales, error: errorStock } = await supabase
       .from("stock")
       .select("id_producto, id_ubicacion, cantidad")
@@ -855,7 +856,6 @@ export async function obtenerStockLineales(): Promise<
 
     if (errorStock || !stockLineales || stockLineales.length === 0) return [];
 
-    // Paso 3: Obtener nombres de productos
     const idsProductos = [...new Set(stockLineales.map((s) => s.id_producto))];
     const { data: productos } = await supabase
       .from("productos")
@@ -863,7 +863,6 @@ export async function obtenerStockLineales(): Promise<
       .in("id", idsProductos);
     const productosMap = new Map((productos || []).map((p) => [p.id, p.nombre]));
 
-    // Paso 4: Combinar todo
     return stockLineales.map((s) => ({
       id_producto: s.id_producto,
       id_ubicacion: s.id_ubicacion,
@@ -955,9 +954,10 @@ export async function ajustarStockLineal(datos: {
 }
 
 // ============================================
-// BÚSQUEDA DE PRODUCTO POR CÓDIGO DE BARRAS (AUTOCOMPLETADO)
+// BÚSQUEDA Y CATÁLOGO DE PRODUCTOS (CORRECCIONES FINALES)
 // ============================================
 
+// 1. Búsqueda exacta por código de barras (para escáner)
 export async function buscarProductoPorCodigo(codigo: string): Promise<Producto | null> {
   if (!codigo.trim()) return null;
   const { data, error } = await supabase
@@ -968,4 +968,46 @@ export async function buscarProductoPorCodigo(codigo: string): Promise<Producto 
     .single();
   if (error) return null;
   return data as Producto;
+}
+
+// 2. Búsqueda flexible por texto (para autocompletado en el formulario)
+export async function buscarProductosPorCodigo(texto: string): Promise<Producto[]> {
+  if (!texto.trim()) return [];
+  const q = texto.trim();
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*")
+    .or(`nombre.ilike.%${q}%,sku.ilike.%${q}%,codigo_barras.ilike.%${q}%`)
+    .eq("activo", true)
+    .order("nombre", { ascending: true })
+    .limit(50); // Limitamos a 50 para que el autocompletado sea rápido
+  
+  if (error) {
+    console.error("Error buscando productos:", error);
+    return [];
+  }
+  return data || [];
+}
+
+// 3. Descarga completa del catálogo con paginación robusta (evita el límite de 1000 filas de Supabase)
+export async function descargarCatalogoCompleto(tamPagina = 1000): Promise<Producto[]> {
+  const todos: Producto[] = [];
+  let desde = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .eq("activo", true)
+      .order("nombre", { ascending: true })
+      .order("id", { ascending: true }) // Desempate para orden estable entre páginas
+      .range(desde, desde + tamPagina - 1);
+    
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    
+    todos.push(...(data as Producto[]));
+    if (data.length < tamPagina) break; // Si trae menos de lo pedido, es el final
+    desde += tamPagina;
+  }
+  return todos;
 }
