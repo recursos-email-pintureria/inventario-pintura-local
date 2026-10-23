@@ -21,9 +21,9 @@ const menuItems = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { perfil, loading } = useMyProfile();
+  const { perfil, isPending } = useMyProfile();
 
-  if (loading) {
+  if (isPending && !perfil) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -86,7 +86,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {perfil?.nombre_completo || 'Usuario'}
               </span>
               <span className="truncate text-xs text-muted-foreground">
-                {perfil?.email || 'Sin email'}
+                {perfil?.correo || 'Sin email'}
               </span>
             </div>
           </div>
