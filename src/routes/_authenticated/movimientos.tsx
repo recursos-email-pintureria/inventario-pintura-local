@@ -104,6 +104,38 @@ function MovimientosPage() {
   const [cargandoDesglose, setCargandoDesglose] = useState<Set<string>>(new Set());
   const [mostrarTodo, setMostrarTodo] = useState<Record<string, boolean>>({});
 
+  // SUMA REAL desde tabla stock (misma fuente que el desglose) para el badge
+  const cargarDesglose = async (idUbicacion: string) => {
+    setCargandoDesglose(prev => new Set(prev).add(idUbicacion));
+    try {
+      const productos = await obtenerProductosPorUbicacion(idUbicacion);
+      setDesgloseProductos(prev => ({ ...prev, [idUbicacion]: productos }));
+    } catch (e) {
+      toast.error('No se pudo cargar el desglose de productos', { description: errorInventario(e) });
+    } finally {
+      setCargandoDesglose(prev => {
+        const s = new Set(prev);
+        s.delete(idUbicacion);
+        return s;
+      });
+    }
+  };
+
+  const totalRealHijo = (hijo: { id: string; stock: number }): number => {
+    const productos = desgloseProductos[hijo.id];
+    if (productos) return productos.reduce((s, p) => s + p.cantidad, 0);
+    // Sin desglose cargado: recalcular desde los movimientos reales de ESA ubicación
+    // (no usar el acumulado del padre ni valores en caché de otras tablas)
+    let total = 0;
+    data.movimientos.forEach(m => {
+      if (m.id_ubicacion !== hijo.id) return;
+      if (m.tipo === 'entrada' || m.tipo === 'reposicion') total += m.cantidad;
+      else if (m.tipo === 'salida') total -= m.cantidad;
+      else if (m.tipo === 'ajuste') total = m.cantidad;
+    });
+    return Math.max(0, total);
+  };
+
   const toggleDesglose = async (idUbicacion: string) => {
     const nuevas = new Set(ubicacionesExpandidas);
     if (nuevas.has(idUbicacion)) {
@@ -113,21 +145,7 @@ function MovimientosPage() {
     }
     nuevas.add(idUbicacion);
     setUbicacionesExpandidas(nuevas);
-    if (!desgloseProductos[idUbicacion]) {
-      setCargandoDesglose(prev => new Set(prev).add(idUbicacion));
-      try {
-        const productos = await obtenerProductosPorUbicacion(idUbicacion);
-        setDesgloseProductos(prev => ({ ...prev, [idUbicacion]: productos }));
-      } catch (e) {
-        toast.error('No se pudo cargar el desglose de productos', { description: errorInventario(e) });
-      } finally {
-        setCargandoDesglose(prev => {
-          const s = new Set(prev);
-          s.delete(idUbicacion);
-          return s;
-        });
-      }
-    }
+    await cargarDesglose(idUbicacion);
   };
 
   const [modalAjusteAbierto, setModalAjusteAbierto] = useState(false);
@@ -697,7 +715,7 @@ function MovimientosPage() {
                                         esCross || esCaja ? 'bg-yellow-100 text-yellow-800' : ''
                                       }`}
                                     >
-                                      {hijo.stock} uds
+                                      {totalRealHijo(hijo)} uds
                                     </Badge>
                                     {hijo.ultimoMovimiento && (
                                       <div className="text-xs text-muted-foreground mt-1">
@@ -717,7 +735,7 @@ function MovimientosPage() {
                                     ) : (
                                       <>
                                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2 pb-1">
-                                          Productos ({productosHijo.length}) · {productosHijo.reduce((s, p) => s + p.cantidad, 0)} uds
+                                          Productos ({productosHijo.length}) · {totalRealHijo(hijo)} uds
                                         </p>
                                         <ul className="space-y-1">
                                           {(productosHijo.length <= maximoVisible || mostrarTodo[hijo.id]
