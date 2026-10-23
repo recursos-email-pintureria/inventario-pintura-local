@@ -18,29 +18,22 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
-// ✅ ICONOS CORREGIDOS Y VISIBLES
-function getIconoTipo(tipo: string): string {
-  const iconos: Record<string, string> = {
-    pasillo: '🛣️',
-    armario: '🗄️',
-    alto: '',
-    cross: '🔄',
-    caja: '💳',
-    reserva: '🏭',
-  }
-  return iconos[tipo] || '📍'
-}
-
+// ✅ BADGES DE COLORES POR TIPO (SIN ICONOS)
 function getColorBadge(tipo: string): string {
   const colores: Record<string, string> = {
-    pasillo: 'bg-blue-100 text-blue-800 border-blue-200',
-    armario: 'bg-green-100 text-green-800 border-green-200',
-    alto: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    cross: 'bg-purple-100 text-purple-800 border-purple-200',
-    caja: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    reserva: 'bg-gray-100 text-gray-800 border-gray-200',
+    pasillo: 'bg-blue-100 text-blue-800 border-blue-300',
+    armario: 'bg-green-100 text-green-800 border-green-300',
+    alto: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    cross: 'bg-purple-100 text-purple-800 border-purple-300',
+    caja: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    reserva: 'bg-gray-100 text-gray-800 border-gray-300',
   }
   return colores[tipo] || 'bg-muted text-muted-foreground'
+}
+
+// ✅ ETIQUETA DE TIPO EN MAYÚSCULA
+function getTipoLabel(tipo: string): string {
+  return tipo.toUpperCase()
 }
 
 function UbicacionesPage() {
@@ -325,12 +318,12 @@ function UbicacionesPage() {
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Tipo *</label>
             <select value={tipo} onChange={(e) => { setTipo(e.target.value); setUbicacionPadreId(''); setPosicionLateral(''); setPosicionLongitudinal(''); setSeccionOrigenId(''); }} className="w-full border border-gray-300 rounded px-3 py-2">
-              <option value="pasillo">🛣️ Pasillo</option>
-              <option value="armario">🗄️ Armario</option>
-              <option value="alto">📦 Alto</option>
-              <option value="cross">🔄 Cross</option>
-              <option value="caja">💳 Caja</option>
-              <option value="reserva">🏭 Reserva</option>
+              <option value="pasillo">PASILLO</option>
+              <option value="armario">ARMARIO</option>
+              <option value="alto">ALTO</option>
+              <option value="cross">CROSS</option>
+              <option value="caja">CAJA</option>
+              <option value="reserva">RESERVA</option>
             </select>
           </div>
           <div>
@@ -420,20 +413,18 @@ function UbicacionesPage() {
   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const numProductos = productosPorUbicacion.get(ubicacion.id) || 0
     const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id)
-    const icono = getIconoTipo(ubicacion.tipo)
     const colorBadge = getColorBadge(ubicacion.tipo)
 
     return (
       <div className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${esHijo ? 'pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4' : 'hover:bg-blue-50'}`}>
         <div className="col-span-4 flex items-center gap-2">
           {esHijo && <span className="text-gray-400 text-xs">─</span>}
-          <span className="text-lg">{icono}</span>
           <span className={`text-sm ${esHijo ? 'font-medium' : 'font-semibold'}`}>{ubicacion.nombre}</span>
           {ubicacion.descripcion && <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>}
         </div>
         <div className="col-span-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium border capitalize ${colorBadge}`}>
-            {ubicacion.tipo}
+          <span className={`px-2 py-1 rounded-full text-xs font-bold border ${colorBadge}`}>
+            {getTipoLabel(ubicacion.tipo)}
           </span>
         </div>
         <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
@@ -444,7 +435,7 @@ function UbicacionesPage() {
               onClick={() => abrirStockUbicacion(ubicacion)} 
               className="flex items-center gap-1 text-xs bg-green-100 text-green-700 hover:bg-green-200 px-2 py-1 rounded font-medium"
             >
-              📦 {numProductos}
+              {numProductos} prod.
             </button>
           )}
           <button onClick={() => editarUbicacion(ubicacion)} className="text-blue-600 hover:text-blue-800 p-1 rounded" title="Editar">✏️</button>
@@ -523,7 +514,9 @@ function UbicacionesPage() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span className="text-2xl">{ubicacionStockAbierta ? getIconoTipo(ubicacionStockAbierta.tipo) : ''}</span>
+              <span className={`px-2 py-1 rounded text-xs font-bold border ${ubicacionStockAbierta ? getColorBadge(ubicacionStockAbierta.tipo) : ''}`}>
+                {ubicacionStockAbierta ? getTipoLabel(ubicacionStockAbierta.tipo) : ''}
+              </span>
               Stock en: {ubicacionStockAbierta?.nombre}
             </DialogTitle>
           </DialogHeader>
