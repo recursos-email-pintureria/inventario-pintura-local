@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Archive, Layers, Route as IconRoute, Crosshair } from "lucide-react";
 import Escaner from "@/components/inventario/Escaner";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
@@ -51,6 +52,29 @@ function getColorBadge(tipo: string): string {
 
 function getTipoLabel(tipo: string): string {
   return tipo.toUpperCase();
+}
+
+// ✅ ICONOS LUCIDE POR TIPO (mobile-first, columna de ubicación)
+const COLORES_TIPO: Record<string, { iconoColor: string; borde: string }> = {
+  armario: { iconoColor: "text-emerald-500", borde: "border-l-emerald-500" },
+  alto: { iconoColor: "text-blue-500", borde: "border-l-blue-500" },
+  pasillo: { iconoColor: "text-amber-500", borde: "border-l-amber-500" },
+  cross: { iconoColor: "text-purple-500", borde: "border-l-purple-500" },
+};
+
+function getIconoComponente(tipo: string) {
+  switch (tipo) {
+    case "armario":
+      return Archive;
+    case "alto":
+      return Layers;
+    case "pasillo":
+      return IconRoute;
+    case "cross":
+      return Crosshair;
+    default:
+      return null;
+  }
 }
 
 // ✅ ICONOS POR TIPO: se usan códigos Unicode explícitos (\u{...})
@@ -287,8 +311,9 @@ function UbicacionesPage() {
       setGuardando(true);
       const coincidencias = await buscarProductosPorCodigo(nuevoCodigoBarras);
       if (coincidencias.length === 1) {
-        seleccionarProductoBusqueda(coincidencias[0]);
-        toast.success(`Producto encontrado: ${coincidencias[0].nombre}`);
+        const unico = coincidencias[0]!;
+        seleccionarProductoBusqueda(unico);
+        toast.success(`Producto encontrado: ${unico.nombre}`);
       } else if (coincidencias.length > 1) {
         setResultadosBusqueda(coincidencias);
         toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
@@ -826,29 +851,38 @@ function UbicacionesPage() {
   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const numProductos = productosPorUbicacion.get(ubicacion.id) || 0;
     const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id);
-    const colorBadge = getColorBadge(ubicacion.tipo);
+    const IconoTipo = getIconoComponente(ubicacion.tipo);
+    const colores = COLORES_TIPO[ubicacion.tipo];
+    const detalles = getDetalles(ubicacion);
 
     return (
       <div
-        className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${esHijo ? "pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4" : "hover:bg-blue-50"}`}
+        className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${
+          esHijo ? "pl-12 bg-gray-50" : "hover:bg-blue-50"
+        } border-l-2 ${colores ? colores.borde : "border-l-gray-300"}`}
       >
-        <div className="col-span-4 flex items-center gap-2">
-          {esHijo && <span className="text-gray-400 text-xs">─</span>}
-          <span className={`text-sm ${esHijo ? "font-medium" : "font-semibold"}`}>
-            {ubicacion.nombre}
-          </span>
-          {ubicacion.descripcion && (
-            <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>
+        {/* Columna ubicación mobile-first: [Icono] [Nombre / Detalles] */}
+        <div className="col-span-7 md:col-span-5 flex items-start gap-2">
+          {esHijo && <span className="text-gray-400 text-xs mt-1.5">─</span>}
+          {IconoTipo ? (
+            <IconoTipo
+              className={`w-5 h-5 md:w-4 md:h-4 shrink-0 mt-0.5 ${colores?.iconoColor ?? "text-gray-500"}`}
+              aria-hidden="true"
+            />
+          ) : (
+            <span className="text-base leading-none mt-0.5">{getIconoTipo(ubicacion.tipo)}</span>
           )}
+          <div className="flex flex-col md:flex-row md:items-baseline md:gap-2 min-w-0">
+            <span className={`truncate ${esHijo ? "text-sm font-medium" : "text-sm font-semibold"}`}>
+              {ubicacion.nombre}
+            </span>
+            <span className="text-xs text-gray-500 truncate">{detalles}</span>
+          </div>
         </div>
-        <div className="col-span-2">
-          <span className={`px-3 py-1 rounded text-xs font-bold ${colorBadge}`}>
-            {getIconoTipo(ubicacion.tipo)} {getTipoLabel(ubicacion.tipo)}
-          </span>
+        <div className="hidden md:block md:col-span-3 text-sm text-gray-600">
+          {getSeccionReal(ubicacion)}
         </div>
-        <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
-        <div className="col-span-2 text-sm text-gray-600">{getSeccionReal(ubicacion)}</div>
-        <div className="col-span-2 flex justify-end gap-1">
+        <div className="col-span-5 md:col-span-4 flex justify-end gap-1">
           <button
             onClick={() => abrirStockUbicacion(ubicacion)}
             className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-medium ${numProductos > 0 ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
@@ -859,7 +893,7 @@ function UbicacionesPage() {
           <button
             onClick={() => editarUbicacion(ubicacion)}
             className="text-blue-600 hover:text-blue-800 p-1 rounded"
-            title="Editar"
+            title={`Editar (${getTipoLabel(ubicacion.tipo)})`}
           >
             ✏️
           </button>
@@ -867,7 +901,7 @@ function UbicacionesPage() {
             <button
               onClick={() => desactivarUbicacionHandler(ubicacion.id)}
               className="text-orange-600 hover:text-orange-800 p-1 rounded"
-              title="Desactivar"
+              title={`Desactivar (${getTipoLabel(ubicacion.tipo)})`}
             >
               ⏸️
             </button>
@@ -875,7 +909,7 @@ function UbicacionesPage() {
             <button
               onClick={() => borrarDefinitivamente(ubicacion.id)}
               className="text-red-600 hover:text-red-800 p-1 rounded"
-              title="Borrar"
+              title={`Borrar (${getTipoLabel(ubicacion.tipo)})`}
             >
               🗑️
             </button>
@@ -914,11 +948,9 @@ function UbicacionesPage() {
         </div>
 
         <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
-          <div className="col-span-4">Ubicación</div>
-          <div className="col-span-2">Tipo</div>
-          <div className="col-span-2">Detalles</div>
-          <div className="col-span-2">Sección</div>
-          <div className="col-span-2 text-right">Acciones</div>
+          <div className="col-span-7 md:col-span-5">Ubicación</div>
+          <div className="hidden md:block md:col-span-3">Sección</div>
+          <div className="col-span-5 md:col-span-4 text-right">Acciones</div>
         </div>
 
         <div className="divide-y divide-gray-100">
