@@ -18,24 +18,31 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
-// ✅ EMOJIS CON CÓDIGOS UNICODE (100% fiable)
-const iconosTipo: Record<string, string> = {
-  pasillo: '🛣️',
-  armario: '🗄️',
-  alto: '',
-  cross: '🔄',
-  caja: '💳',
-  reserva: '',
+// ✅ ICONOS MEJORADOS Y MÁS VISIBLES
+function getIconoTipo(tipo: string): string {
+  const iconos: Record<string, string> = {
+    pasillo: '🛣️',
+    armario: '🗄️',
+    alto: '',
+    cross: '🔄',
+    caja: '💳',
+    reserva: '🏭',
+  }
+  return iconos[tipo] || '📍'
 }
 
-const coloresTipo: Record<string, string> = {
-  pasillo: 'bg-blue-100 text-blue-800 border-blue-200',
-  armario: 'bg-green-100 text-green-800 border-green-200',
-  alto: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  cross: 'bg-purple-100 text-purple-800 border-purple-200',
-  caja: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  reserva: 'bg-gray-100 text-gray-800 border-gray-200',
+function getColorBadge(tipo: string): string {
+  const colores: Record<string, string> = {
+    pasillo: 'bg-blue-100 text-blue-800 border-blue-200',
+    armario: 'bg-green-100 text-green-800 border-green-200',
+    alto: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    cross: 'bg-purple-100 text-purple-800 border-purple-200',
+    caja: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    reserva: 'bg-gray-100 text-gray-800 border-gray-200',
+  }
+  return colores[tipo] || 'bg-muted text-muted-foreground'
 }
+
 function UbicacionesPage() {
   const [secciones, setSecciones] = useState<any[]>([])
   const [ubicaciones, setUbicaciones] = useState<any[]>([])
@@ -85,9 +92,8 @@ function UbicacionesPage() {
         .select('id_ubicacion, cantidad')
         .gt('cantidad', 0)
       
-      if (stockError) {
-        console.error('Error cargando stock:', stockError)
-      } else {
+      if (stockError) console.error('Error cargando stock:', stockError)
+      else {
         const productosMap = new Map<string, number>()
         stockData?.forEach((item: any) => {
           const count = productosMap.get(item.id_ubicacion) || 0
@@ -282,9 +288,27 @@ function UbicacionesPage() {
     }))
   }
 
+  // ✅ FUNCIÓN MEJORADA PARA OBTENER SECCIÓN
   function getSeccionReal(ubicacion: any): string {
-    if (ubicacion.tipo === 'cross') return ubicacion.seccion_origen_nombre || '-'
-    return ubicacion.seccion_nombre || '-'
+    try {
+      if (ubicacion.tipo === 'cross') {
+        // Para cross, usar sección_origen
+        if (ubicacion.seccion_origen_nombre) return ubicacion.seccion_origen_nombre
+        if (typeof ubicacion.seccion_origen === 'string') return ubicacion.seccion_origen
+        if (ubicacion.seccion_origen?.nombre) return ubicacion.seccion_origen.nombre
+        return '-'
+      } else {
+        // Para otros tipos, usar sección
+        if (ubicacion.seccion_nombre) return ubicacion.seccion_nombre
+        if (typeof ubicacion.seccion === 'string') return ubicacion.seccion
+        if (ubicacion.seccion?.nombre) return ubicacion.seccion.nombre
+        if (ubicacion.seccion?.id) return ubicacion.seccion.id
+        return '-'
+      }
+    } catch (e) {
+      console.error('Error obteniendo sección:', e, ubicacion)
+      return '-'
+    }
   }
 
   function getDetalles(ubicacion: any): string {
@@ -305,7 +329,7 @@ function UbicacionesPage() {
             <label className="block text-sm font-medium mb-1 text-gray-700">Tipo *</label>
             <select value={tipo} onChange={(e) => { setTipo(e.target.value); setUbicacionPadreId(''); setPosicionLateral(''); setPosicionLongitudinal(''); setSeccionOrigenId(''); }} className="w-full border border-gray-300 rounded px-3 py-2">
               <option value="pasillo">🛣️ Pasillo</option>
-              <option value="armario">🗄️ Armario</option>
+              <option value="armario">️ Armario</option>
               <option value="alto">📦 Alto</option>
               <option value="cross">🔄 Cross</option>
               <option value="caja">💳 Caja</option>
@@ -399,20 +423,21 @@ function UbicacionesPage() {
   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const numProductos = productosPorUbicacion.get(ubicacion.id) || 0
     const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id)
+    const icono = getIconoTipo(ubicacion.tipo)
+    const colorBadge = getColorBadge(ubicacion.tipo)
 
     return (
       <div className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${esHijo ? 'pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4' : 'hover:bg-blue-50'}`}>
         <div className="col-span-4 flex items-center gap-2">
           {esHijo && <span className="text-gray-400 text-xs">─</span>}
-          <span className="text-base">{iconosTipo[ubicacion.tipo]}</span>
+          <span className="text-lg">{icono}</span>
           <span className={`text-sm ${esHijo ? 'font-medium' : 'font-semibold'}`}>{ubicacion.nombre}</span>
           {ubicacion.descripcion && <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>}
         </div>
         <div className="col-span-2">
-          <span className="text-base">{iconosTipo[ubicacion.tipo]}</span>
-<span className="text-base" title={ubicacion.tipo}>
-  {iconosTipo[ubicacion.tipo] || '📍'}
-</span>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium border capitalize ${colorBadge}`}>
+            {ubicacion.tipo}
+          </span>
         </div>
         <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
         <div className="col-span-2 text-sm text-gray-600">{getSeccionReal(ubicacion)}</div>
@@ -501,7 +526,7 @@ function UbicacionesPage() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span className="text-2xl">{ubicacionStockAbierta ? iconosTipo[ubicacionStockAbierta.tipo] : ''}</span>
+              <span className="text-2xl">{ubicacionStockAbierta ? getIconoTipo(ubicacionStockAbierta.tipo) : ''}</span>
               Stock en: {ubicacionStockAbierta?.nombre}
             </DialogTitle>
           </DialogHeader>
