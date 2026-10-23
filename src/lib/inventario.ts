@@ -535,46 +535,17 @@ export async function crearMovimientoConStock(datos: {
   });
   if (movError) throw movError;
 
-  const { data: stockActual, error: stockError } = await supabase
+  // La tabla `stock` solo permite SELECT a authenticated (GRANT/RLS en sql/):
+  // el trigger `movimientos_actualizar_stock` ya aplicó la nueva cantidad al
+  // insertar el movimiento. Escribir stock directamente devolvía 403.
+  const { data: stockNuevo, error: stockError } = await supabase
     .from("stock")
     .select("cantidad")
     .eq("id_producto", datos.id_producto)
     .eq("id_ubicacion", datos.id_ubicacion)
     .maybeSingle();
   if (stockError) throw stockError;
-
-  const cantidadActual = stockActual?.cantidad || 0;
-  let nuevaCantidad = cantidadActual;
-
-  if (datos.tipo === "entrada" || datos.tipo === "reposicion") {
-    nuevaCantidad = cantidadActual + datos.cantidad;
-  } else if (datos.tipo === "salida") {
-    nuevaCantidad = cantidadActual - datos.cantidad;
-    if (nuevaCantidad < 0)
-      throw new Error(`No hay stock suficiente. Stock actual: ${cantidadActual}`);
-  } else if (datos.tipo === "ajuste") {
-    nuevaCantidad = datos.cantidad;
-    if (nuevaCantidad < 0) throw new Error("La cantidad de ajuste no puede ser negativa.");
-  }
-
-  if (stockActual) {
-    const { error: updateError } = await supabase
-      .from("stock")
-      .update({ cantidad: nuevaCantidad })
-      .eq("id_producto", datos.id_producto)
-      .eq("id_ubicacion", datos.id_ubicacion);
-    if (updateError) throw updateError;
-  } else if (nuevaCantidad > 0) {
-    const { error: insertError } = await supabase
-      .from("stock")
-      .insert({
-        id_producto: datos.id_producto,
-        id_ubicacion: datos.id_ubicacion,
-        cantidad: nuevaCantidad,
-      });
-    if (insertError) throw insertError;
-  }
-  return { nuevaCantidad };
+  return { nuevaCantidad: stockNuevo?.cantidad ?? 0 };
 }
 
 export async function crearTraslado(datos: {
@@ -605,7 +576,7 @@ export async function crearTraslado(datos: {
   if (cantidadEnOrigen < datos.cantidad)
     throw new Error(`No hay stock suficiente en origen. Stock actual: ${cantidadEnOrigen}`);
 
-  await supabase.from("movimientos").insert({
+  const { error: movOrigenError } = await supabase.from("movimientos").insert({
     id_producto: datos.id_producto,
     id_ubicacion: datos.id_ubicacion_origen,
     tipo: "salida" as TipoMovimiento,
@@ -615,8 +586,9 @@ export async function crearTraslado(datos: {
     realizado_por: user.id,
     fecha_movimiento: fecha,
   });
+  if (movOrigenError) throw movOrigenError;
 
-  await supabase.from("movimientos").insert({
+  const { error: movDestinoError } = await supabase.from("movimientos").insert({
     id_producto: datos.id_producto,
     id_ubicacion: datos.id_ubicacion_destino,
     tipo: "entrada" as TipoMovimiento,
@@ -626,40 +598,27 @@ export async function crearTraslado(datos: {
     realizado_por: user.id,
     fecha_movimiento: fecha,
   });
+  if (movDestinoError) throw movDestinoError;
 
-  await supabase
+  // El trigger de la BD ya actualizó ambas cantidades de stock al insertar los
+  // movimientos; solo leemos el resultado (stock no admite escrituras directas).
+  const { data: stockFinalOrigen } = await supabase
     .from("stock")
-    .update({ cantidad: cantidadEnOrigen - datos.cantidad })
+    .select("cantidad")
     .eq("id_producto", datos.id_producto)
-    .eq("id_ubicacion", datos.id_ubicacion_origen);
+    .eq("id_ubicacion", datos.id_ubicacion_origen)
+    .maybeSingle();
 
-  const { data: stockDestino } = await supabase
+  const { data: stockFinalDestino } = await supabase
     .from("stock")
     .select("cantidad")
     .eq("id_producto", datos.id_producto)
     .eq("id_ubicacion", datos.id_ubicacion_destino)
     .maybeSingle();
-  const cantidadEnDestino = stockDestino?.cantidad || 0;
-
-  if (stockDestino) {
-    await supabase
-      .from("stock")
-      .update({ cantidad: cantidadEnDestino + datos.cantidad })
-      .eq("id_producto", datos.id_producto)
-      .eq("id_ubicacion", datos.id_ubicacion_destino);
-  } else {
-    await supabase
-      .from("stock")
-      .insert({
-        id_producto: datos.id_producto,
-        id_ubicacion: datos.id_ubicacion_destino,
-        cantidad: cantidadEnDestino + datos.cantidad,
-      });
-  }
 
   return {
-    nuevaCantidadOrigen: cantidadEnOrigen - datos.cantidad,
-    nuevaCantidadDestino: cantidadEnDestino + datos.cantidad,
+    nuevaCantidadOrigen: stockFinalOrigen?.cantidad ?? cantidadEnOrigen - datos.cantidad,
+    nuevaCantidadDestino: stockFinalDestino?.cantidad ?? datos.cantidad,
   };
 }
 
@@ -690,8 +649,11 @@ export async function obtenerProductosPorUbicacion(
     .map((row: any) => ({ ...(row.producto as Producto), cantidad: row.cantidad as number }));
 }
 
-// Ajusta el stock de un producto en una ubicación y registra el movimiento
-// correspondiente (entrada si sube, salida si baja). Cantidad 0 elimina la fila.
+// Ajusta el stock de un producto en una ubicación registrando UN ÚNICO
+// movimiento (entrada si sube, salida si baja o se quita). La tabla `stock`
+// solo acepta SELECT para el rol authenticated: las escrituras directas
+// (update/insert/delete) fallan con 403 por RLS. El cambio de cantidades lo
+// aplica el trigger `movimientos_actualizar_stock` al insertar el movimiento.
 export async function actualizarStock(
   id_producto: string,
   id_ubicacion: string,
@@ -727,28 +689,6 @@ export async function actualizarStock(
   });
   if (movError) throw movError;
 
-  if (nuevaCantidad > 0) {
-    if (actual) {
-      const { error } = await supabase
-        .from("stock")
-        .update({ cantidad: nuevaCantidad })
-        .eq("id_producto", id_producto)
-        .eq("id_ubicacion", id_ubicacion);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from("stock")
-        .insert({ id_producto, id_ubicacion, cantidad: nuevaCantidad });
-      if (error) throw error;
-    }
-  } else {
-    const { error } = await supabase
-      .from("stock")
-      .delete()
-      .eq("id_producto", id_producto)
-      .eq("id_ubicacion", id_ubicacion);
-    if (error) throw error;
-  }
   return { sinCambios: false, nuevaCantidad };
 }
 
@@ -804,7 +744,9 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
 
   let productosAfectados = 0;
   for (const stock of stockLineales) {
-    await supabase.from("movimientos").insert({
+    // El trigger `movimientos_actualizar_stock` resetea la cantidad a 0 con la
+    // salida; ya no se escribe en stock directamente (403 por RLS/GRANT).
+    const { error: movError } = await supabase.from("movimientos").insert({
       id_producto: stock.id_producto,
       id_ubicacion: stock.id_ubicacion,
       tipo: "salida" as TipoMovimiento,
@@ -814,11 +756,7 @@ export async function limpiarStockLineales(): Promise<{ productosAfectados: numb
       realizado_por: user.id,
       fecha_movimiento: fecha,
     });
-    await supabase
-      .from("stock")
-      .update({ cantidad: 0 })
-      .eq("id_producto", stock.id_producto)
-      .eq("id_ubicacion", stock.id_ubicacion);
+    if (movError) throw movError;
     productosAfectados++;
   }
   return { productosAfectados };
@@ -899,56 +837,33 @@ export async function ajustarStockLineal(datos: {
 
   const diferencia = datos.cantidad_real - cantidadSistema;
 
-  if (datos.cantidad_real <= cantidadSistema) {
-    const cantidadASacar = cantidadSistema - datos.cantidad_real;
-    if (cantidadASacar > 0) {
-      await supabase.from("movimientos").insert({
-        id_producto: datos.id_producto,
-        id_ubicacion: datos.id_ubicacion,
-        tipo: "salida" as TipoMovimiento,
-        cantidad: cantidadASacar,
-        precio_unitario: null,
-        notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${diferencia})`,
-        realizado_por: user.id,
-        fecha_movimiento: fecha,
-      });
-    }
-  } else {
-    const cantidadAAñadir = datos.cantidad_real - cantidadSistema;
-    await supabase.from("movimientos").insert({
+  // El trigger `movimientos_actualizar_stock` aplica la cantidad final al
+  // insertar el movimiento; no se escribe en stock directamente (403 por RLS).
+  const cantidadASacar = cantidadSistema - datos.cantidad_real;
+  if (cantidadASacar > 0) {
+    const { error: movError } = await supabase.from("movimientos").insert({
+      id_producto: datos.id_producto,
+      id_ubicacion: datos.id_ubicacion,
+      tipo: "salida" as TipoMovimiento,
+      cantidad: cantidadASacar,
+      precio_unitario: null,
+      notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: ${diferencia})`,
+      realizado_por: user.id,
+      fecha_movimiento: fecha,
+    });
+    if (movError) throw movError;
+  } else if (datos.cantidad_real > cantidadSistema) {
+    const { error: movError } = await supabase.from("movimientos").insert({
       id_producto: datos.id_producto,
       id_ubicacion: datos.id_ubicacion,
       tipo: "entrada" as TipoMovimiento,
-      cantidad: cantidadAAñadir,
+      cantidad: datos.cantidad_real - cantidadSistema,
       precio_unitario: null,
       notas: `AJUSTE RÁPIDO - Sistema: ${cantidadSistema} → Real: ${datos.cantidad_real} (dif: +${diferencia})`,
       realizado_por: user.id,
       fecha_movimiento: fecha,
     });
-  }
-
-  if (datos.cantidad_real > 0) {
-    if (stockActual) {
-      await supabase
-        .from("stock")
-        .update({ cantidad: datos.cantidad_real })
-        .eq("id_producto", datos.id_producto)
-        .eq("id_ubicacion", datos.id_ubicacion);
-    } else {
-      await supabase
-        .from("stock")
-        .insert({
-          id_producto: datos.id_producto,
-          id_ubicacion: datos.id_ubicacion,
-          cantidad: datos.cantidad_real,
-        });
-    }
-  } else {
-    await supabase
-      .from("stock")
-      .delete()
-      .eq("id_producto", datos.id_producto)
-      .eq("id_ubicacion", datos.id_ubicacion);
+    if (movError) throw movError;
   }
 
   return { ajustado: true, diferencia };

@@ -283,25 +283,10 @@ function UbicacionesPage() {
     }
     try {
       setGuardando(true);
-      const { data: actual } = await supabase
-        .from("stock")
-        .select("cantidad")
-        .eq("id_producto", ajusteRapido.id)
-        .eq("id_ubicacion", ubicacionStockAbierta.id)
-        .maybeSingle();
-      const cantidadSistema = actual?.cantidad ?? ajusteRapido.cantidad;
-      const diferencia = Math.abs(nuevaCantidadAjuste - cantidadSistema);
-      if (diferencia > 0) {
-        await crearMovimientoConStock({
-          id_producto: ajusteRapido.id,
-          id_ubicacion: ubicacionStockAbierta.id,
-          tipo: "ajuste",
-          cantidad: nuevaCantidadAjuste,
-          notas: `AJUSTE RÁPIDO DESDE ARMARIO - Sistema: ${cantidadSistema} → Real: ${nuevaCantidadAjuste}`,
-        });
-      } else {
-        await actualizarStock(ajusteRapido.id, ubicacionStockAbierta.id, nuevaCantidadAjuste);
-      }
+      // actualizarStock registra el movimiento 'ajuste'→salida/entrada y deja
+      // que el trigger de BD aplique la cantidad; nunca escribe en stock
+      // directamente (eso devolvía 403 por RLS).
+      await actualizarStock(ajusteRapido.id, ubicacionStockAbierta.id, nuevaCantidadAjuste);
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
       setAjusteRapido(null);
