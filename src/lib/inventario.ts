@@ -658,6 +658,7 @@ export async function actualizarStock(
   id_producto: string,
   id_ubicacion: string,
   nuevaCantidad: number,
+  opciones?: { tipo?: TipoMovimiento; notas?: string },
 ) {
   if (!Number.isInteger(nuevaCantidad) || nuevaCantidad < 0)
     throw new Error("La cantidad debe ser un entero ≥ 0.");
@@ -675,15 +676,21 @@ export async function actualizarStock(
   const cantidadSistema = actual?.cantidad || 0;
   if (cantidadSistema === nuevaCantidad) return { sinCambios: true };
 
-  const diferencia = Math.abs(nuevaCantidad - cantidadSistema);
-  const tipo: TipoMovimiento = nuevaCantidad > cantidadSistema ? "entrada" : "salida";
+  // El trigger de BD interpreta el movimiento según su tipo: 'ajuste' fija la
+  // cantidad absoluta (= valor insertado), entrada suma y salida resta. Por
+  // eso aquí SIEMPRE se inserta la cantidad final deseada, no la diferencia:
+  // con 'salida' + diferencia el stock quedaba mal cuando no existía fila en
+  // stock (restar sobre 0) y nunca se fijaba el valor real contado.
+  const tipo: TipoMovimiento = opciones?.tipo ?? "ajuste";
   const { error: movError } = await supabase.from("movimientos").insert({
     id_producto,
     id_ubicacion,
     tipo,
-    cantidad: diferencia,
+    cantidad: nuevaCantidad,
     precio_unitario: null,
-    notas: `GESTIÓN DESDE UBICACIÓN - Sistema: ${cantidadSistema} → Real: ${nuevaCantidad}`,
+    notas:
+      opciones?.notas ??
+      `GESTIÓN DESDE UBICACIÓN - Sistema: ${cantidadSistema} → Real: ${nuevaCantidad}`,
     realizado_por: user.id,
     fecha_movimiento: fecha,
   });
@@ -874,13 +881,29 @@ export async function ajustarStockLineal(datos: {
 // ============================================
 
 export async function buscarProductoPorCodigo(codigo: string): Promise<Producto | null> {
-  if (!codigo.trim()) return null;
-  const { data, error } = await supabase
+  const resultados = await buscarProductosPorCodigo(codigo);
+  return resultados[0] ?? null;
+}
+
+/** Lista de coincidencias por código de barras exacto o parcial (nombre/SKU). */
+export async function buscarProductosPorCodigo(codigo: string): Promise<Producto[]> {
+  const q = codigo.trim();
+  if (!q) return [];
+  // Primero coincidencia EXACTA de código de barras (caso típico del escáner).
+  const { data: exactos, error: eExacta } = await supabase
     .from("productos")
     .select("*")
-    .eq("codigo_barras", codigo.trim())
-    .limit(1)
-    .single();
-  if (error) return null;
-  return data as Producto;
+    .eq("codigo_barras", q)
+    .eq("activo", true)
+    .limit(20);
+  if (!eExacta && exactos && exactos.length > 0) return exactos as Producto[];
+  // Si no hay exactos, búsqueda parcial por código, SKU o nombre.
+  const { data: parciales, error: eParcial } = await supabase
+    .from("productos")
+    .select("*")
+    .eq("activo", true)
+    .or(`codigo_barras.ilike.%${q}%,sku.ilike.%${q}%,nombre.ilike.%${q}%`)
+    .limit(20);
+  if (eParcial) return [];
+  return (parciales || []) as Producto[];
 }

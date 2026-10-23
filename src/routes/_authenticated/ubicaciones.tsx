@@ -11,10 +11,10 @@ import {
   obtenerProductosPorUbicacion,
   actualizarStock,
   crearMovimientoConStock,
-  buscarProductoPorCodigo,
+  buscarProductosPorCodigo,
   guardarProducto,
 } from "../../lib/inventario";
-import type { ProductoConCantidad } from "../../lib/inventario";
+import type { Producto, ProductoConCantidad } from "../../lib/inventario";
 import { supabase } from "../../lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -107,6 +107,8 @@ function UbicacionesPage() {
   const [nuevoSku, setNuevoSku] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevaCantidad, setNuevaCantidad] = useState<number | "">(1);
+  // Resultados de la búsqueda por código (desplegable bajo el input)
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([]);
 
   const [tipo, setTipo] = useState<string>("pasillo");
   const [nombre, setNombre] = useState("");
@@ -188,6 +190,7 @@ function UbicacionesPage() {
     setNuevoSku("");
     setNuevoNombre("");
     setNuevaCantidad(1);
+    setResultadosBusqueda([]);
     setAjusteRapido(null);
     setNuevaCantidadAjuste("");
   }
@@ -256,9 +259,19 @@ function UbicacionesPage() {
       return;
     try {
       setGuardando(true);
-      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0); // registra movimiento tipo 'salida'
+      // Movimiento tipo 'salida' con cantidad 0 vía actualizarStock (misma
+      // lógica que ✏️: solo se inserta el movimiento; el trigger fija la
+      // cantidad a 0 y así desaparece del armario).
+      const { sinCambios } = await actualizarStock(producto.id, ubicacionStockAbierta.id, 0, {
+        tipo: "salida",
+        notas: `SALIDA - Producto retirado de ${ubicacionStockAbierta.nombre}`,
+      });
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
+      if (sinCambios) {
+        toast.info(`"${producto.nombre}" ya estaba a 0 en esta ubicación`);
+      } else {
+        toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
+      }
     } catch (err: any) {
       toast.error(errorInventario(err));
     } finally {
@@ -283,12 +296,23 @@ function UbicacionesPage() {
     }
     try {
       setGuardando(true);
-      // actualizarStock registra el movimiento 'ajuste'→salida/entrada y deja
-      // que el trigger de BD aplique la cantidad; nunca escribe en stock
-      // directamente (eso devolvía 403 por RLS).
-      await actualizarStock(ajusteRapido.id, ubicacionStockAbierta.id, nuevaCantidadAjuste);
+      // Movimiento tipo 'ajuste' vía actualizarStock (no escribe en stock
+      // directamente: eso devolvía 403 por RLS; el trigger aplica la cantidad).
+      const res = await actualizarStock(
+        ajusteRapido.id,
+        ubicacionStockAbierta.id,
+        nuevaCantidadAjuste,
+        {
+          tipo: "ajuste",
+          notas: `Ajuste rápido desde ${ubicacionStockAbierta.nombre}`,
+        },
+      );
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
+      if ("sinCambios" in res && res.sinCambios) {
+        toast.info(`La cantidad ya era ${nuevaCantidadAjuste} uds`);
+      } else {
+        toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
+      }
       setAjusteRapido(null);
       setNuevaCantidadAjuste("");
     } catch (err: any) {
@@ -298,21 +322,25 @@ function UbicacionesPage() {
     }
   }
 
-  // Escáner / búsqueda por código de barras: si existe, se añade a la ubicación;
-  // si no, permite crear el producto nuevo con ese código.
+  // Escáner / búsqueda por código de barras: despliega lista de coincidencias
+  // para seleccionar; si no hay ninguna, permite crear el producto nuevo.
   async function escanearCodigo() {
     setScanError("");
     setProductoEscaneado(null);
+    setResultadosBusqueda([]);
     if (!nuevoCodigoBarras.trim()) {
       setScanError("Introduce o escanea un código de barras.");
       return;
     }
     try {
       setGuardando(true);
-      const existente = await buscarProductoPorCodigo(nuevoCodigoBarras);
-      if (existente) {
-        setProductoEscaneado({ id: existente.id, sku: existente.sku, nombre: existente.nombre });
-        toast.success(`Producto encontrado: ${existente.nombre}`);
+      const coincidencias = await buscarProductosPorCodigo(nuevoCodigoBarras);
+      if (coincidencias.length === 1) {
+        seleccionarProductoBusqueda(coincidencias[0]);
+        toast.success(`Producto encontrado: ${coincidencias[0].nombre}`);
+      } else if (coincidencias.length > 1) {
+        setResultadosBusqueda(coincidencias);
+        toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
       } else {
         setNuevoSku("");
         setNuevoNombre("");
@@ -323,6 +351,13 @@ function UbicacionesPage() {
     } finally {
       setGuardando(false);
     }
+  }
+
+  function seleccionarProductoBusqueda(p: Producto) {
+    setProductoEscaneado({ id: p.id, sku: p.sku, nombre: p.nombre });
+    setNuevoCodigoBarras(p.codigo_barras);
+    setResultadosBusqueda([]);
+    setScanError("");
   }
 
   async function anadirProducto() {
@@ -1049,6 +1084,7 @@ function UbicacionesPage() {
                       setNuevoCodigoBarras(e.target.value);
                       setProductoEscaneado(null);
                       setScanError("");
+                      setResultadosBusqueda([]);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -1057,6 +1093,24 @@ function UbicacionesPage() {
                       }
                     }}
                   />
+                  {/* Desplegable de resultados de búsqueda por código */}
+                  {resultadosBusqueda.length > 0 && (
+                    <div className="border border-blue-200 rounded-md bg-white shadow-sm max-h-48 overflow-y-auto divide-y divide-gray-100">
+                      {resultadosBusqueda.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => seleccionarProductoBusqueda(p)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
+                        >
+                          <span className="font-medium truncate">{p.nombre}</span>
+                          <span className="text-xs text-gray-500 font-mono shrink-0">
+                            {p.sku} · {p.codigo_barras}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-end gap-2">
                   <Button
