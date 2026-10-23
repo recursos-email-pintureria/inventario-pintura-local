@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   obtenerSecciones,
   obtenerUbicaciones,
@@ -90,10 +90,6 @@ function UbicacionesPage() {
   const [guardando, setGuardando] = useState(false);
   const [productoEditando, setProductoEditando] = useState<ProductoConCantidad | null>(null);
   const [cantidadEdicion, setCantidadEdicion] = useState<number | "">("");
-
-  // Ajuste rápido (mini-modal)
-  const [ajusteRapido, setAjusteRapido] = useState<ProductoConCantidad | null>(null);
-  const [nuevaCantidadAjuste, setNuevaCantidadAjuste] = useState<number | "">("");
 
   // Formulario "añadir producto" (inline en el modal)
   const [nuevoCodigoBarras, setNuevoCodigoBarras] = useState("");
@@ -191,8 +187,6 @@ function UbicacionesPage() {
     setNuevoNombre("");
     setNuevaCantidad(1);
     setResultadosBusqueda([]);
-    setAjusteRapido(null);
-    setNuevaCantidadAjuste("");
   }
 
   async function abrirStockUbicacion(ubicacion: any) {
@@ -272,49 +266,6 @@ function UbicacionesPage() {
       } else {
         toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
       }
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  function abrirAjusteRapido(producto: ProductoConCantidad) {
-    setAjusteRapido(producto);
-    setNuevaCantidadAjuste(producto.cantidad);
-  }
-
-  async function guardarAjusteRapido() {
-    if (!ubicacionStockAbierta || !ajusteRapido) return;
-    if (
-      nuevaCantidadAjuste === "" ||
-      !Number.isInteger(nuevaCantidadAjuste) ||
-      nuevaCantidadAjuste < 0
-    ) {
-      toast.error("Introduce una cantidad entera ≥ 0.");
-      return;
-    }
-    try {
-      setGuardando(true);
-      // Movimiento tipo 'ajuste' vía actualizarStock (no escribe en stock
-      // directamente: eso devolvía 403 por RLS; el trigger aplica la cantidad).
-      const res = await actualizarStock(
-        ajusteRapido.id,
-        ubicacionStockAbierta.id,
-        nuevaCantidadAjuste,
-        {
-          tipo: "ajuste",
-          notas: `Ajuste rápido desde ${ubicacionStockAbierta.nombre}`,
-        },
-      );
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      if ("sinCambios" in res && res.sinCambios) {
-        toast.info(`La cantidad ya era ${nuevaCantidadAjuste} uds`);
-      } else {
-        toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
-      }
-      setAjusteRapido(null);
-      setNuevaCantidadAjuste("");
     } catch (err: any) {
       toast.error(errorInventario(err));
     } finally {
@@ -994,6 +945,20 @@ function UbicacionesPage() {
     );
   }
 
+  // Autocompletado del buscador: coincidencias de la ubicación por nombre/SKU/código
+  const sugerenciasBusqueda = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return [];
+    return productosUbicacion
+      .filter(
+        (p) =>
+          p.nombre.toLowerCase().includes(q) ||
+          (p.sku || "").toLowerCase().includes(q) ||
+          (p.codigo_barras || "").toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  }, [busqueda, productosUbicacion]);
+
   // ---------- RENDER DEL MODAL ----------
 
   function renderizarModal() {
@@ -1036,13 +1001,43 @@ function UbicacionesPage() {
 
           {/* Barra de acciones: buscador + añadir */}
           <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-            <Input
-              placeholder="Buscar por nombre, SKU o código de barras..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="max-w-xs"
-              disabled={modalMode !== "ver"}
-            />
+            <div className="relative max-w-xs w-full">
+              <Input
+                placeholder="Buscar por nombre, SKU o código de barras..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && sugerenciasBusqueda.length > 0) {
+                    e.preventDefault();
+                    setBusqueda(sugerenciasBusqueda[0]?.nombre ?? "");
+                  }
+                  if (e.key === "Escape") setBusqueda("");
+                }}
+                disabled={modalMode !== "ver"}
+              />
+              {/* Autocompletado: coincidencias bajo el input */}
+              {modalMode === "ver" && busqueda.trim() && (
+                <div className="absolute top-full left-0 z-20 mt-1 w-full border border-gray-200 rounded-md bg-white shadow-sm max-h-48 overflow-y-auto divide-y divide-gray-100">
+                  {sugerenciasBusqueda.length > 0 ? (
+                    sugerenciasBusqueda.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setBusqueda(p.nombre)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
+                      >
+                        <span className="font-medium truncate">{p.nombre}</span>
+                        <span className="text-xs text-gray-500 font-mono shrink-0">
+                          {p.sku} · {p.cantidad} uds
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-2 text-sm text-gray-500">Sin coincidencias.</p>
+                  )}
+                </div>
+              )}
+            </div>
             {modalMode === "ver" && (
               <Button
                 size="sm"
@@ -1085,6 +1080,19 @@ function UbicacionesPage() {
                       setProductoEscaneado(null);
                       setScanError("");
                       setResultadosBusqueda([]);
+                      // Autocompletado en vivo mientras se escribe el código
+                      const q = e.target.value.trim().toLowerCase();
+                      if (q.length >= 2) {
+                        const coincidenciasUbicacion = productosUbicacion.filter(
+                          (p) =>
+                            p.codigo_barras?.toLowerCase().includes(q) ||
+                            p.sku?.toLowerCase().includes(q) ||
+                            p.nombre.toLowerCase().includes(q),
+                        );
+                        if (coincidenciasUbicacion.length > 0) {
+                          setResultadosBusqueda(coincidenciasUbicacion.slice(0, 8));
+                        }
+                      }
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -1311,19 +1319,9 @@ function UbicacionesPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="text-amber-600 hover:text-amber-800 h-8 px-2"
-                              onClick={() => abrirAjusteRapido(p)}
-                              disabled={modalMode !== "ver" || !!ajusteRapido}
-                              title="Ajuste rápido"
-                            >
-                              ⚡
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
                               className="text-red-600 hover:text-red-800 h-8 px-2"
                               onClick={() => eliminarProducto(p)}
-                              disabled={modalMode !== "ver" || !!ajusteRapido}
+                              disabled={modalMode !== "ver"}
                               title="Quitar de esta ubicación"
                             >
                               🗑️
@@ -1344,64 +1342,6 @@ function UbicacionesPage() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* MINI-MODAL: AJUSTE RÁPIDO */}
-      {ajusteRapido && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">⚡ Ajuste rápido</h3>
-            <p className="text-sm text-gray-600">
-              {ajusteRapido.nombre}
-              <span className="text-xs text-gray-500">
-                {" "}
-                (SKU {ajusteRapido.sku}) · actual: {ajusteRapido.cantidad} uds
-              </span>
-            </p>
-            <div className="space-y-1">
-              <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
-              <Input
-                id="cantidad-ajuste-rapido"
-                type="number"
-                min={0}
-                autoFocus
-                value={nuevaCantidadAjuste}
-                onChange={(e) =>
-                  setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    guardarAjusteRapido();
-                  }
-                  if (e.key === "Escape") {
-                    setAjusteRapido(null);
-                    setNuevaCantidadAjuste("");
-                  }
-                }}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAjusteRapido(null);
-                  setNuevaCantidadAjuste("");
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={guardarAjusteRapido}
-                disabled={guardando}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {guardando ? "Guardando..." : "Guardar ajuste"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
       {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (html5-qrcode) */}
       {escanerAbierto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
