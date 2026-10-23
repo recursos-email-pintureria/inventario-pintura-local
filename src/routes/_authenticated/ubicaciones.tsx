@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   obtenerSecciones,
   obtenerUbicaciones,
@@ -136,6 +136,9 @@ function UbicacionesPage() {
   const [nuevaCantidad, setNuevaCantidad] = useState<number | "">(1);
   // Resultados de la búsqueda por código (desplegable bajo el input)
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([]);
+  const [buscandoProductos, setBuscandoProductos] = useState(false);
+  const [sinResultados, setSinResultados] = useState(false);
+  const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [tipo, setTipo] = useState<string>("pasillo");
   const [nombre, setNombre] = useState("");
@@ -207,6 +210,7 @@ function UbicacionesPage() {
   }
 
   function resetearModalForms() {
+    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     setModalMode("ver");
     setBusqueda("");
     setProductoEditando(null);
@@ -218,6 +222,8 @@ function UbicacionesPage() {
     setNuevoNombre("");
     setNuevaCantidad(1);
     setResultadosBusqueda([]);
+    setSinResultados(false);
+    setBuscandoProductos(false);
   }
 
   async function abrirStockUbicacion(ubicacion: any) {
@@ -304,18 +310,21 @@ function UbicacionesPage() {
     }
   }
 
-  // Escáner / búsqueda por código de barras: despliega lista de coincidencias
-  // para seleccionar; si no hay ninguna, permite crear el producto nuevo.
+  // Escáner / búsqueda por código: busca en TODA la tabla productos.
+  // Despliega lista de coincidencias para seleccionar; si no hay ninguna,
+  // permite crear el producto nuevo.
   async function escanearCodigo() {
+    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     setScanError("");
     setProductoEscaneado(null);
-    setResultadosBusqueda([]);
+    setSinResultados(false);
     if (!nuevoCodigoBarras.trim()) {
+      setResultadosBusqueda([]);
       setScanError("Introduce o escanea un código de barras.");
       return;
     }
     try {
-      setGuardando(true);
+      setBuscandoProductos(true);
       const coincidencias = await buscarProductosPorCodigo(nuevoCodigoBarras);
       if (coincidencias.length === 1) {
         const unico = coincidencias[0]!;
@@ -323,23 +332,52 @@ function UbicacionesPage() {
         toast.success(`Producto encontrado: ${unico.nombre}`);
       } else if (coincidencias.length > 1) {
         setResultadosBusqueda(coincidencias);
+        setSinResultados(false);
         toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
       } else {
+        setResultadosBusqueda([]);
+        setSinResultados(true);
         setNuevoSku("");
         setNuevoNombre("");
         toast.info("No existe ningún producto con ese código. Complétalo para crearlo.");
       }
     } catch (err: any) {
       setScanError(errorInventario(err));
+      toast.error(errorInventario(err));
     } finally {
-      setGuardando(false);
+      setBuscandoProductos(false);
     }
+  }
+
+  // Autocompletado en vivo contra TODA la tabla productos (debounce 250ms)
+  function autocompletarProductos(texto: string) {
+    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
+    const q = texto.trim();
+    setResultadosBusqueda([]);
+    setSinResultados(false);
+    if (q.length < 2) {
+      setBuscandoProductos(false);
+      return;
+    }
+    debounceBusquedaRef.current = setTimeout(async () => {
+      try {
+        setBuscandoProductos(true);
+        const coincidencias = await buscarProductosPorCodigo(q);
+        setResultadosBusqueda(coincidencias.slice(0, 8));
+        setSinResultados(coincidencias.length === 0);
+      } catch (err: any) {
+        toast.error(errorInventario(err));
+      } finally {
+        setBuscandoProductos(false);
+      }
+    }, 250);
   }
 
   function seleccionarProductoBusqueda(p: Producto) {
     setProductoEscaneado({ id: p.id, sku: p.sku, nombre: p.nombre });
     setNuevoCodigoBarras(p.codigo_barras);
     setResultadosBusqueda([]);
+    setSinResultados(false);
     setScanError("");
   }
 
@@ -1130,26 +1168,14 @@ function UbicacionesPage() {
                   <Input
                     id="scan-codigo"
                     autoFocus
-                    placeholder="Escanea o escribe el código y pulsa Buscar"
+                    placeholder="Escanea o escribe (mín. 2 caracteres) y pulsa Buscar"
                     value={nuevoCodigoBarras}
                     onChange={(e) => {
                       setNuevoCodigoBarras(e.target.value);
                       setProductoEscaneado(null);
                       setScanError("");
-                      setResultadosBusqueda([]);
-                      // Autocompletado en vivo mientras se escribe el código
-                      const q = e.target.value.trim().toLowerCase();
-                      if (q.length >= 2) {
-                        const coincidenciasUbicacion = productosUbicacion.filter(
-                          (p) =>
-                            p.codigo_barras?.toLowerCase().includes(q) ||
-                            p.sku?.toLowerCase().includes(q) ||
-                            p.nombre.toLowerCase().includes(q),
-                        );
-                        if (coincidenciasUbicacion.length > 0) {
-                          setResultadosBusqueda(coincidenciasUbicacion.slice(0, 8));
-                        }
-                      }
+                      // Autocompletado en vivo contra TODA la tabla productos
+                      autocompletarProductos(e.target.value);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -1158,22 +1184,32 @@ function UbicacionesPage() {
                       }
                     }}
                   />
-                  {/* Desplegable de resultados de búsqueda por código */}
-                  {resultadosBusqueda.length > 0 && (
+                  {/* Desplegable de resultados (búsqueda global en productos) */}
+                  {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
                     <div className="border border-blue-200 rounded-md bg-white shadow-sm max-h-48 overflow-y-auto divide-y divide-gray-100">
-                      {resultadosBusqueda.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => seleccionarProductoBusqueda(p)}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
-                        >
-                          <span className="font-medium truncate">{p.nombre}</span>
-                          <span className="text-xs text-gray-500 font-mono shrink-0">
-                            {p.sku} · {p.codigo_barras}
-                          </span>
-                        </button>
-                      ))}
+                      {buscandoProductos ? (
+                        <p className="px-3 py-2 text-sm text-gray-500 animate-pulse">
+                          Buscando en todos los productos…
+                        </p>
+                      ) : resultadosBusqueda.length > 0 ? (
+                        resultadosBusqueda.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => seleccionarProductoBusqueda(p)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
+                          >
+                            <span className="font-medium truncate">{p.nombre}</span>
+                            <span className="text-xs text-gray-500 font-mono shrink-0">
+                              {p.sku} · {p.codigo_barras}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="px-3 py-2 text-sm text-gray-500">
+                          No se encontraron productos
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
