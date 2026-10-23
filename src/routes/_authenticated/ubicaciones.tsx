@@ -12,6 +12,7 @@ import {
   actualizarStock,
   crearMovimientoConStock,
   buscarProductosPorCodigo,
+  obtenerTodosProductos,
   guardarProducto,
 } from "../../lib/inventario";
 import type { Producto, ProductoConCantidad } from "../../lib/inventario";
@@ -138,6 +139,7 @@ function UbicacionesPage() {
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([]);
   const [buscandoProductos, setBuscandoProductos] = useState(false);
   const [sinResultados, setSinResultados] = useState(false);
+  const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>([]);
   const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [tipo, setTipo] = useState<string>("pasillo");
@@ -153,6 +155,30 @@ function UbicacionesPage() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Al abrir el formulario "Añadir producto", cargar AUTOMÁTICAMENTE la lista
+  // completa de productos (tabla `productos`) para mostrarla sin esperar escritura.
+  useEffect(() => {
+    if (modalMode !== "anadir" || catalogoProductos.length > 0) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        setBuscandoProductos(true);
+        const todos = await obtenerTodosProductos(100);
+        console.log("[autocompletar] catálogo inicial cargado:", todos.length, "productos");
+        if (!cancelado) setCatalogoProductos(todos);
+      } catch (err: any) {
+        console.error("[autocompletar] ERROR cargando catálogo:", err);
+        if (!cancelado) toast.error(errorInventario(err));
+      } finally {
+        if (!cancelado) setBuscandoProductos(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalMode]);
 
   async function cargarDatos() {
     try {
@@ -349,13 +375,19 @@ function UbicacionesPage() {
     }
   }
 
-  // Autocompletado en vivo contra TODA la tabla productos (debounce 250ms)
+  // Autocompletado en vivo contra TODA la tabla productos. Con el input vacío se
+  // muestra directamente el catálogo cargado; con texto se filtra (debounce 250ms).
   function autocompletarProductos(texto: string) {
     if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     const q = texto.trim();
-    setResultadosBusqueda([]);
     setSinResultados(false);
+    if (!q) {
+      setResultadosBusqueda(catalogoProductos.slice(0, 8));
+      setBuscandoProductos(false);
+      return;
+    }
     if (q.length < 2) {
+      setResultadosBusqueda([]);
       setBuscandoProductos(false);
       return;
     }
@@ -363,6 +395,7 @@ function UbicacionesPage() {
       try {
         setBuscandoProductos(true);
         const coincidencias = await buscarProductosPorCodigo(q);
+        console.log("[autocompletar] resultadosBusqueda:", coincidencias.length);
         setResultadosBusqueda(coincidencias.slice(0, 8));
         setSinResultados(coincidencias.length === 0);
       } catch (err: any) {
@@ -1136,7 +1169,12 @@ function UbicacionesPage() {
             {modalMode === "ver" && (
               <Button
                 size="sm"
-                onClick={() => setModalMode("anadir")}
+                onClick={() => {
+                  setModalMode("anadir");
+                  setResultadosBusqueda(catalogoProductos.slice(0, 8));
+                  setSinResultados(false);
+                  setScanError("");
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 + Añadir producto
@@ -1168,8 +1206,14 @@ function UbicacionesPage() {
                   <Input
                     id="scan-codigo"
                     autoFocus
-                    placeholder="Escanea o escribe (mín. 2 caracteres) y pulsa Buscar"
+                    placeholder="Busca por nombre, SKU o código (o selecciona de la lista)"
                     value={nuevoCodigoBarras}
+                    onFocus={() => {
+                      if (!nuevoCodigoBarras.trim() && !productoEscaneado) {
+                        setResultadosBusqueda(catalogoProductos.slice(0, 8));
+                        setSinResultados(false);
+                      }
+                    }}
                     onChange={(e) => {
                       setNuevoCodigoBarras(e.target.value);
                       setProductoEscaneado(null);
@@ -1225,7 +1269,15 @@ function UbicacionesPage() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={escanearCodigo}
+                    onClick={() => {
+                      if (!nuevoCodigoBarras.trim()) {
+                        setResultadosBusqueda(catalogoProductos.slice(0, 8));
+                        setSinResultados(false);
+                        setScanError("");
+                      } else {
+                        escanearCodigo();
+                      }
+                    }}
                     disabled={guardando}
                   >
                     🔍 Buscar

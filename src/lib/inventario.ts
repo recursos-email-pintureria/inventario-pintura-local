@@ -885,9 +885,22 @@ export async function buscarProductoPorCodigo(codigo: string): Promise<Producto 
   return resultados[0] ?? null;
 }
 
+/** Primeros N productos activos ordenados por nombre (para autocompletado inicial). */
+export async function obtenerTodosProductos(limit = 100): Promise<Producto[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*")
+    .eq("activo", true)
+    .order("nombre", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return (data || []) as Producto[];
+}
+
 /** Lista de coincidencias por código de barras exacto o parcial (nombre/SKU). */
 export async function buscarProductosPorCodigo(codigo: string): Promise<Producto[]> {
   const q = codigo.trim();
+  console.log("[autocompletar] texto buscado:", JSON.stringify(q));
   if (!q) return [];
   // Primero coincidencia EXACTA de código de barras (caso típico del escáner).
   const { data: exactos, error: eExacta } = await supabase
@@ -898,12 +911,14 @@ export async function buscarProductosPorCodigo(codigo: string): Promise<Producto
     .limit(20);
   if (!eExacta && exactos && exactos.length > 0) return exactos as Producto[];
   // Si no hay exactos, búsqueda parcial por código, SKU o nombre.
+  const filtro = `codigo_barras.ilike.%${q}%,sku.ilike.%${q}%,nombre.ilike.%${q}%`;
   const { data: parciales, error: eParcial } = await supabase
     .from("productos")
     .select("*")
     .eq("activo", true)
-    .or(`codigo_barras.ilike.%${q}%,sku.ilike.%${q}%,nombre.ilike.%${q}%`)
+    .or(filtro)
     .limit(20);
-  if (eParcial) return [];
+  if (eParcial) console.error("[autocompletar] ERROR consulta Supabase:", eParcial);
+  console.log("[autocompletar] datos crudos:", parciales?.length ?? null, "coincidencias");
   return (parciales || []) as Producto[];
 }
