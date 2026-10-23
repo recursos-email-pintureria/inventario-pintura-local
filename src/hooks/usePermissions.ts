@@ -25,6 +25,11 @@ export interface PermisosUsuario {
 
 export type Permiso = keyof Omit<PermisosUsuario, "id_usuario">;
 
+/** Cierra la sesión del usuario actual en Supabase. */
+export async function cerrarSesion() {
+  await supabase.auth.signOut();
+}
+
 export function useMyProfile() {
   const { user } = useAuth();
   const query = useQuery({
