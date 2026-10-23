@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import Escaner from "@/components/inventario/Escaner";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
   component: UbicacionesPage,
@@ -92,6 +93,7 @@ function UbicacionesPage() {
   // Formulario "añadir producto" (inline en el modal)
   const [nuevoCodigoBarras, setNuevoCodigoBarras] = useState("");
   const [scanError, setScanError] = useState("");
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
   const [productoEscaneado, setProductoEscaneado] = useState<{
     id: string;
     sku: string;
@@ -200,6 +202,7 @@ function UbicacionesPage() {
   function cerrarModal() {
     const anterior = ubicacionStockAbierta;
     setUbicacionStockAbierta(null);
+    setEscanerAbierto(false);
     resetearModalForms();
     if (anterior) recargarProductosUbicacion(anterior.id);
   }
@@ -925,6 +928,7 @@ function UbicacionesPage() {
       : productosUbicacion;
 
     return (
+      <>
       <Dialog
         open={!!ubicacionStockAbierta}
         onOpenChange={(open) => {
@@ -1009,7 +1013,15 @@ function UbicacionesPage() {
                     }}
                   />
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEscanerAbierto(true)}
+                    disabled={guardando}
+                  >
+                    {"\u{1F4F7} Escanear"}
+                  </Button>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -1221,7 +1233,26 @@ function UbicacionesPage() {
           </div>
         </DialogContent>
       </Dialog>
-    );
+
+      {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (html5-qrcode) */}
+      {escanerAbierto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg space-y-4">
+            <h2 className="text-lg font-semibold">{"\u{1F4F7} Escanear código de barras"}</h2>
+            <Escaner
+              onCodigo={(codigo) => {
+                setNuevoCodigoBarras(codigo);
+                setProductoEscaneado(null);
+                setScanError("");
+                setEscanerAbierto(false);
+              }}
+              onCerrar={() => setEscanerAbierto(false)}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
   }
 
   return (
