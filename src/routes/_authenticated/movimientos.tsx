@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin, LayoutGrid, History, Trash2, Info } from 'lucide-react';
+import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin, LayoutGrid, History, Trash2, Info, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import {
   inventarioQueryOptions, usuarioActual, permisoExplicito, 
   crearMovimientoConStock, crearTraslado, obtenerStockActual, obtenerUbicacionesConStock,
   limpiarStockLineales, obtenerStockLineales, ajustarStockLineal,
+  obtenerProductosPorUbicacion, type ProductoConCantidad,
   errorInventario, formatoPrecio, formatoFecha, 
   filtrarMovimientos, exportarMovimientos,
   type Movimiento, type FiltrosMovimiento 
@@ -97,6 +98,38 @@ function MovimientosPage() {
   const [ubicacionesConStock, setUbicacionesConStock] = useState<{ id_ubicacion: string; cantidad: number; nombre_ubicacion?: string }[]>([]);
 
   // Estados para ajuste rápido
+  // Desglose de productos por ubicación (informativo, solo lectura)
+  const [ubicacionesExpandidas, setUbicacionesExpandidas] = useState<Set<string>>(new Set());
+  const [desgloseProductos, setDesgloseProductos] = useState<Record<string, ProductoConCantidad[]>>({});
+  const [cargandoDesglose, setCargandoDesglose] = useState<Set<string>>(new Set());
+  const [mostrarTodo, setMostrarTodo] = useState<Record<string, boolean>>({});
+
+  const toggleDesglose = async (idUbicacion: string) => {
+    const nuevas = new Set(ubicacionesExpandidas);
+    if (nuevas.has(idUbicacion)) {
+      nuevas.delete(idUbicacion);
+      setUbicacionesExpandidas(nuevas);
+      return;
+    }
+    nuevas.add(idUbicacion);
+    setUbicacionesExpandidas(nuevas);
+    if (!desgloseProductos[idUbicacion]) {
+      setCargandoDesglose(prev => new Set(prev).add(idUbicacion));
+      try {
+        const productos = await obtenerProductosPorUbicacion(idUbicacion);
+        setDesgloseProductos(prev => ({ ...prev, [idUbicacion]: productos }));
+      } catch (e) {
+        toast.error('No se pudo cargar el desglose de productos', { description: errorInventario(e) });
+      } finally {
+        setCargandoDesglose(prev => {
+          const s = new Set(prev);
+          s.delete(idUbicacion);
+          return s;
+        });
+      }
+    }
+  };
+
   const [modalAjusteAbierto, setModalAjusteAbierto] = useState(false);
   const [stockLineales, setStockLineales] = useState<any[]>([]);
   const [cantidadesReales, setCantidadesReales] = useState<Map<string, number>>(new Map());
@@ -600,68 +633,137 @@ function MovimientosPage() {
                             const esArmarioOAlto = hijo.tipo === 'armario' || hijo.tipo === 'alto';
                             const esCross = hijo.tipo === 'cross';
                             const esCaja = hijo.tipo === 'caja';
-                            
+                            const expandida = ubicacionesExpandidas.has(hijo.id);
+                            const productosHijo = desgloseProductos[hijo.id];
+                            const cargandoHijo = cargandoDesglose.has(hijo.id);
+                            const maximoVisible = 5;
+
                             return (
-                              <div key={hijo.id} className="px-4 py-3 pl-12 bg-white flex items-center justify-between hover:bg-gray-50">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground text-xs">└─</span>
-                                  <span className="text-base">
-                                    {hijo.tipo === 'armario' ? '🗄️' : hijo.tipo === 'alto' ? '📦' : hijo.tipo === 'cross' ? '🔄' : hijo.tipo === 'caja' ? '💳' : ''}
-                                  </span>
-                                  <div>
-                                    <span className="font-medium text-sm">{hijo.nombre}</span>
-                                    <Badge variant="outline" className="ml-2 text-xs">{hijo.tipo}</Badge>
-                                    {hijo.posicion_lateral && (
-                                      <span className="text-xs text-muted-foreground ml-2">[{hijo.posicion_lateral}]</span>
+                              <div key={hijo.id}>
+                                <div
+                                  className={`px-4 py-3 pl-12 bg-white flex items-center justify-between hover:bg-gray-50 cursor-pointer transition-colors ${expandida ? 'bg-gray-50' : ''}`}
+                                  onClick={() => toggleDesglose(hijo.id)}
+                                  role="button"
+                                  aria-expanded={expandida}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ${expandida ? 'rotate-90' : ''}`} />
+                                    <span className="text-muted-foreground text-xs">└─</span>
+                                    <span className="text-base">
+                                      {hijo.tipo === 'armario' ? '\u{1F5C4}\u{FE0F}' : hijo.tipo === 'alto' ? '\u{1F4E6}' : hijo.tipo === 'cross' ? '\u{1F504}' : hijo.tipo === 'caja' ? '\u{1F4B3}' : ''}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <span className="font-medium text-sm">{hijo.nombre}</span>
+                                      <Badge variant="outline" className="ml-2 text-xs">{hijo.tipo}</Badge>
+                                      {hijo.posicion_lateral && (
+                                        <span className="text-xs text-muted-foreground ml-2">[{hijo.posicion_lateral}]</span>
+                                      )}
+                                      {hijo.numero && (
+                                        <span className="text-xs text-muted-foreground ml-1">Nº{hijo.numero}</span>
+                                      )}
+                                    </div>
+                                    {esArmarioOAlto && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-300 cursor-help">
+                                            ✅ 100% fiable
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                          <p className="font-semibold mb-1">🟢 Stock 100% fiable</p>
+                                          <p className="text-xs">Armarios y altos tienen stock controlado.</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     )}
-                                    {hijo.numero && (
-                                      <span className="text-xs text-muted-foreground ml-1">Nº{hijo.numero}</span>
+                                    {(esCross || esCaja) && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
+                                            ⚠️ Stock estimado
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                          <p className="font-semibold mb-1"> Stock NO fiable</p>
+                                          <p className="text-xs">Zonas de venta. El stock puede variar por compras de clientes.</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     )}
                                   </div>
-                                  {esArmarioOAlto && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-300 cursor-help">
-                                          ✅ 100% fiable
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="font-semibold mb-1">🟢 Stock 100% fiable</p>
-                                        <p className="text-xs">Armarios y altos tienen stock controlado.</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {(esCross || esCaja) && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
-                                          ⚠️ Stock estimado
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="font-semibold mb-1"> Stock NO fiable</p>
-                                        <p className="text-xs">Zonas de venta. El stock puede variar por compras de clientes.</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
+                                  <div className="text-right flex-shrink-0 ml-2">
+                                    <Badge
+                                      variant={esArmarioOAlto ? 'default' : 'secondary'}
+                                      className={`text-lg px-3 py-1 ${
+                                        esArmarioOAlto ? 'bg-green-600 hover:bg-green-700' :
+                                        esCross || esCaja ? 'bg-yellow-100 text-yellow-800' : ''
+                                      }`}
+                                    >
+                                      {hijo.stock} uds
+                                    </Badge>
+                                    {hijo.ultimoMovimiento && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        <p>{formatoFecha(hijo.ultimoMovimiento.fecha_movimiento)}</p>
+                                        {usuario && <p>por {usuario.nombre_completo}</p>}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="text-right">
-                                  <Badge 
-                                    variant={esArmarioOAlto ? 'default' : 'secondary'}
-                                    className={`text-lg px-3 py-1 ${
-                                      esArmarioOAlto ? 'bg-green-600 hover:bg-green-700' : 
-                                      esCross || esCaja ? 'bg-yellow-100 text-yellow-800' : ''
-                                    }`}
-                                  >
-                                    {hijo.stock} uds
-                                  </Badge>
-                                  {hijo.ultimoMovimiento && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                      <p>{formatoFecha(hijo.ultimoMovimiento.fecha_movimiento)}</p>
-                                      {usuario && <p>por {usuario.nombre_completo}</p>}
-                                    </div>
-                                  )}
-                                </div>
+
+                                {expandida && (
+                                  <div className="pl-16 pr-4 pb-3 pt-1 bg-gray-50/60 border-t border-gray-100">
+                                    {cargandoHijo ? (
+                                      <p className="text-xs text-muted-foreground py-2 animate-pulse">Cargando productos…</p>
+                                    ) : !productosHijo || productosHijo.length === 0 ? (
+                                      <p className="text-xs text-muted-foreground py-2">Sin productos con stock en esta ubicación.</p>
+                                    ) : (
+                                      <>
+                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2 pb-1">
+                                          Productos ({productosHijo.length}) · {productosHijo.reduce((s, p) => s + p.cantidad, 0)} uds
+                                        </p>
+                                        <ul className="space-y-1">
+                                          {(productosHijo.length <= maximoVisible || mostrarTodo[hijo.id]
+                                            ? productosHijo
+                                            : productosHijo.slice(0, maximoVisible)
+                                          ).map(p => (
+                                            <li key={p.id} className="flex items-center justify-between gap-2 text-sm bg-white rounded-md px-3 py-1.5 border border-gray-100">
+                                              <div className="min-w-0 flex-1">
+                                                <span className="font-medium truncate">{p.nombre}</span>
+                                                <span className="block sm:inline text-xs text-muted-foreground sm:ml-2 font-mono">{p.sku}</span>
+                                                {p.codigo_barras && (
+                                                  <span className="hidden md:inline text-xs text-muted-foreground ml-2 font-mono">{p.codigo_barras}</span>
+                                                )}
+                                              </div>
+                                              <Badge variant="outline" className="flex-shrink-0 text-xs font-mono">{p.cantidad} uds</Badge>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                        {productosHijo.length > maximoVisible && !mostrarTodo[hijo.id] && (
+                                          <button
+                                            type="button"
+                                            className="text-xs text-blue-600 hover:underline mt-1.5"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setMostrarTodo(prev => ({ ...prev, [hijo.id]: true }));
+                                            }}
+                                          >
+                                            +{productosHijo.length - maximoVisible} más…
+                                          </button>
+                                        )}
+                                        {productosHijo.length > maximoVisible && mostrarTodo[hijo.id] && (
+                                          <button
+                                            type="button"
+                                            className="text-xs text-blue-600 hover:underline mt-1.5"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setMostrarTodo(prev => ({ ...prev, [hijo.id]: false }));
+                                            }}
+                                          >
+                                            Mostrar menos
+                                          </button>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
