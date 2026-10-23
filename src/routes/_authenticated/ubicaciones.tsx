@@ -18,9 +18,10 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
+// ✅ EMOJIS CORREGIDOS Y VISIBLES
 const iconosTipo: Record<string, string> = {
-  pasillo: '️',
-  armario: '️',
+  pasillo: '🛣️',
+  armario: '🗄️',
   alto: '📦',
   cross: '🔄',
   caja: '💳',
@@ -80,7 +81,6 @@ function UbicacionesPage() {
       )
       setExpandidos(padres)
 
-      // ✅ CONSULTA ÚNICA: obtener todo el stock de una vez
       const { data: stockData, error: stockError } = await supabase
         .from('stock')
         .select('id_ubicacion, cantidad')
@@ -89,14 +89,12 @@ function UbicacionesPage() {
       if (stockError) {
         console.error('Error cargando stock:', stockError)
       } else {
-        // Agrupar por ubicación
         const productosMap = new Map<string, number>()
         stockData?.forEach((item: any) => {
           const count = productosMap.get(item.id_ubicacion) || 0
           productosMap.set(item.id_ubicacion, count + 1)
         })
         setProductosPorUbicacion(productosMap)
-        console.log('✅ Stock cargado:', productosMap)
       }
     } catch (err: any) {
       setError(errorInventario(err))
@@ -256,7 +254,7 @@ function UbicacionesPage() {
       alert('No se puede borrar: hay productos en esta ubicación. Desactívala en su lugar.')
       return
     }
-    if (!confirm('️ ¿Borrar DEFINITIVAMENTE?')) return
+    if (!confirm('⚠️ ¿Borrar DEFINITIVAMENTE?')) return
     try {
       await borrarUbicacionDefinitivamente(id)
       await cargarDatos()
@@ -312,7 +310,7 @@ function UbicacionesPage() {
               <option value="alto">📦 Alto</option>
               <option value="cross">🔄 Cross</option>
               <option value="caja">💳 Caja</option>
-              <option value="reserva"> Reserva</option>
+              <option value="reserva">🏭 Reserva</option>
             </select>
           </div>
           <div>
@@ -431,7 +429,7 @@ function UbicacionesPage() {
           {numProductos > 0 || tieneHijos ? (
             <button onClick={() => desactivarUbicacionHandler(ubicacion.id)} className="text-orange-600 hover:text-orange-800 p-1 rounded" title="Desactivar">⏸️</button>
           ) : (
-            <button onClick={() => borrarDefinitivamente(ubicacion.id)} className="text-red-600 hover:text-red-800 p-1 rounded" title="Borrar">️</button>
+            <button onClick={() => borrarDefinitivamente(ubicacion.id)} className="text-red-600 hover:text-red-800 p-1 rounded" title="Borrar">🗑️</button>
           )}
         </div>
       </div>

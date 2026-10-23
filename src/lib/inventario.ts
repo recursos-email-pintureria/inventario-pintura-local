@@ -216,7 +216,38 @@ export async function crearUbicacion(ubicacion: {
   numero?: number | null;
   descripcion?: string | null;
 }) {
-  const { data, error } = await supabase.from('ubicaciones').insert([ubicacion]).select().single();
+  // ✅ Validar unicidad SOLO dentro del mismo pasillo padre
+  if (ubicacion.id_ubicacion_padre) {
+    const { data: existe } = await supabase
+      .from('ubicaciones')
+      .select('id')
+      .eq('nombre', ubicacion.nombre)
+      .eq('id_ubicacion_padre', ubicacion.id_ubicacion_padre)
+      .limit(1);
+    
+    if (existe && existe.length > 0) {
+      throw new Error(`Ya existe "${ubicacion.nombre}" en este pasillo.`);
+    }
+  } else {
+    // Para pasillos/reservas (sin padre), validar nombre único global
+    const { data: existe } = await supabase
+      .from('ubicaciones')
+      .select('id')
+      .eq('nombre', ubicacion.nombre)
+      .is('id_ubicacion_padre', null)
+      .limit(1);
+    
+    if (existe && existe.length > 0) {
+      throw new Error(`Ya existe el pasillo "${ubicacion.nombre}".`);
+    }
+  }
+  
+  const { data, error } = await supabase
+    .from('ubicaciones')
+    .insert([ubicacion])
+    .select()
+    .single();
+  
   if (error) throw error;
   return data;
 }
