@@ -18,7 +18,7 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
-// ✅ ICONOS MEJORADOS Y MÁS VISIBLES
+// ✅ ICONOS CORREGIDOS Y VISIBLES
 function getIconoTipo(tipo: string): string {
   const iconos: Record<string, string> = {
     pasillo: '🛣️',
@@ -288,17 +288,14 @@ function UbicacionesPage() {
     }))
   }
 
-  // ✅ FUNCIÓN MEJORADA PARA OBTENER SECCIÓN
   function getSeccionReal(ubicacion: any): string {
     try {
       if (ubicacion.tipo === 'cross') {
-        // Para cross, usar sección_origen
         if (ubicacion.seccion_origen_nombre) return ubicacion.seccion_origen_nombre
         if (typeof ubicacion.seccion_origen === 'string') return ubicacion.seccion_origen
         if (ubicacion.seccion_origen?.nombre) return ubicacion.seccion_origen.nombre
         return '-'
       } else {
-        // Para otros tipos, usar sección
         if (ubicacion.seccion_nombre) return ubicacion.seccion_nombre
         if (typeof ubicacion.seccion === 'string') return ubicacion.seccion
         if (ubicacion.seccion?.nombre) return ubicacion.seccion.nombre
@@ -329,7 +326,7 @@ function UbicacionesPage() {
             <label className="block text-sm font-medium mb-1 text-gray-700">Tipo *</label>
             <select value={tipo} onChange={(e) => { setTipo(e.target.value); setUbicacionPadreId(''); setPosicionLateral(''); setPosicionLongitudinal(''); setSeccionOrigenId(''); }} className="w-full border border-gray-300 rounded px-3 py-2">
               <option value="pasillo">🛣️ Pasillo</option>
-              <option value="armario">️ Armario</option>
+              <option value="armario">🗄️ Armario</option>
               <option value="alto">📦 Alto</option>
               <option value="cross">🔄 Cross</option>
               <option value="caja">💳 Caja</option>
