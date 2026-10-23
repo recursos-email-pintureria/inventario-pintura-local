@@ -12,7 +12,7 @@ import {
   actualizarStock,
   crearMovimientoConStock,
   buscarProductosPorCodigo,
-  obtenerTodosProductos,
+  descargarCatalogoCompleto,
   guardarProducto,
 } from "../../lib/inventario";
 import type { Producto, ProductoConCantidad } from "../../lib/inventario";
@@ -140,11 +140,14 @@ function UbicacionesPage() {
   const [buscandoProductos, setBuscandoProductos] = useState(false);
   const [sinResultados, setSinResultados] = useState(false);
   const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>([]);
-  const [totalCatalogo, setTotalCatalogo] = useState(0);
-  const [paginaCatalogo, setPaginaCatalogo] = useState(1);
-  const [cargandoMas, setCargandoMas] = useState(false);
+  // Conteo REAL de TODOS los productos en la tabla (incl. inactivos) para avisar
+  // si el filtro "activo" oculta algunos.
+  const [totalRealesTabla, setTotalRealesTabla] = useState<number | null>(null);
   const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const TAM_PAGINA_PRODUCTOS = 50;
+  // Nº de items visibles por página de render en la lista desplegable (scroll claro).
+  const ITEMS_VISIBLES = 25;
+  const [visiblesLista, setVisiblesLista] = useState(ITEMS_VISIBLES);
 
   const [tipo, setTipo] = useState<string>("pasillo");
   const [nombre, setNombre] = useState("");
@@ -160,24 +163,19 @@ function UbicacionesPage() {
     cargarDatos();
   }, []);
 
-  // Al abrir el formulario "Añadir producto", cargar AUTOMÁTICAMENTE la primera
-  // página del catálogo (tabla `productos`) para mostrarla sin esperar escritura.
+  // Al abrir el formulario "Añadir producto", cargar AUTOMÁTICAMENTE TODO el
+  // catálogo activo (tabla `productos`) para mostrarlo sin esperar escritura.
   useEffect(() => {
     if (modalMode !== "anadir" || catalogoProductos.length > 0) return;
     let cancelado = false;
     (async () => {
       try {
         setBuscandoProductos(true);
-        const { productos, total } = await obtenerTodosProductos(
-          TAM_PAGINA_PRODUCTOS,
-          1,
-          TAM_PAGINA_PRODUCTOS,
-        );
-        console.log("[autocompletar] catálogo inicial cargado:", productos.length, "de", total);
+        const productos = await descargarCatalogoCompleto(TAM_PAGINA_PRODUCTOS);
+        console.log("[autocompletar] catálogo completo cargado:", productos.length);
         if (!cancelado) {
           setCatalogoProductos(productos);
-          setTotalCatalogo(total);
-          setPaginaCatalogo(1);
+          setResultadosBusqueda((prev) => (prev.length === 0 ? productos : prev));
         }
       } catch (err: any) {
         console.error("[autocompletar] ERROR cargando catálogo:", err);
@@ -192,29 +190,43 @@ function UbicacionesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalMode]);
 
-  // Scroll infinito: al llegar al final de la lista, cargar 50 productos más.
-  async function cargarMasProductos() {
-    if (cargandoMas || catalogoProductos.length >= totalCatalogo) return;
-    try {
-      setCargandoMas(true);
-      const siguiente = paginaCatalogo + 1;
-      const { productos, total } = await obtenerTodosProductos(
-        TAM_PAGINA_PRODUCTOS,
-        siguiente,
-        TAM_PAGINA_PRODUCTOS,
+  // Conteo REAL de la tabla productos (incluye inactivos) para detectar si el
+  // filtro activo=true oculta productos respecto al total real.
+  useEffect(() => {
+    if (totalRealesTabla !== null) return;
+    (async () => {
+      const { count, error } = await supabase
+        .from("productos")
+        .select("id", { count: "exact", head: true });
+      console.log(
+        "[autocompletar] conteo REAL tabla productos:",
+        count,
+        error ? "| ERROR:" : "",
+        error ?? "",
       );
-      setCatalogoProductos((prev) => [...prev, ...productos]);
-      setTotalCatalogo(total);
-      setPaginaCatalogo(siguiente);
-      setResultadosBusqueda((prev) => {
-        const nuevos = productos.filter((p) => !prev.some((x) => x.id === p.id));
-        return [...prev, ...nuevos];
-      });
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setCargandoMas(false);
-    }
+      if (!error) setTotalRealesTabla(count ?? 0);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // "Cargar más": como el catálogo ya está completo en memoria, solo amplía los
+  // items RENDERIZADOS de la lista (página de render), sin consultas extra.
+  function cargarMasProductos() {
+    setVisiblesLista((v) => v + ITEMS_VISIBLES);
+  }
+
+  // Autocompletado LOCAL instantáneo sobre el catálogo completo ya descargado.
+  // No depende de red ni del botón "Buscar": al escribir se filtran nombre, SKU
+  // y código de barras en tiempo real.
+  function filtrarCatalogoLocal(texto: string): Producto[] {
+    const q = texto.trim().toLowerCase();
+    if (!q) return catalogoProductos;
+    return catalogoProductos.filter(
+      (p) =>
+        p.nombre.toLowerCase().includes(q) ||
+        (p.sku || "").toLowerCase().includes(q) ||
+        (p.codigo_barras || "").toLowerCase().includes(q),
+    );
   }
 
   async function cargarDatos() {
@@ -287,7 +299,22 @@ function UbicacionesPage() {
     setResultadosBusqueda([]);
     setSinResultados(false);
     setBuscandoProductos(false);
+    setVisiblesLista(ITEMS_VISIBLES);
   }
+
+  // Cerrar el modal SIEMPRE al pulsar Escape, desde cualquier foco/input.
+  useEffect(() => {
+    if (!ubicacionStockAbierta) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        console.log("[modal] Escape pulsado -> cerrarModal()");
+        cerrarModal();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ubicacionStockAbierta]);
 
   async function abrirStockUbicacion(ubicacion: any) {
     setUbicacionStockAbierta(ubicacion);
@@ -418,29 +445,34 @@ function UbicacionesPage() {
     if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     const q = texto.trim();
     setSinResultados(false);
+    // Filtrado LOCAL instantáneo sobre el catálogo completo descargado al abrir
+    // el formulario (ya busca en TODA la tabla, no solo el armario).
+    const locales = filtrarCatalogoLocal(q);
+    setResultadosBusqueda(locales);
+    setVisiblesLista(ITEMS_VISIBLES);
     if (!q) {
-      setResultadosBusqueda(catalogoProductos);
       setBuscandoProductos(false);
       return;
     }
-    if (q.length < 2) {
-      setResultadosBusqueda([]);
+    if (locales.length === 0 && catalogoProductos.length > 0) {
+      // El catálogo local puede estar truncado por el límite de descarga: si no
+      // hay coincidencias, se consulta igualmente a Supabase para no perder nada.
+      debounceBusquedaRef.current = setTimeout(async () => {
+        try {
+          setBuscandoProductos(true);
+          const coincidencias = await buscarProductosPorCodigo(q);
+          console.log("[autocompletar] resultadosBusqueda (remoto):", coincidencias.length);
+          setResultadosBusqueda(coincidencias);
+          setSinResultados(coincidencias.length === 0);
+        } catch (err: any) {
+          toast.error(errorInventario(err));
+        } finally {
+          setBuscandoProductos(false);
+        }
+      }, 250);
+    } else {
       setBuscandoProductos(false);
-      return;
     }
-    debounceBusquedaRef.current = setTimeout(async () => {
-      try {
-        setBuscandoProductos(true);
-        const coincidencias = await buscarProductosPorCodigo(q);
-        console.log("[autocompletar] resultadosBusqueda:", coincidencias.length);
-        setResultadosBusqueda(coincidencias);
-        setSinResultados(coincidencias.length === 0);
-      } catch (err: any) {
-        toast.error(errorInventario(err));
-      } finally {
-        setBuscandoProductos(false);
-      }
-    }, 250);
   }
 
   function seleccionarProductoBusqueda(p: Producto) {
@@ -1145,7 +1177,19 @@ function UbicacionesPage() {
           if (!open) cerrarModal();
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-3xl max-h-[85vh] overflow-y-auto"
+          // Cierre garantizado al hacer clic en el fondo oscuro (overlay), incluso
+          // tras usar el scroll de la lista, y con Escape desde cualquier foco.
+          onInteractOutside={() => {
+            console.log("[modal] clic fuera (overlay) -> cerrarModal()");
+            cerrarModal();
+          }}
+          onEscapeKeyDown={() => {
+            console.log("[modal] Escape (Radix) -> cerrarModal()");
+            cerrarModal();
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex flex-wrap items-center gap-2">
               <span
@@ -1269,9 +1313,11 @@ function UbicacionesPage() {
                   {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
                     <div
                       className="relative z-50 border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]"
+                      data-scroll-lock=""
+                      onMouseDown={(e) => e.stopPropagation()}
                       onScroll={(e) => {
                         const el = e.currentTarget;
-                        // Scroll infinito: al acercarse al final, cargar 50 más.
+                        // Al llegar al final, renderizar 25 items más del catálogo.
                         if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
                           cargarMasProductos();
                         }
@@ -1284,10 +1330,17 @@ function UbicacionesPage() {
                       ) : resultadosBusqueda.length > 0 ? (
                         <>
                           <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0">
-                            Mostrando {resultadosBusqueda.length} de{" "}
-                            {totalCatalogo || resultadosBusqueda.length} productos
+                            Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
+                            {resultadosBusqueda.length} productos
+                            {totalRealesTabla !== null && totalRealesTabla > catalogoProductos.length && (
+                              <span className="text-amber-600">
+                                {" "}
+                                · {totalRealesTabla} en total ({totalRealesTabla - catalogoProductos.length}{" "}
+                                inactivos ocultos)
+                              </span>
+                            )}
                           </p>
-                          {resultadosBusqueda.map((p) => (
+                          {resultadosBusqueda.slice(0, visiblesLista).map((p) => (
                             <button
                               key={p.id}
                               type="button"
@@ -1300,19 +1353,16 @@ function UbicacionesPage() {
                               </span>
                             </button>
                           ))}
-                          {catalogoProductos.length < totalCatalogo && (
+                          {visiblesLista < resultadosBusqueda.length && (
                             <div className="sticky bottom-0 bg-white p-2">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
                                 className="w-full"
-                                disabled={cargandoMas}
                                 onClick={cargarMasProductos}
                               >
-                                {cargandoMas
-                                  ? "Cargando…"
-                                  : `Cargar más (${totalCatalogo - catalogoProductos.length} restantes)`}
+                                Ver más ({resultadosBusqueda.length - visiblesLista} restantes)
                               </Button>
                             </div>
                           )}
@@ -1555,23 +1605,28 @@ function UbicacionesPage() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (html5-qrcode) */}
-      {escanerAbierto && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg space-y-4">
-            <h2 className="text-lg font-semibold">{"\u{1F4F7} Escanear código de barras"}</h2>
-            <Escaner
-              onCodigo={(codigo) => {
-                setNuevoCodigoBarras(codigo);
-                setProductoEscaneado(null);
-                setScanError("");
-                setEscanerAbierto(false);
-              }}
-              onCerrar={() => setEscanerAbierto(false)}
-            />
-          </div>
-        </div>
-      )}
+      {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (html5-qrcode).
+          Se cierra al hacer clic en el fondo oscuro o con Escape. */}
+      <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={() => setEscanerAbierto(false)}
+          onEscapeKeyDown={() => setEscanerAbierto(false)}
+        >
+          <DialogHeader>
+            <DialogTitle>{"\u{1F4F7} Escanear código de barras"}</DialogTitle>
+          </DialogHeader>
+          <Escaner
+            onCodigo={(codigo) => {
+              setNuevoCodigoBarras(codigo);
+              setProductoEscaneado(null);
+              setScanError("");
+              setEscanerAbierto(false);
+            }}
+            onCerrar={() => setEscanerAbierto(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
   }

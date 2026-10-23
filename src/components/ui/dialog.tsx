@@ -35,7 +35,31 @@ const DialogContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <DialogPrimitive.Content
+        <DialogPrimitive.Content
+          // El scroll de una lista/barra dentro del modal dispara pointerdown que
+          // Radix interpreta como "clic fuera". Si el origen está marcado con
+          // data-scroll-lock, se ignora ese evento para no cerrar por accidente;
+          // un clic REAL en el overlay (fondo oscuro) sigue cerrando siempre.
+          onPointerDownOutside={(e) => {
+            const target = (e.detail as unknown as { sourceEvent?: Event })
+              ?.sourceEvent?.target as HTMLElement | null;
+            if (target?.closest?.("[data-scroll-lock]")) {
+              console.log("[modal] pointerdown fuera por scroll -> se IGNORA");
+              e.preventDefault();
+              return;
+            }
+            console.log("[modal] pointerdown fuera -> cerrar");
+            props.onPointerDownOutside?.(e);
+          }}
+          onInteractOutside={(e) => {
+            const target = e.detail.originalEvent.target as HTMLElement | null;
+            if (target?.closest?.("[data-scroll-lock]")) {
+              console.log("[modal] interact fuera por scroll -> se IGNORA");
+              e.preventDefault();
+              return;
+            }
+            props.onInteractOutside?.(e);
+          }}
       ref={ref}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",

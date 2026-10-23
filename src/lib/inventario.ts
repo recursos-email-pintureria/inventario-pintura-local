@@ -898,14 +898,50 @@ export async function obtenerTodosProductos(
   const size = tamPagina ?? limit;
   const desde = (pagina - 1) * size;
   const hasta = desde + size - 1;
+  // Conteo REAL sobre TODOS los productos (sin filtro activo): así el usuario ve
+  // si hay productos inactivos ocultos por el filtro de la lista.
+  const { count: totalReales } = await supabase
+    .from("productos")
+    .select("id", { count: "exact", head: true });
   const { data, error, count } = await supabase
     .from("productos")
     .select("*", { count: "exact" })
     .eq("activo", true)
     .order("nombre", { ascending: true })
     .range(desde, hasta);
+  console.log(
+    "[autocompletar] obtenerTodosProductos pagina",
+    pagina,
+    "size",
+    size,
+    "-> devueltos:",
+    data?.length ?? 0,
+    "| activos(total count):",
+    count,
+    "| reales en tabla:",
+    totalReales,
+    error ? `| ERROR: ${JSON.stringify(error)}` : "",
+  );
   if (error) throw error;
   return { productos: (data || []) as Producto[], total: count ?? 0 };
+}
+
+/**
+ * Descarga COMPLETA del catálogo activo (todas las páginas), para que el
+ * autocompletado muestre y permita navegar TODOS los productos sin límites.
+ */
+export async function descargarCatalogoCompleto(tamPagina = 500): Promise<Producto[]> {
+  const acumulados: Producto[] = [];
+  let pagina = 1;
+  for (;;) {
+    const { productos } = await obtenerTodosProductos(tamPagina, pagina, tamPagina);
+    acumulados.push(...productos);
+    if (productos.length < tamPagina) break;
+    pagina += 1;
+    if (pagina > 40) break; // salvaguarda: máx. 20.000 productos
+  }
+  console.log("[autocompletar] catálogo completo descargado:", acumulados.length, "productos");
+  return acumulados;
 }
 
 /** Lista de coincidencias por código de barras exacto o parcial (nombre/SKU). */
