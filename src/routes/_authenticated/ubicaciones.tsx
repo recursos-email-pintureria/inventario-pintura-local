@@ -18,14 +18,14 @@ export const Route = createFileRoute('/_authenticated/ubicaciones')({
   component: UbicacionesPage,
 })
 
-// ✅ EMOJIS CORREGIDOS Y VISIBLES
+// ✅ EMOJIS CON CÓDIGOS UNICODE (100% fiable)
 const iconosTipo: Record<string, string> = {
   pasillo: '🛣️',
   armario: '🗄️',
-  alto: '📦',
+  alto: '',
   cross: '🔄',
   caja: '💳',
-  reserva: '🏭',
+  reserva: '',
 }
 
 const coloresTipo: Record<string, string> = {
@@ -36,7 +36,6 @@ const coloresTipo: Record<string, string> = {
   caja: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   reserva: 'bg-gray-100 text-gray-800 border-gray-200',
 }
-
 function UbicacionesPage() {
   const [secciones, setSecciones] = useState<any[]>([])
   const [ubicaciones, setUbicaciones] = useState<any[]>([])
@@ -410,9 +409,10 @@ function UbicacionesPage() {
           {ubicacion.descripcion && <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>}
         </div>
         <div className="col-span-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${coloresTipo[ubicacion.tipo]}`}>
-            {ubicacion.tipo.charAt(0).toUpperCase() + ubicacion.tipo.slice(1)}
-          </span>
+          <span className="text-base">{iconosTipo[ubicacion.tipo]}</span>
+<span className="text-base" title={ubicacion.tipo}>
+  {iconosTipo[ubicacion.tipo] || '📍'}
+</span>
         </div>
         <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
         <div className="col-span-2 text-sm text-gray-600">{getSeccionReal(ubicacion)}</div>
