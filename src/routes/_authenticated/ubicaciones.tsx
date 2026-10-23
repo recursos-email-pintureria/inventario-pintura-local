@@ -10,6 +10,7 @@ import {
   errorInventario,
   obtenerProductosPorUbicacion,
   actualizarStock,
+  crearMovimientoConStock,
   buscarProductoPorCodigo,
   guardarProducto,
 } from "../../lib/inventario";
@@ -89,6 +90,10 @@ function UbicacionesPage() {
   const [guardando, setGuardando] = useState(false);
   const [productoEditando, setProductoEditando] = useState<ProductoConCantidad | null>(null);
   const [cantidadEdicion, setCantidadEdicion] = useState<number | "">("");
+
+  // Ajuste rápido (mini-modal)
+  const [ajusteRapido, setAjusteRapido] = useState<ProductoConCantidad | null>(null);
+  const [nuevaCantidadAjuste, setNuevaCantidadAjuste] = useState<number | "">("");
 
   // Formulario "añadir producto" (inline en el modal)
   const [nuevoCodigoBarras, setNuevoCodigoBarras] = useState("");
@@ -183,6 +188,8 @@ function UbicacionesPage() {
     setNuevoSku("");
     setNuevoNombre("");
     setNuevaCantidad(1);
+    setAjusteRapido(null);
+    setNuevaCantidadAjuste("");
   }
 
   async function abrirStockUbicacion(ubicacion: any) {
@@ -221,7 +228,13 @@ function UbicacionesPage() {
     }
     try {
       setGuardando(true);
-      await actualizarStock(productoEditando.id, ubicacionStockAbierta.id, cantidadEdicion);
+      await crearMovimientoConStock({
+        id_producto: productoEditando.id,
+        id_ubicacion: ubicacionStockAbierta.id,
+        tipo: "ajuste",
+        cantidad: cantidadEdicion,
+        notas: "Edición de cantidad desde armario (ajuste)",
+      });
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`Cantidad actualizada: ${productoEditando.nombre} → ${cantidadEdicion} uds`);
       resetearModalForms();
@@ -243,9 +256,56 @@ function UbicacionesPage() {
       return;
     try {
       setGuardando(true);
-      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0);
+      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0); // registra movimiento tipo 'salida'
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
+    } catch (err: any) {
+      toast.error(errorInventario(err));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  function abrirAjusteRapido(producto: ProductoConCantidad) {
+    setAjusteRapido(producto);
+    setNuevaCantidadAjuste(producto.cantidad);
+  }
+
+  async function guardarAjusteRapido() {
+    if (!ubicacionStockAbierta || !ajusteRapido) return;
+    if (
+      nuevaCantidadAjuste === "" ||
+      !Number.isInteger(nuevaCantidadAjuste) ||
+      nuevaCantidadAjuste < 0
+    ) {
+      toast.error("Introduce una cantidad entera ≥ 0.");
+      return;
+    }
+    try {
+      setGuardando(true);
+      const { data: actual } = await supabase
+        .from("stock")
+        .select("cantidad")
+        .eq("id_producto", ajusteRapido.id)
+        .eq("id_ubicacion", ubicacionStockAbierta.id)
+        .maybeSingle();
+      const cantidadSistema = actual?.cantidad ?? ajusteRapido.cantidad;
+      const diferencia = Math.abs(nuevaCantidadAjuste - cantidadSistema);
+      if (diferencia > 0) {
+        await crearMovimientoConStock({
+          id_producto: ajusteRapido.id,
+          id_ubicacion: ubicacionStockAbierta.id,
+          tipo: "ajuste",
+          cantidad: nuevaCantidadAjuste,
+          notas: `AJUSTE RÁPIDO DESDE ARMARIO - Sistema: ${cantidadSistema} → Real: ${nuevaCantidadAjuste}`,
+        });
+      } else {
+        await actualizarStock(ajusteRapido.id, ubicacionStockAbierta.id, nuevaCantidadAjuste);
+      }
+      await recargarProductosUbicacion(ubicacionStockAbierta.id);
+      toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
+      setAjusteRapido(null);
+      setNuevaCantidadAjuste("");
     } catch (err: any) {
       toast.error(errorInventario(err));
     } finally {
@@ -1198,26 +1258,38 @@ function UbicacionesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-blue-600 hover:text-blue-800 h-8 px-2"
-                            onClick={() => iniciarEdicion(p)}
-                            disabled={modalMode !== "ver"}
-                            title="Modificar cantidad"
-                          >
-                            ✏️
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-600 hover:text-red-800 h-8 px-2"
-                            onClick={() => eliminarProducto(p)}
-                            disabled={modalMode !== "ver"}
-                            title="Quitar de esta ubicación"
-                          >
-                            🗑️
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-blue-600 hover:text-blue-800 h-8 px-2"
+                              onClick={() => iniciarEdicion(p)}
+                              disabled={modalMode !== "ver"}
+                              title="Modificar cantidad"
+                            >
+                              ✏️
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-amber-600 hover:text-amber-800 h-8 px-2"
+                              onClick={() => abrirAjusteRapido(p)}
+                              disabled={modalMode !== "ver" || !!ajusteRapido}
+                              title="Ajuste rápido"
+                            >
+                              ⚡
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-800 h-8 px-2"
+                              onClick={() => eliminarProducto(p)}
+                              disabled={modalMode !== "ver" || !!ajusteRapido}
+                              title="Quitar de esta ubicación"
+                            >
+                              🗑️
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1233,6 +1305,63 @@ function UbicacionesPage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* MINI-MODAL: AJUSTE RÁPIDO */}
+      {ajusteRapido && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">⚡ Ajuste rápido</h3>
+            <p className="text-sm text-gray-600">
+              {ajusteRapido.nombre}
+              <span className="text-xs text-gray-500">
+                {" "}
+                (SKU {ajusteRapido.sku}) · actual: {ajusteRapido.cantidad} uds
+              </span>
+            </p>
+            <div className="space-y-1">
+              <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
+              <Input
+                id="cantidad-ajuste-rapido"
+                type="number"
+                min={0}
+                autoFocus
+                value={nuevaCantidadAjuste}
+                onChange={(e) =>
+                  setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    guardarAjusteRapido();
+                  }
+                  if (e.key === "Escape") {
+                    setAjusteRapido(null);
+                    setNuevaCantidadAjuste("");
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAjusteRapido(null);
+                  setNuevaCantidadAjuste("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={guardarAjusteRapido}
+                disabled={guardando}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {guardando ? "Guardando..." : "Guardar ajuste"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (html5-qrcode) */}
       {escanerAbierto && (
