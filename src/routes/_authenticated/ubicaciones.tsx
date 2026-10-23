@@ -35,6 +35,20 @@ function getTipoLabel(tipo: string): string {
   return tipo.toUpperCase()
 }
 
+// ✅ ICONOS POR TIPO: se usan códigos Unicode explícitos (secuencias \u{...})
+// para evitar que los emojis se corrompan al copiar el código desde chats de IA.
+function getIconoTipo(tipo: string): string {
+  const iconos: Record<string, string> = {
+    pasillo: '\u{1F6E3}\u{FE0F}',   // 🛣️ señal de carretera
+    armario: '\u{1F5C4}\u{FE0F}',   // 🗄️ archivador
+    alto: '\u{1F4E6}',              // 📦 paquete
+    cross: '\u{1F504}',             // 🔄 flechas cruzadas
+    caja: '\u{1F4B3}',              // 💳 tarjeta
+    reserva: '\u{1F3ED}',           // 🏭 fábrica
+  }
+  return iconos[tipo] || '\u{1F4CD}' // 📍 chincheta (por defecto)
+}
+
 function UbicacionesPage() {
   const [secciones, setSecciones] = useState<any[]>([])
   const [ubicaciones, setUbicaciones] = useState<any[]>([])
@@ -423,7 +437,7 @@ function UbicacionesPage() {
         </div>
         <div className="col-span-2">
           <span className={`px-3 py-1 rounded text-xs font-bold ${colorBadge}`}>
-            {getTipoLabel(ubicacion.tipo)}
+            {getIconoTipo(ubicacion.tipo)} {getTipoLabel(ubicacion.tipo)}
           </span>
         </div>
         <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
@@ -514,7 +528,7 @@ function UbicacionesPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className={`px-3 py-1 rounded text-xs font-bold ${ubicacionStockAbierta ? getColorBadge(ubicacionStockAbierta.tipo) : ''}`}>
-                {ubicacionStockAbierta ? getTipoLabel(ubicacionStockAbierta.tipo) : ''}
+                {ubicacionStockAbierta ? getIconoTipo(ubicacionStockAbierta.tipo) : ''} {ubicacionStockAbierta ? getTipoLabel(ubicacionStockAbierta.tipo) : ''}
               </span>
               Stock en: {ubicacionStockAbierta?.nombre}
             </DialogTitle>
