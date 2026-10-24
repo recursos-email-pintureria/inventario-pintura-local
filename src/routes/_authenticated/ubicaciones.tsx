@@ -12,13 +12,13 @@ import {
   actualizarStock,
   crearMovimientoConStock,
   buscarProductoPorCodigo,
-  buscarProductosPorCodigo, // <-- AÑADIDO
-  descargarCatalogoCompleto, // <-- AÑADIDO
+  buscarProductosPorCodigo,
+  descargarCatalogoCompleto,
   guardarProducto,
 } from "../../lib/inventario";
-import type { Producto, ProductoConCantidad } from "../../lib/inventario"; // <-- AÑADIDO Producto
+import type { Producto, ProductoConCantidad } from "../../lib/inventario";
 import { supabase } from "../../lib/supabase";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -109,7 +109,7 @@ function UbicacionesPage() {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevaCantidad, setNuevaCantidad] = useState<number | "">(1);
 
-  // ESTADOS PARA AUTOCOMPLETADO (Reintroducidos y corregidos)
+  // ESTADOS PARA AUTOCOMPLETADO
   const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>([]);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([]);
   const [buscandoProductos, setBuscandoProductos] = useState(false);
@@ -117,7 +117,7 @@ function UbicacionesPage() {
   const [totalRealesTabla, setTotalRealesTabla] = useState<number | null>(null);
   const [visiblesLista, setVisiblesLista] = useState(25);
   const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const TAM_PAGINA_PRODUCTOS = 1000; // Optimizado para cargar más rápido
+  const TAM_PAGINA_PRODUCTOS = 1000;
 
   const [tipo, setTipo] = useState<string>("pasillo");
   const [nombre, setNombre] = useState("");
@@ -133,9 +133,9 @@ function UbicacionesPage() {
     cargarDatos();
   }, []);
 
-  // Cargar catálogo al abrir el formulario de añadir
+  // FIX 8: Cargar catálogo al abrir el formulario de añadir (recarga cada vez para evitar datos obsoletos)
   useEffect(() => {
-    if (modalMode !== "anadir" || catalogoProductos.length > 0) return;
+    if (modalMode !== "anadir") return;
     let cancelado = false;
     (async () => {
       try {
@@ -360,7 +360,6 @@ function UbicacionesPage() {
     }
   }
 
-  // CORRECCIÓN BUG 3: Acepta código manual para que el escáner pueda disparar la búsqueda
   async function escanearCodigo(codigoManual?: string) {
     if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     const codigo = (codigoManual ?? nuevoCodigoBarras).trim();
@@ -465,7 +464,7 @@ function UbicacionesPage() {
           id_categoria: null,
           precio_unitario: null,
         });
-        // CORRECCIÓN BUG 5: Invalidar caché al crear producto nuevo
+        // Invalidar caché al crear producto nuevo
         setCatalogoProductos([]);
         setTotalRealesTabla(null);
       }
@@ -1094,7 +1093,6 @@ function UbicacionesPage() {
           if (!open) cerrarModal();
         }}
       >
-        {/* CORRECCIÓN BUG 1 y 4: Prevenir cierre si el escáner está abierto */}
         <DialogContent 
           className="max-w-3xl max-h-[85vh] overflow-y-auto"
           onInteractOutside={(e) => {
@@ -1188,7 +1186,7 @@ function UbicacionesPage() {
                     }}
                   />
                   
-                  {/* LISTA DESPLEGABLE DE AUTOCOMPLETADO (CORREGIDA) */}
+                  {/* LISTA DESPLEGABLE DE AUTOCOMPLETADO */}
                   {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
                     <div className="absolute top-full left-0 z-50 mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]">
                       {buscandoProductos ? (
@@ -1200,10 +1198,11 @@ function UbicacionesPage() {
                           <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0 z-10">
                             Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
                             {resultadosBusqueda.length} productos
+                            {/* FIX 8: Aviso de inactivos */}
                             {totalRealesTabla !== null && totalRealesTabla > catalogoProductos.length && (
                               <span className="text-amber-600">
                                 {" "}
-                                · {totalRealesTabla} en total
+                                · {totalRealesTabla - catalogoProductos.length} inactivos no se muestran
                               </span>
                             )}
                           </p>
@@ -1535,33 +1534,25 @@ function UbicacionesPage() {
         </div>
       )}
 
-      {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA (CORREGIDO BUG 2 y 3) */}
-      {escanerAbierto && (
-        <div 
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setEscanerAbierto(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setEscanerAbierto(false);
-          }}
-          tabIndex={-1}
-        >
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg space-y-4">
-            <h2 className="text-lg font-semibold">{"\u{1F4F7} Escanear código de barras"}</h2>
-            <Escaner
-              onCodigo={(codigo) => {
-                setNuevoCodigoBarras(codigo);
-                setProductoEscaneado(null);
-                setScanError("");
-                setEscanerAbierto(false);
-                escanearCodigo(codigo); // <-- CORRECCIÓN: Dispara la búsqueda automáticamente
-              }}
-              onCerrar={() => setEscanerAbierto(false)}
-            />
-          </div>
-        </div>
-      )}
+      {/* FIX 6: MODAL SECUNDARIO: ESCÁNER DE CÁMARA (Ahora usa Dialog oficial) */}
+      <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
+        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-md overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{"\u{1F4F7} Escanear código de barras"}</DialogTitle>
+            <DialogDescription>Apunta al código o escríbelo manualmente.</DialogDescription>
+          </DialogHeader>
+          <Escaner
+            onCodigo={(codigo) => {
+              setNuevoCodigoBarras(codigo);
+              setProductoEscaneado(null);
+              setScanError("");
+              setEscanerAbierto(false);
+              escanearCodigo(codigo);
+            }}
+            onCerrar={() => setEscanerAbierto(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
   }
