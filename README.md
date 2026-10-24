@@ -1,14 +1,14 @@
-# 🎨 Inventario Pintura - LM
+#  Inventario Pintura - LM
 
-Sistema profesional de gestión de inventario jerárquico para tienda de pinturas. Permite el control de stock por ubicaciones específicas (secciones, pasillos, armarios, altos, cross, cajas y reserva), con escáner de código de barras, ajustes rápidos, métricas en tiempo real y exportación a Excel/PDF.
+Sistema profesional de gestión de inventario jerárquico para tienda de pinturas. Permite el control de stock por ubicaciones específicas (secciones, pasillos, armarios, altos, cross, cajas y reserva), con escáner de código de barras, ajustes rápidos, métricas en tiempo real, gestión de usuarios con permisos granulares y exportación a Excel/PDF.
 
-**🌐 Aplicación en producción:** [https://inventario-pintura-local.vercel.app](https://inventario-pintura-local.vercel.app)
+** Aplicación en producción:** [https://inventario-pintura-local.vercel.app](https://inventario-pintura-local.vercel.app)
 
 **📦 Repositorio GitHub:** [https://github.com/recursos-email-pintureria/inventario-pintura-local](https://github.com/recursos-email-pintureria/inventario-pintura-local)
 
-**🏷️ Versión estable actual:** [v1.0.0-stable](https://github.com/recursos-email-pintureria/inventario-pintura-local/tree/v1.0.0-stable)
+**🏷️ Versión estable actual:** [v1.2.0-visual](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.2.0-visual)
 
-** Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
+**📋 Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
 
 **🗄️ Panel de Supabase:** [https://app.supabase.com](https://app.supabase.com)
 
@@ -30,27 +30,26 @@ Sistema profesional de gestión de inventario jerárquico para tienda de pintura
 ## 📂 Estructura Jerárquica de Ubicaciones
 
 El sistema soporta una jerarquía estricta de 3 niveles:
-
 🏷️ Sección (Ej: Pintura Exterior, Droguería)
-└── ️ Pasillo / 🏭 Reserva (Nivel 1 - Padre)
-└── 🗄️ Armario / 📦 Alto / 🔄 Cross / 💳 Caja (Nivel 2 - Hijo)
+└── ↔️ Pasillo / 🏭 Reserva (Nivel 1 - Padre)
+└── 🗄️ Armario / 📚 Alto / 🔀 Cross / Caja (Nivel 2 - Hijo)
 └── Productos con stock
-
 
 **Tipos de ubicación y sus reglas:**
 
-| Tipo | Nivel | Requiere padre | Posición lateral | Posición longitudinal | Sección origen |
-|------|-------|----------------|------------------|----------------------|----------------|
-| `pasillo` | 1 | ❌ No | ❌ No | ❌ No | ❌ No |
-| `reserva` | 1 | ❌ No | ❌ No | ❌ No | ❌ No |
-| `armario` | 2 | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
-| `alto` | 2 | ✅ Sí | ✅ Sí |  No | ❌ No (hereda) |
-| `caja` | 2 | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
-| `cross` | 2 | ✅ Sí | ✅ Sí | ✅ Sí | ✅ Sí |
+| Tipo | Nivel | Icono | Color | Requiere padre | Posición lateral | Posición longitudinal | Sección origen |
+|------|-------|-------|-------|----------------|------------------|----------------------|----------------|
+| `seccion` | 0 | 🏢 Building2 | Índigo | ❌ No |  No | ❌ No | ❌ No |
+| `pasillo` | 1 | ↔️ ArrowLeftRight | Azul | ❌ No | ❌ No | ❌ No | ❌ No |
+| `reserva` | 1 | 🏭 Warehouse | Gris | ❌ No | ❌ No | ❌ No | ❌ No |
+| `armario` | 2 | 🗄️ Archive | Esmeralda | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
+| `alto` | 2 |  Layers | Ámbar | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
+| `caja` | 2 | 📦 Package | Rosa | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
+| `cross` | 2 | 🔀 Shuffle | Púrpura | ✅ Sí | ✅ Sí | ✅ Sí | ✅ Sí |
 
 ---
 
-## 🏗️ Arquitectura de Stock (CRÍTICO)
+## ️ Arquitectura de Stock (CRÍTICO)
 
 ### Principio fundamental: **El cliente NUNCA escribe directamente en la tabla `stock`**
 
@@ -102,7 +101,7 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 - [x] Ajuste rápido de stock
 - [x] Limpieza de stock de lineales
 
-### Fase 5 (parcial): Corrección de bugs críticos
+### Fase 4.5: Corrección de bugs críticos (v1.0.0-stable)
 - [x] Eliminación de escritura directa en `stock` desde el cliente
 - [x] Cálculo real de stock por ubicación usando `data.stock`
 - [x] Desglose expandible de productos por armario/pasillo
@@ -110,9 +109,32 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 - [x] Modal de ajuste rápido convertido a `Dialog` oficial
 - [x] Mensajes de error RLS claros y específicos
 
+### Fase 4.6: Gestión de Usuarios y Permisos (v1.1.0)
+- [x] Página `/usuarios` con lista de usuarios y permisos
+- [x] Modal de edición con toggles individuales por permiso
+- [x] Protección contra auto-desprivilegio (no puedes quitarte el rol admin)
+- [x] Toasts de éxito/advertencia en operaciones
+- [x] Modal de confirmación (AlertDialog) para cambios críticos
+- [x] Visibilidad del menú condicionada a `isAdmin` o `puede_gestionar_usuarios`
+
+### Fase 4.7: Confirmaciones para acciones críticas (v1.1.5)
+- [x] AlertDialog al eliminar producto de ubicación
+- [x] AlertDialog al ajustar stock a 0 (ajuste rápido y edición)
+- [x] AlertDialog al desactivar/borrar ubicación
+- [x] AlertDialog al limpiar stock masivo de lineales
+- [x] Sustitución completa de `window.confirm` por AlertDialog de shadcn/ui
+
+### Fase 4.8: Mejoras visuales y UX (v1.2.0-visual)
+- [x] Iconos específicos por tipo de ubicación (Lucide React)
+- [x] Paleta de colores distintiva por tipo (índigo, azul, esmeralda, ámbar, púrpura, rosa, gris)
+- [x] Componente reutilizable `BadgeTipoUbicacion` con 3 tamaños (sm, md, lg)
+- [x] Archivo de configuración `tiposUbicacion.ts` centralizado
+- [x] Hover effects suaves en filas de ubicaciones
+- [x] Vista de árbol con indentación y líneas conectoras
+
 ---
 
-## 🐛 Bugs Críticos Corregidos en v1.0.0-stable
+## 🐛 Bugs Críticos Corregidos
 
 | # | Bug | Causa raíz | Solución |
 |---|-----|-----------|----------|
@@ -125,20 +147,20 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 
 ---
 
-## 🏷️ Versiones y Recuperación de Emergencia
+## ️ Versiones y Recuperación de Emergencia
 
-### Versión Actual Estable: `v1.0.0-stable`
+### Versión Actual Estable: `v1.2.0-visual`
 
-**Commit:** [`853715c`](https://github.com/recursos-email-pintureria/inventario-pintura-local/commit/853715c)  
 **Fecha:** 24/10/2026  
 **Estado:** ✅ Producción en Vercel  
-**Tag:** [v1.0.0-stable](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.0.0-stable)
+**Tag:** [v1.2.0-visual](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.2.0-visual)  
+**Tag anterior:** [v1.0.0-stable](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.0.0-stable)
 
-**Incluye:**
-- Corrección total de escritura de stock (delegada a triggers de BD)
-- Cálculo real de stock por ubicación con desglose expandible
-- Escáner de cámara estable y modal de "Ajuste Rápido" funcional
-- Limpieza de ramas y cierre de PRs obsoletos
+**Incluye todas las mejoras desde v1.0.0:**
+- Gestión completa de usuarios con permisos granulares
+- Confirmaciones visuales (AlertDialog) para todas las acciones críticas
+- Iconos y colores distintivos por tipo de ubicación
+- Trazabilidad total (quién/cuándo en cada operación)
 - 31 tests unitarios pasando
 
 ### 🚨 Cómo recuperar esta versión en caso de error crítico futuro
@@ -148,17 +170,15 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 git checkout main
 
 # 2. Restablece el código local al estado de la versión estable
-git reset --hard v1.0.0-stable
+git reset --hard v1.2.0-visual
 
 # 3. Fuerza la actualización en GitHub
 # ⚠️ ATENCIÓN: Esto sobrescribe el historial remoto
 git push origin main --force
-
 Alternativa segura (solo inspección, sin alterar main):
-git checkout v1.0.0-stable
+git checkout v1.2.0-visual
 # Para volver al presente:
 git checkout main
-
 🔐 Seguridad y Credenciales
 Variables de entorno
 El archivo .env.example contiene las variables necesarias. Nunca subir .env al repositorio.
@@ -168,12 +188,14 @@ Reglas de seguridad
 ✅ La clave anon de Supabase es pública por diseño (segura en frontend)
 ✅ RLS (Row Level Security) activo en todas las tablas
 ✅ Permisos granulares por usuario en permisos_usuario
-❌ NUNCA subir tokens personales de GitHub (PAT) al código o chats
+✅ Protección contra auto-desprivilegio en gestión de usuarios
+NUNCA subir tokens personales de GitHub (PAT) al código o chats
 ❌ NUNCA escribir directamente en tablas protegidas desde el cliente
 Si un token se expone
 Ir a GitHub Settings → Tokens
 Revocar el token inmediatamente (botón "Delete")
 Generar uno nuevo con los permisos mínimos necesarios
+🚀 Comandos Útiles
 # Desarrollo local
 npm run dev              # Iniciar servidor de desarrollo
 npm run build            # Compilar para producción
@@ -188,25 +210,61 @@ git fetch --prune        # Limpiar referencias remotas obsoletas
 
 # Despliegue
 git push origin main     # Vercel despliega automáticamente
-Última actualización: 24/10/2026 · Versión v1.0.0-stable
+📋 Próximas Fases Planificadas
+Fase 5: Automatización de datos (Leroy Merlin)
+Script para extraer Ref/SKU y descripción desde web de Leroy Merlin
+Integración con el formulario de creación de productos
+Validación automática de códigos de barras
+Fase 6: Mejoras visuales adicionales
+Rediseño del Dashboard con KPIs con semáforo de colores
+Badges de colores para tipos de movimiento en tabla de actividad
+Gráfico de movimientos de los últimos 7 días
+Filtros en tabla de actividad (por tipo, fecha, ubicación)
+Modo oscuro/claro
+Atajos de teclado para operaciones frecuentes
+Fase 7: Reportes y analítica avanzada
+Dashboard de rotación de stock
+Alertas automáticas de stock bajo por email
+Historial de movimientos por producto con gráficos
+Comparativa de inventarios entre fechas
+👥 Contribución
+Este proyecto fue desarrollado para gestión interna. Si necesitas colaborar:
+Crea una rama desde main: git checkout -b feature/nueva-funcionalidad
+Haz commits descriptivos siguiendo el patrón: tipo: descripción corta
+feat: nueva funcionalidad
+fix: corrección de bug
+docs: cambios en documentación
+style: cambios de formato (sin afectar lógica)
+Abre un Pull Request describiendo los cambios
+Licencia
+Propietario. Uso interno para gestión de inventario de la tienda.
+Última actualización: 24/10/2026 · Versión v1.2.0-visual
 
 ---
 
-## 📋 Instrucciones para aplicarlo
+##  Instrucciones para aplicarlo
 
-1. En VS Code, con el archivo `README.md` abierto, pulsa **`Ctrl + A`** (seleccionar todo).
-2. Pulsa **`Supr`** o **`Delete`** para borrar el contenido actual.
-3. **Copia el bloque completo de arriba** (desde `# 🎨 Inventario Pintura - LM` hasta el final).
-4. Pégalo en el archivo (`Ctrl + V`).
-5. Guarda con **`Ctrl + S`**.
+1. En VS Code, abre el archivo `README.md`
+2. Pulsa **`Ctrl + A`** (seleccionar todo)
+3. Pulsa **`Supr`** o **`Delete`** (borrar contenido actual)
+4. Pega el bloque completo de arriba (**`Ctrl + V`**)
+5. Guarda con **`Ctrl + S`**
 
 ---
 
 ## 💾 Subir a GitHub
 
-En tu terminal de VS Code ejecuta:
+En tu terminal ejecuta:
 
 ```bash
-git add README.md
-git commit -m "docs: README completo con arquitectura, fases, bugs corregidos y guía de recuperación v1.0.0-stable"
-git push origin main
+git add README.md && git commit -m "docs: actualizar README a v1.2.0-visual con todas las fases completadas" && git push origin main
+(Si sale el aviso de OneDrive, pulsa N y Enter)
+✅ Qué incluye este README actualizado
+🆕 Versión actualizada a v1.2.0-visual con enlace directo al tag
+🆕 Fases 4.6, 4.7 y 4.8 completadas (usuarios, confirmaciones, mejoras visuales)
+🆕 Tabla de tipos de ubicación con iconos y colores
+🆕 Reglas de seguridad actualizadas (protección contra auto-desprivilegio)
+🆕 Próximas fases reorganizadas (Dashboard, filtros, modo oscuro)
+✅ Todos los enlaces clicables (Vercel, GitHub, Supabase, tags)
+✅ Guía de recuperación actualizada al nuevo tag
+Pégalo, guárdalo, haz el commit y confírmame cuando esté subido. Luego creamos el tag v1.2.0-visual para asegurar este punto. 🏆
