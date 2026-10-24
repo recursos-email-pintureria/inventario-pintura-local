@@ -330,25 +330,12 @@ function UbicacionesPage() {
     }
     try {
       setGuardando(true);
-      const { data: actual } = await supabase
-        .from("stock")
-        .select("cantidad")
-        .eq("id_producto", ajusteRapido.id)
-        .eq("id_ubicacion", ubicacionStockAbierta.id)
-        .maybeSingle();
-      const cantidadSistema = actual?.cantidad ?? ajusteRapido.cantidad;
-      const diferencia = Math.abs(nuevaCantidadAjuste - cantidadSistema);
-      if (diferencia > 0) {
-        await crearMovimientoConStock({
-          id_producto: ajusteRapido.id,
-          id_ubicacion: ubicacionStockAbierta.id,
-          tipo: "ajuste",
-          cantidad: nuevaCantidadAjuste,
-          notas: `AJUSTE RÁPIDO DESDE ARMARIO - Sistema: ${cantidadSistema} → Real: ${nuevaCantidadAjuste}`,
-        });
-      } else {
-        await actualizarStock(ajusteRapido.id, ubicacionStockAbierta.id, nuevaCantidadAjuste);
-      }
+      // actualizarStock (ya corregida) solo inserta movimiento; el trigger actualiza stock
+      await actualizarStock(
+        ajusteRapido.id,
+        ubicacionStockAbierta.id,
+        nuevaCantidadAjuste,
+      );
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
       setAjusteRapido(null);
@@ -1096,7 +1083,7 @@ function UbicacionesPage() {
         <DialogContent 
           className="max-w-3xl max-h-[85vh] overflow-y-auto"
           onInteractOutside={(e) => {
-            if (escanerAbierto) e.preventDefault();
+            if (escanerAbierto || ajusteRapido) e.preventDefault();
           }}
         >
           <DialogHeader>
@@ -1472,33 +1459,23 @@ function UbicacionesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* MINI-MODAL: AJUSTE RÁPIDO */}
-      {ajusteRapido && (
-        <div 
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setAjusteRapido(null);
-              setNuevaCantidadAjuste("");
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setAjusteRapido(null);
-              setNuevaCantidadAjuste("");
-            }
-          }}
-          tabIndex={-1}
-        >
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">⚡ Ajuste rápido</h3>
-            <p className="text-sm text-gray-600">
-              {ajusteRapido.nombre}
-              <span className="text-xs text-gray-500">
-                {" "}
-                (SKU {ajusteRapido.sku}) · actual: {ajusteRapido.cantidad} uds
-              </span>
-            </p>
+      <Dialog 
+        open={!!ajusteRapido} 
+        onOpenChange={(open) => { 
+          if (!open && !guardando) {
+            setAjusteRapido(null);
+            setNuevaCantidadAjuste("");
+          }
+        }}
+      >
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
+          <DialogHeader>
+            <DialogTitle>⚡ Ajuste rápido</DialogTitle>
+            <DialogDescription>
+              {ajusteRapido?.nombre} (SKU {ajusteRapido?.sku}) · actual: {ajusteRapido?.cantidad} uds
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
               <Input
@@ -1510,6 +1487,12 @@ function UbicacionesPage() {
                 onChange={(e) =>
                   setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
                 }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    guardarAjusteRapido();
+                  }
+                }}
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -1519,6 +1502,7 @@ function UbicacionesPage() {
                   setAjusteRapido(null);
                   setNuevaCantidadAjuste("");
                 }}
+                disabled={guardando}
               >
                 Cancelar
               </Button>
@@ -1531,8 +1515,8 @@ function UbicacionesPage() {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* FIX 6: MODAL SECUNDARIO: ESCÁNER DE CÁMARA (Ahora usa Dialog oficial) */}
       <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
