@@ -7,6 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +53,10 @@ function Usuarios() {
   const [rol, setRol] = useState<string>("vendedor");
   const [activo, setActivo] = useState(true);
   const [permisos, setPermisos] = useState<Record<string, boolean>>({});
+  const [confirmacionCritica, setConfirmacionCritica] = useState<{
+    usuario: UsuarioConPermisos;
+    motivos: string[];
+  } | null>(null);
 
   const { data: usuarios, isLoading, isError, refetch } = useQuery({
     queryKey: ["usuarios"],
@@ -51,42 +65,72 @@ function Usuarios() {
   });
 
   const guardar = useMutation({
-    mutationFn: async () => {
-      if (!editando) return;
-      
+    mutationFn: async (usuarioAEditar: UsuarioConPermisos) => {
       // ✅ VALIDACIÓN: no permitir que el admin se quite permisos críticos a sí mismo
-      if (editando.id === miPerfil?.id) {
-        if (rol !== 'admin') {
-          toast.error('No puedes cambiar tu propio rol de admin a otro rol.');
-          return; // Detiene la ejecución y no guarda
-        }
-        if (!permisos['puede_gestionar_usuarios']) {
-          toast.error('No puedes quitarte el permiso de gestionar usuarios a ti mismo.');
-          return; // Detiene la ejecución y no guarda
+      if (usuarioAEditar.id === miPerfil?.id) {
+        if (rol !== "admin" || !permisos["puede_gestionar_usuarios"]) {
+          toast.warning("No puedes quitarte el rol de admin ni el permiso de gestionar usuarios");
+          return { aborted: true, nombre: usuarioAEditar.nombre_completo };
         }
       }
-      
+
       const { error: e1 } = await supabase
         .from("perfiles_usuario")
         .update({ rol, activo })
-        .eq("id", editando.id);
+        .eq("id", usuarioAEditar.id);
       if (e1) throw e1;
-      
+
       const { error: e2 } = await supabase
         .from("permisos_usuario")
         .update(permisos)
-        .eq("id_usuario", editando.id);
+        .eq("id_usuario", usuarioAEditar.id);
       if (e2) throw e2;
+
+      return { aborted: false, nombre: usuarioAEditar.nombre_completo };
     },
-    onSuccess: () => {
-      toast.success("Usuario actualizado correctamente");
+    onSuccess: (res) => {
+      if (!res || res.aborted) return;
+      toast.success(`Permisos de ${res.nombre} actualizados correctamente`);
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
       setEditando(null);
+      setConfirmacionCritica(null);
     },
     onError: (error) => {
       toast.error("Error al guardar: " + (error as Error).message);
-    }
+    },
   });
+
+  const verificarYGuardar = () => {
+    if (!editando) return;
+
+    // Validación previa de auto-desprivilegio
+    if (editando.id === miPerfil?.id) {
+      if (rol !== "admin" || !permisos["puede_gestionar_usuarios"]) {
+        toast.warning("No puedes quitarte el rol de admin ni el permiso de gestionar usuarios");
+        return;
+      }
+    }
+
+    const advertencias: string[] = [];
+    if (rol !== editando.rol) {
+      advertencias.push(`Cambiar el rol de "${editando.rol}" a "${rol}"`);
+    }
+    if (editando.activo && !activo) {
+      advertencias.push("Desactivar la cuenta del usuario (perderá acceso al sistema)");
+    }
+    if (editando.permisos_usuario?.puede_gestionar_usuarios && !permisos["puede_gestionar_usuarios"]) {
+      advertencias.push("Quitar el permiso crítico 'Gestionar usuarios'");
+    }
+    if (editando.permisos_usuario?.puede_crear_productos && !permisos["puede_crear_productos"]) {
+      advertencias.push("Quitar el permiso crítico 'Crear productos'");
+    }
+
+    if (advertencias.length > 0) {
+      setConfirmacionCritica({ usuario: editando, motivos: advertencias });
+    } else {
+      guardar.mutate(editando);
+    }
+  };
 
   const abrirEdicion = (u: UsuarioConPermisos) => {
     setEditando(u);
@@ -190,13 +234,50 @@ function Usuarios() {
                 </div>
               )}
               
-              <Button className="w-full" onClick={() => guardar.mutate()} disabled={guardar.isPending}>
+              <Button className="w-full" onClick={verificarYGuardar} disabled={guardar.isPending}>
                 {guardar.isPending ? "Guardando…" : "Guardar cambios"}
               </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!confirmacionCritica}
+        onOpenChange={(open) => !open && setConfirmacionCritica(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar cambios críticos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de aplicar cambios importantes en la cuenta de{" "}
+              <strong className="text-foreground">{confirmacionCritica?.usuario.nombre_completo}</strong>:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="my-2 list-disc list-inside space-y-1.5 text-sm text-muted-foreground">
+            {confirmacionCritica?.motivos.map((motivo, i) => (
+              <li key={i} className="text-foreground/90 font-medium">
+                {motivo}
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmacionCritica(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmacionCritica) {
+                  guardar.mutate(confirmacionCritica.usuario);
+                  setConfirmacionCritica(null);
+                }
+              }}
+            >
+              Confirmar y guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
