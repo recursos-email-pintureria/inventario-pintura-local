@@ -18,7 +18,13 @@ import {
 } from "../../lib/inventario";
 import type { Producto, ProductoConCantidad } from "../../lib/inventario";
 import { supabase } from "../../lib/supabase";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,39 +49,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Escaner from "@/components/inventario/Escaner";
+import { Pencil, Pause, Trash2, Package, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { BadgeTipoUbicacion } from "@/components/inventario/BadgeTipoUbicacion";
+import { getConfigTipo, CONFIG_TIPOS } from "@/lib/tiposUbicacion";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
   component: UbicacionesPage,
 });
 
-// ✅ BADGES DE COLORES POR TIPO
+// ✅ CONFIGURACIÓN Y COMPATIBILIDAD POR TIPO
 function getColorBadge(tipo: string): string {
-  const colores: Record<string, string> = {
-    pasillo: "bg-blue-500 text-white border-blue-600",
-    armario: "bg-green-500 text-white border-green-600",
-    alto: "bg-emerald-500 text-white border-emerald-600",
-    cross: "bg-purple-500 text-white border-purple-600",
-    caja: "bg-yellow-500 text-white border-yellow-600",
-    reserva: "bg-gray-500 text-white border-gray-600",
-  };
-  return colores[tipo] || "bg-gray-200 text-gray-800";
+  return getConfigTipo(tipo).badgeClass;
 }
 
 function getTipoLabel(tipo: string): string {
-  return tipo.toUpperCase();
+  return getConfigTipo(tipo).label;
 }
 
-// ✅ ICONOS POR TIPO
 function getIconoTipo(tipo: string): string {
-  const iconos: Record<string, string> = {
-    pasillo: "\u{1F6E3}\u{FE0F}",
-    armario: "\u{1F5C4}\u{FE0F}",
-    alto: "\u{1F4E6}",
-    cross: "\u{1F504}",
-    caja: "\u{1F4B3}",
-    reserva: "\u{1F3ED}",
-  };
-  return iconos[tipo] || "\u{1F4CD}";
+  return "";
 }
 
 type ModalMode = "ver" | "anadir" | "editar";
@@ -170,7 +162,9 @@ function UbicacionesPage() {
         if (!cancelado) setBuscandoProductos(false);
       }
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+    };
   }, [modalMode]);
 
   // Contar total de productos reales en la tabla
@@ -348,11 +342,7 @@ function UbicacionesPage() {
     if (!ubicacionStockAbierta) return;
     try {
       setGuardando(true);
-      await actualizarStock(
-        prod.id,
-        ubicacionStockAbierta.id,
-        cant,
-      );
+      await actualizarStock(prod.id, ubicacionStockAbierta.id, cant);
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
       toast.success(`Ajuste rápido: ${prod.nombre} → ${cant} uds`);
       setAjusteRapido(null);
@@ -400,7 +390,7 @@ function UbicacionesPage() {
     setScanError("");
     setProductoEscaneado(null);
     setSinResultados(false);
-    
+
     if (!codigo) {
       setResultadosBusqueda([]);
       setScanError("Introduce o escanea un código de barras.");
@@ -442,19 +432,19 @@ function UbicacionesPage() {
     if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
     const q = texto.trim().toLowerCase();
     setSinResultados(false);
-    
+
     const locales = catalogoProductos.filter(
       (p) =>
         p.nombre.toLowerCase().includes(q) ||
         (p.sku || "").toLowerCase().includes(q) ||
-        (p.codigo_barras || "").toLowerCase().includes(q)
+        (p.codigo_barras || "").toLowerCase().includes(q),
     );
-    
+
     setResultadosBusqueda(locales);
     setVisiblesLista(25);
-    
+
     if (!q) return;
-    
+
     if (locales.length === 0 && catalogoProductos.length > 0) {
       debounceBusquedaRef.current = setTimeout(async () => {
         try {
@@ -781,15 +771,22 @@ function UbicacionesPage() {
                 setPosicionLongitudinal("");
                 setSeccionOrigenId("");
               }}
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className="w-full border border-gray-300 rounded px-3 py-2 bg-white"
             >
-              <option value="pasillo">PASILLO</option>
-              <option value="armario">ARMARIO</option>
-              <option value="alto">ALTO</option>
-              <option value="cross">CROSS</option>
-              <option value="caja">CAJA</option>
-              <option value="reserva">RESERVA</option>
+              <option value="pasillo">Pasillo (Estantería estándar)</option>
+              <option value="armario">Armario (Módulo de estantes / gavetero)</option>
+              <option value="alto">Alto (Nivel superior / altillo)</option>
+              <option value="cross">Cross (Paso / ubicación cruzada)</option>
+              <option value="caja">Caja (Contenedor / cubeta)</option>
+              <option value="reserva">Reserva (Almacén / trastienda)</option>
             </select>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium">Estilo:</span>
+              <BadgeTipoUbicacion tipo={tipo} size="sm" />
+              <span className="text-xs text-gray-400 hidden sm:inline">
+                · {getConfigTipo(tipo).descripcion}
+              </span>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">Nombre *</label>
@@ -1001,42 +998,80 @@ function UbicacionesPage() {
   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const numProductos = productosPorUbicacion.get(ubicacion.id) || 0;
     const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id);
-    const colorBadge = getColorBadge(ubicacion.tipo);
+    const estaExpandido = expandidos.has(ubicacion.id);
+    const config = getConfigTipo(ubicacion.tipo);
+    const IconoUbicacion = config.icon;
 
     return (
       <div
-        className={`grid grid-cols-12 gap-2 px-4 py-2 items-center ${esHijo ? "pl-12 bg-gray-50 border-l-2 border-gray-300 ml-4" : "hover:bg-blue-50"}`}
+        className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors ${
+          esHijo
+            ? "pl-10 bg-slate-50/70 border-l-2 border-slate-300 ml-4 hover:bg-slate-100/80"
+            : "hover:bg-blue-50/60 bg-white"
+        }`}
       >
-        <div className="col-span-4 flex items-center gap-2">
-          {esHijo && <span className="text-gray-400 text-xs">─</span>}
-          <span className={`text-sm ${esHijo ? "font-medium" : "font-semibold"}`}>
-            {ubicacion.nombre}
-          </span>
-          {ubicacion.descripcion && (
-            <span className="text-xs text-gray-500 truncate">({ubicacion.descripcion})</span>
+        <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+          {!esHijo && tieneHijos ? (
+            <span className="text-gray-400 p-0.5">
+              {estaExpandido ? (
+                <ChevronDown className="w-4 h-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              )}
+            </span>
+          ) : !esHijo ? (
+            <span className="w-4 shrink-0" />
+          ) : (
+            <span className="text-slate-400 text-xs font-mono shrink-0">└</span>
           )}
+
+          <div
+            className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
+            title={config.label}
+          >
+            <IconoUbicacion className={esHijo ? "w-3.5 h-3.5" : "w-4 h-4"} />
+          </div>
+
+          <div className="flex flex-col min-w-0">
+            <span
+              className={`text-sm truncate ${
+                esHijo ? "font-medium text-gray-800" : "font-semibold text-gray-900"
+              }`}
+            >
+              {ubicacion.nombre}
+            </span>
+            {ubicacion.descripcion && (
+              <span className="text-xs text-gray-500 truncate">{ubicacion.descripcion}</span>
+            )}
+          </div>
         </div>
+
         <div className="col-span-2">
-          <span className={`px-3 py-1 rounded text-xs font-bold ${colorBadge}`}>
-            {getIconoTipo(ubicacion.tipo)} {getTipoLabel(ubicacion.tipo)}
-          </span>
+          <BadgeTipoUbicacion tipo={ubicacion.tipo} size="sm" />
         </div>
-        <div className="col-span-2 text-sm text-gray-600">{getDetalles(ubicacion)}</div>
-        <div className="col-span-2 text-sm text-gray-600">{getSeccionReal(ubicacion)}</div>
-        <div className="col-span-2 flex justify-end gap-1">
+
+        <div className="col-span-2 text-sm text-gray-600 truncate">{getDetalles(ubicacion)}</div>
+        <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(ubicacion)}</div>
+
+        <div className="col-span-2 flex justify-end items-center gap-1.5">
           <button
             onClick={() => abrirStockUbicacion(ubicacion)}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-medium ${numProductos > 0 ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${
+              numProductos > 0
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+            }`}
             title="Gestionar productos de esta ubicación"
           >
-            {numProductos > 0 ? `${numProductos} prod.` : "+ prod."}
+            <Package className="w-3.5 h-3.5" />
+            <span>{numProductos > 0 ? `${numProductos} prod.` : "+ prod."}</span>
           </button>
           <button
             onClick={() => editarUbicacion(ubicacion)}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded"
-            title="Editar"
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
+            title="Editar ubicación"
           >
-            ✏️
+            <Pencil className="w-3.5 h-3.5" />
           </button>
           {numProductos > 0 || tieneHijos ? (
             <button
@@ -1044,10 +1079,10 @@ function UbicacionesPage() {
                 e.stopPropagation();
                 desactivarUbicacionHandler(ubicacion);
               }}
-              className="text-orange-600 hover:text-orange-800 p-1 rounded"
-              title="Desactivar"
+              className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded-md transition-colors"
+              title="Desactivar ubicación"
             >
-              ⏸️
+              <Pause className="w-3.5 h-3.5" />
             </button>
           ) : (
             <button
@@ -1055,10 +1090,10 @@ function UbicacionesPage() {
                 e.stopPropagation();
                 borrarDefinitivamente(ubicacion);
               }}
-              className="text-red-600 hover:text-red-800 p-1 rounded"
-              title="Borrar"
+              className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded-md transition-colors"
+              title="Borrar ubicación"
             >
-              🗑️
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -1079,22 +1114,48 @@ function UbicacionesPage() {
     const agrupadas = getUbicacionesAgrupadas();
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            <strong>{ubicaciones.length}</strong> ubicaciones
+      <div className="bg-white rounded-lg shadow-xs border overflow-hidden">
+        <div className="bg-gray-50 px-4 py-3 border-b flex flex-wrap justify-between items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-sm text-gray-700">
+              <strong>{ubicaciones.length}</strong> ubicaciones
+            </div>
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-gray-500 border-l pl-3">
+              {Object.values(CONFIG_TIPOS).map((cfg) => {
+                const count = ubicaciones.filter((u: any) => u.tipo === cfg.tipo).length;
+                if (count === 0 && cfg.tipo !== "pasillo" && cfg.tipo !== "armario") return null;
+                const Icon = cfg.icon;
+                return (
+                  <span
+                    key={cfg.tipo}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 shadow-2xs"
+                  >
+                    <Icon className={`w-3 h-3 ${cfg.textColor}`} />
+                    <span>
+                      {cfg.label}: {count}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={expandirTodos} className="text-xs bg-white border px-3 py-1 rounded">
-              ▼ Expandir
+            <button
+              onClick={expandirTodos}
+              className="text-xs bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors"
+            >
+              ▼ Expandir todos
             </button>
-            <button onClick={colapsarTodos} className="text-xs bg-white border px-3 py-1 rounded">
-              ▶ Colapsar
+            <button
+              onClick={colapsarTodos}
+              className="text-xs bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors"
+            >
+              ▶ Colapsar todos
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
+        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-100/80 border-b text-xs font-semibold text-gray-600 uppercase tracking-wider">
           <div className="col-span-4">Ubicación</div>
           <div className="col-span-2">Tipo</div>
           <div className="col-span-2">Detalles</div>
@@ -1141,471 +1202,471 @@ function UbicacionesPage() {
 
     return (
       <>
-      <Dialog
-        open={!!ubicacionStockAbierta}
-        onOpenChange={(open) => {
-          if (!open) cerrarModal();
-        }}
-      >
-        <DialogContent 
-          className="max-w-3xl max-h-[85vh] overflow-y-auto"
-          onInteractOutside={(e) => {
-            if (escanerAbierto || ajusteRapido || productoAEliminar || confirmacionStockCero) e.preventDefault();
+        <Dialog
+          open={!!ubicacionStockAbierta}
+          onOpenChange={(open) => {
+            if (!open) cerrarModal();
           }}
         >
-          <DialogHeader>
-            <DialogTitle className="flex flex-wrap items-center gap-2">
-              <span
-                className={`px-3 py-1 rounded text-xs font-bold ${ubicacionStockAbierta ? getColorBadge(ubicacionStockAbierta.tipo) : ""}`}
-              >
-                {ubicacionStockAbierta
-                  ? `${getIconoTipo(ubicacionStockAbierta.tipo)} ${getTipoLabel(ubicacionStockAbierta.tipo)}`
-                  : ""}
-              </span>
-              <span>Productos en: {ubicacionStockAbierta?.nombre}</span>
-              {ubicacionStockAbierta?.ubicacion_padre_nombre && (
-                <span className="text-xs font-normal text-gray-500">
-                  ({ubicacionStockAbierta.ubicacion_padre_nombre})
-                </span>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-            <Input
-              placeholder="Buscar por nombre, SKU o código de barras..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="max-w-xs"
-              disabled={modalMode !== "ver"}
-            />
-            {modalMode === "ver" && (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setModalMode("anadir");
-                  setResultadosBusqueda(catalogoProductos);
-                  setSinResultados(false);
-                  setScanError("");
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                + Añadir producto
-              </Button>
-            )}
-            {modalMode !== "ver" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  resetearModalForms();
-                  setUbicacionStockAbierta(ubicacionStockAbierta);
-                }}
-              >
-                Cancelar
-              </Button>
-            )}
-          </div>
-
-          {modalMode === "anadir" && (
-            <div className="border border-blue-200 bg-blue-50/50 rounded-lg p-4 space-y-3">
-              <p className="text-sm font-semibold text-gray-800">
-                Añadir producto a {ubicacionStockAbierta?.nombre}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                <div className="space-y-1 relative">
-                  <Label htmlFor="scan-codigo">Código de barras (escáner o manual)</Label>
-                  <Input
-                    id="scan-codigo"
-                    autoFocus
-                    placeholder="Busca por nombre, SKU o código (o selecciona de la lista)"
-                    value={nuevoCodigoBarras}
-                    onFocus={() => {
-                      if (!nuevoCodigoBarras.trim() && !productoEscaneado) {
-                        setResultadosBusqueda(catalogoProductos);
-                        setSinResultados(false);
-                      }
-                    }}
-                    onChange={(e) => {
-                      setNuevoCodigoBarras(e.target.value);
-                      setProductoEscaneado(null);
-                      setScanError("");
-                      autocompletarProductos(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        escanearCodigo();
-                      }
-                    }}
-                  />
-                  
-                  {/* LISTA DESPLEGABLE DE AUTOCOMPLETADO */}
-                  {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
-                    <div className="absolute top-full left-0 z-50 mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]">
-                      {buscandoProductos ? (
-                        <p className="px-3 py-2 text-sm text-gray-500 animate-pulse">
-                          Buscando en todos los productos…
-                        </p>
-                      ) : resultadosBusqueda.length > 0 ? (
-                        <>
-                          <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0 z-10">
-                            Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
-                            {resultadosBusqueda.length} productos
-                            {/* FIX 8: Aviso de inactivos */}
-                            {totalRealesTabla !== null && totalRealesTabla > catalogoProductos.length && (
-                              <span className="text-amber-600">
-                                {" "}
-                                · {totalRealesTabla - catalogoProductos.length} inactivos no se muestran
-                              </span>
-                            )}
-                          </p>
-                          {resultadosBusqueda.slice(0, visiblesLista).map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => seleccionarProductoBusqueda(p)}
-                              className="w-full text-left px-3 py-3 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
-                            >
-                              <span className="font-semibold truncate">{p.nombre}</span>
-                              <span className="text-xs text-gray-500 font-mono shrink-0">
-                                {p.sku} · {p.codigo_barras}
-                              </span>
-                            </button>
-                          ))}
-                          {visiblesLista < resultadosBusqueda.length && (
-                            <div className="sticky bottom-0 bg-white p-2 z-10">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => setVisiblesLista((v) => v + 25)}
-                              >
-                                Ver más ({resultadosBusqueda.length - visiblesLista} restantes)
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <p className="px-3 py-2 text-sm text-gray-500">
-                          No se encontraron productos
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEscanerAbierto(true)}
-                    disabled={guardando}
-                  >
-                    {"\u{1F4F7} Escanear"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => escanearCodigo()}
-                    disabled={guardando}
-                  >
-                    🔍 Buscar
-                  </Button>
-                </div>
-              </div>
-
-              {productoEscaneado && (
-                <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
-                  <span className="font-semibold">{productoEscaneado.nombre}</span>
-                  <span className="text-green-600"> · SKU: {productoEscaneado.sku}</span>
-                  <span className="text-green-600">
-                    {" "}
-                    · ya existe en el catálogo, solo se ajustará su stock aquí
+          <DialogContent
+            className="max-w-3xl max-h-[85vh] overflow-y-auto"
+            onInteractOutside={(e) => {
+              if (escanerAbierto || ajusteRapido || productoAEliminar || confirmacionStockCero)
+                e.preventDefault();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle className="flex flex-wrap items-center gap-2">
+                {ubicacionStockAbierta && (
+                  <BadgeTipoUbicacion tipo={ubicacionStockAbierta.tipo} size="md" />
+                )}
+                <span>Productos en: {ubicacionStockAbierta?.nombre}</span>
+                {ubicacionStockAbierta?.ubicacion_padre_nombre && (
+                  <span className="text-xs font-normal text-gray-500">
+                    ({ubicacionStockAbierta.ubicacion_padre_nombre})
                   </span>
-                </div>
-              )}
-
-              {!productoEscaneado &&
-                nuevoCodigoBarras.trim() !== "" &&
-                scanError === "" &&
-                (nuevoSku !== "" || nuevoNombre !== "") && (
-                  <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    No se encontró el código en el catálogo. Completa SKU y nombre para crear un
-                    producto nuevo.
-                  </div>
                 )}
+              </DialogTitle>
+            </DialogHeader>
 
-              {!productoEscaneado &&
-                (nuevoSku !== "" ||
-                  nuevoNombre !== "" ||
-                  (nuevoCodigoBarras.trim() !== "" && scanError !== "")) && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="nuevo-sku">SKU *</Label>
-                      <Input
-                        id="nuevo-sku"
-                        value={nuevoSku}
-                        onChange={(e) => setNuevoSku(e.target.value)}
-                        placeholder="Ej: PINT-001"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nuevo-nombre">Nombre *</Label>
-                      <Input
-                        id="nuevo-nombre"
-                        value={nuevoNombre}
-                        onChange={(e) => setNuevoNombre(e.target.value)}
-                        placeholder="Ej: Esmalte blanco 750ml"
-                      />
-                    </div>
-                  </div>
-                )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="nueva-cantidad">Cantidad *</Label>
-                  <Input
-                    id="nueva-cantidad"
-                    type="number"
-                    min={1}
-                    value={nuevaCantidad}
-                    onChange={(e) =>
-                      setNuevaCantidad(e.target.value === "" ? "" : parseInt(e.target.value))
-                    }
-                  />
-                </div>
-                <div className="flex items-end gap-2">
-                  <Button
-                    size="default"
-                    onClick={anadirProducto}
-                    disabled={guardando}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {guardando ? "Guardando..." : "Guardar en ubicación"}
-                  </Button>
-                </div>
-              </div>
-
-              {scanError && (
-                <div className="bg-red-50 text-red-700 p-2 rounded border border-red-200 text-sm">
-                  {scanError}
-                </div>
-              )}
-            </div>
-          )}
-
-          {modalMode === "editar" && productoEditando && (
-            <div className="border border-amber-200 bg-amber-50/60 rounded-lg p-4 space-y-3">
-              <p className="text-sm font-semibold text-gray-800">
-                Editar cantidad: {productoEditando.nombre}
-                <span className="text-xs font-normal text-gray-500">
-                  {" "}
-                  (SKU {productoEditando.sku}) · actual: {productoEditando.cantidad} uds
-                </span>
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-[150px_auto] gap-2 items-end">
-                <div className="space-y-1">
-                  <Label htmlFor="cantidad-edicion">Nueva cantidad</Label>
-                  <Input
-                    id="cantidad-edicion"
-                    type="number"
-                    min={0}
-                    autoFocus
-                    value={cantidadEdicion}
-                    onChange={(e) =>
-                      setCantidadEdicion(e.target.value === "" ? "" : parseInt(e.target.value))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        guardarCantidad();
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Pon 0 para quitar el producto de esta ubicación.
-                  </p>
-                </div>
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+              <Input
+                placeholder="Buscar por nombre, SKU o código de barras..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="max-w-xs"
+                disabled={modalMode !== "ver"}
+              />
+              {modalMode === "ver" && (
                 <Button
-                  size="default"
-                  onClick={guardarCantidad}
-                  disabled={guardando}
+                  size="sm"
+                  onClick={() => {
+                    setModalMode("anadir");
+                    setResultadosBusqueda(catalogoProductos);
+                    setSinResultados(false);
+                    setScanError("");
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {guardando ? "Guardando..." : "Guardar cambios"}
+                  + Añadir producto
+                </Button>
+              )}
+              {modalMode !== "ver" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    resetearModalForms();
+                    setUbicacionStockAbierta(ubicacionStockAbierta);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              )}
+            </div>
+
+            {modalMode === "anadir" && (
+              <div className="border border-blue-200 bg-blue-50/50 rounded-lg p-4 space-y-3">
+                <p className="text-sm font-semibold text-gray-800">
+                  Añadir producto a {ubicacionStockAbierta?.nombre}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                  <div className="space-y-1 relative">
+                    <Label htmlFor="scan-codigo">Código de barras (escáner o manual)</Label>
+                    <Input
+                      id="scan-codigo"
+                      autoFocus
+                      placeholder="Busca por nombre, SKU o código (o selecciona de la lista)"
+                      value={nuevoCodigoBarras}
+                      onFocus={() => {
+                        if (!nuevoCodigoBarras.trim() && !productoEscaneado) {
+                          setResultadosBusqueda(catalogoProductos);
+                          setSinResultados(false);
+                        }
+                      }}
+                      onChange={(e) => {
+                        setNuevoCodigoBarras(e.target.value);
+                        setProductoEscaneado(null);
+                        setScanError("");
+                        autocompletarProductos(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          escanearCodigo();
+                        }
+                      }}
+                    />
+
+                    {/* LISTA DESPLEGABLE DE AUTOCOMPLETADO */}
+                    {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
+                      <div className="absolute top-full left-0 z-50 mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]">
+                        {buscandoProductos ? (
+                          <p className="px-3 py-2 text-sm text-gray-500 animate-pulse">
+                            Buscando en todos los productos…
+                          </p>
+                        ) : resultadosBusqueda.length > 0 ? (
+                          <>
+                            <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0 z-10">
+                              Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
+                              {resultadosBusqueda.length} productos
+                              {/* FIX 8: Aviso de inactivos */}
+                              {totalRealesTabla !== null &&
+                                totalRealesTabla > catalogoProductos.length && (
+                                  <span className="text-amber-600">
+                                    {" "}
+                                    · {totalRealesTabla - catalogoProductos.length} inactivos no se
+                                    muestran
+                                  </span>
+                                )}
+                            </p>
+                            {resultadosBusqueda.slice(0, visiblesLista).map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => seleccionarProductoBusqueda(p)}
+                                className="w-full text-left px-3 py-3 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                              >
+                                <span className="font-semibold truncate">{p.nombre}</span>
+                                <span className="text-xs text-gray-500 font-mono shrink-0">
+                                  {p.sku} · {p.codigo_barras}
+                                </span>
+                              </button>
+                            ))}
+                            {visiblesLista < resultadosBusqueda.length && (
+                              <div className="sticky bottom-0 bg-white p-2 z-10">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => setVisiblesLista((v) => v + 25)}
+                                >
+                                  Ver más ({resultadosBusqueda.length - visiblesLista} restantes)
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <p className="px-3 py-2 text-sm text-gray-500">
+                            No se encontraron productos
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEscanerAbierto(true)}
+                      disabled={guardando}
+                    >
+                      {"\u{1F4F7} Escanear"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => escanearCodigo()}
+                      disabled={guardando}
+                    >
+                      🔍 Buscar
+                    </Button>
+                  </div>
+                </div>
+
+                {productoEscaneado && (
+                  <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
+                    <span className="font-semibold">{productoEscaneado.nombre}</span>
+                    <span className="text-green-600"> · SKU: {productoEscaneado.sku}</span>
+                    <span className="text-green-600">
+                      {" "}
+                      · ya existe en el catálogo, solo se ajustará su stock aquí
+                    </span>
+                  </div>
+                )}
+
+                {!productoEscaneado &&
+                  nuevoCodigoBarras.trim() !== "" &&
+                  scanError === "" &&
+                  (nuevoSku !== "" || nuevoNombre !== "") && (
+                    <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      No se encontró el código en el catálogo. Completa SKU y nombre para crear un
+                      producto nuevo.
+                    </div>
+                  )}
+
+                {!productoEscaneado &&
+                  (nuevoSku !== "" ||
+                    nuevoNombre !== "" ||
+                    (nuevoCodigoBarras.trim() !== "" && scanError !== "")) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="nuevo-sku">SKU *</Label>
+                        <Input
+                          id="nuevo-sku"
+                          value={nuevoSku}
+                          onChange={(e) => setNuevoSku(e.target.value)}
+                          placeholder="Ej: PINT-001"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="nuevo-nombre">Nombre *</Label>
+                        <Input
+                          id="nuevo-nombre"
+                          value={nuevoNombre}
+                          onChange={(e) => setNuevoNombre(e.target.value)}
+                          placeholder="Ej: Esmalte blanco 750ml"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="nueva-cantidad">Cantidad *</Label>
+                    <Input
+                      id="nueva-cantidad"
+                      type="number"
+                      min={1}
+                      value={nuevaCantidad}
+                      onChange={(e) =>
+                        setNuevaCantidad(e.target.value === "" ? "" : parseInt(e.target.value))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button
+                      size="default"
+                      onClick={anadirProducto}
+                      disabled={guardando}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {guardando ? "Guardando..." : "Guardar en ubicación"}
+                    </Button>
+                  </div>
+                </div>
+
+                {scanError && (
+                  <div className="bg-red-50 text-red-700 p-2 rounded border border-red-200 text-sm">
+                    {scanError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {modalMode === "editar" && productoEditando && (
+              <div className="border border-amber-200 bg-amber-50/60 rounded-lg p-4 space-y-3">
+                <p className="text-sm font-semibold text-gray-800">
+                  Editar cantidad: {productoEditando.nombre}
+                  <span className="text-xs font-normal text-gray-500">
+                    {" "}
+                    (SKU {productoEditando.sku}) · actual: {productoEditando.cantidad} uds
+                  </span>
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-[150px_auto] gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label htmlFor="cantidad-edicion">Nueva cantidad</Label>
+                    <Input
+                      id="cantidad-edicion"
+                      type="number"
+                      min={0}
+                      autoFocus
+                      value={cantidadEdicion}
+                      onChange={(e) =>
+                        setCantidadEdicion(e.target.value === "" ? "" : parseInt(e.target.value))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          guardarCantidad();
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Pon 0 para quitar el producto de esta ubicación.
+                    </p>
+                  </div>
+                  <Button
+                    size="default"
+                    onClick={guardarCantidad}
+                    disabled={guardando}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {guardando ? "Guardando..." : "Guardar cambios"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {cargandoStock ? (
+              <div className="py-8 text-center text-gray-500">Cargando...</div>
+            ) : productosUbicacion.length === 0 ? (
+              <div className="py-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                No hay productos en esta ubicación todavía. Usa «+ Añadir producto» para empezar.
+              </div>
+            ) : (
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[110px]">SKU</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="hidden sm:table-cell w-[140px]">Cód. barras</TableHead>
+                      <TableHead className="text-right w-[90px]">Cantidad</TableHead>
+                      <TableHead className="text-right w-[110px]">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {productosFiltrados.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-gray-500 py-6">
+                          Ningún resultado para «{busqueda}».
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      productosFiltrados.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-mono text-xs">{p.sku || "—"}</TableCell>
+                          <TableCell className="font-medium">{p.nombre}</TableCell>
+                          <TableCell className="hidden sm:table-cell font-mono text-xs text-gray-500">
+                            {p.codigo_barras || "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary" className="text-base px-3 py-1">
+                              {p.cantidad}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-blue-600 hover:text-blue-800 h-8 px-2"
+                                onClick={() => iniciarEdicion(p)}
+                                disabled={modalMode !== "ver"}
+                                title="Modificar cantidad"
+                              >
+                                ✏️
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-amber-600 hover:text-amber-800 h-8 px-2"
+                                onClick={() => abrirAjusteRapido(p)}
+                                disabled={modalMode !== "ver" || !!ajusteRapido}
+                                title="Ajuste rápido"
+                              >
+                                ⚡
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-600 hover:text-red-800 h-8 px-2"
+                                onClick={() => setProductoAEliminar(p)}
+                                disabled={modalMode !== "ver" || !!ajusteRapido || guardando}
+                                title="Quitar de esta ubicación"
+                              >
+                                🗑️
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <div className="text-xs text-gray-500 flex justify-between">
+              <span>{productosUbicacion.length} producto(s) en esta ubicación</span>
+              <span>Total unidades: {productosUbicacion.reduce((n, p) => n + p.cantidad, 0)}</span>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={!!ajusteRapido}
+          onOpenChange={(open) => {
+            if (!open && !guardando) {
+              setAjusteRapido(null);
+              setNuevaCantidadAjuste("");
+            }
+          }}
+        >
+          <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
+            <DialogHeader>
+              <DialogTitle>⚡ Ajuste rápido</DialogTitle>
+              <DialogDescription>
+                {ajusteRapido?.nombre} (SKU {ajusteRapido?.sku}) · actual: {ajusteRapido?.cantidad}{" "}
+                uds
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
+                <Input
+                  id="cantidad-ajuste-rapido"
+                  type="number"
+                  min={0}
+                  autoFocus
+                  value={nuevaCantidadAjuste}
+                  onChange={(e) =>
+                    setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      guardarAjusteRapido();
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAjusteRapido(null);
+                    setNuevaCantidadAjuste("");
+                  }}
+                  disabled={guardando}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={guardarAjusteRapido}
+                  disabled={guardando}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {guardando ? "Guardando..." : "Guardar ajuste"}
                 </Button>
               </div>
             </div>
-          )}
+          </DialogContent>
+        </Dialog>
 
-          {cargandoStock ? (
-            <div className="py-8 text-center text-gray-500">Cargando...</div>
-          ) : productosUbicacion.length === 0 ? (
-            <div className="py-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
-              No hay productos en esta ubicación todavía. Usa «+ Añadir producto» para empezar.
-            </div>
-          ) : (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[110px]">SKU</TableHead>
-                    <TableHead>Producto</TableHead>
-                    <TableHead className="hidden sm:table-cell w-[140px]">Cód. barras</TableHead>
-                    <TableHead className="text-right w-[90px]">Cantidad</TableHead>
-                    <TableHead className="text-right w-[110px]">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {productosFiltrados.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-gray-500 py-6">
-                        Ningún resultado para «{busqueda}».
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    productosFiltrados.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-mono text-xs">{p.sku || "—"}</TableCell>
-                        <TableCell className="font-medium">{p.nombre}</TableCell>
-                        <TableCell className="hidden sm:table-cell font-mono text-xs text-gray-500">
-                          {p.codigo_barras || "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary" className="text-base px-3 py-1">
-                            {p.cantidad}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-blue-600 hover:text-blue-800 h-8 px-2"
-                              onClick={() => iniciarEdicion(p)}
-                              disabled={modalMode !== "ver"}
-                              title="Modificar cantidad"
-                            >
-                              ✏️
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-amber-600 hover:text-amber-800 h-8 px-2"
-                              onClick={() => abrirAjusteRapido(p)}
-                              disabled={modalMode !== "ver" || !!ajusteRapido}
-                              title="Ajuste rápido"
-                            >
-                              ⚡
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-800 h-8 px-2"
-                              onClick={() => setProductoAEliminar(p)}
-                              disabled={modalMode !== "ver" || !!ajusteRapido || guardando}
-                              title="Quitar de esta ubicación"
-                            >
-                              🗑️
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          <div className="text-xs text-gray-500 flex justify-between">
-            <span>{productosUbicacion.length} producto(s) en esta ubicación</span>
-            <span>Total unidades: {productosUbicacion.reduce((n, p) => n + p.cantidad, 0)}</span>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog 
-        open={!!ajusteRapido} 
-        onOpenChange={(open) => { 
-          if (!open && !guardando) {
-            setAjusteRapido(null);
-            setNuevaCantidadAjuste("");
-          }
-        }}
-      >
-        <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
-          <DialogHeader>
-            <DialogTitle>⚡ Ajuste rápido</DialogTitle>
-            <DialogDescription>
-              {ajusteRapido?.nombre} (SKU {ajusteRapido?.sku}) · actual: {ajusteRapido?.cantidad} uds
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
-              <Input
-                id="cantidad-ajuste-rapido"
-                type="number"
-                min={0}
-                autoFocus
-                value={nuevaCantidadAjuste}
-                onChange={(e) =>
-                  setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    guardarAjusteRapido();
-                  }
-                }}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAjusteRapido(null);
-                  setNuevaCantidadAjuste("");
-                }}
-                disabled={guardando}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={guardarAjusteRapido}
-                disabled={guardando}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {guardando ? "Guardando..." : "Guardar ajuste"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* FIX 6: MODAL SECUNDARIO: ESCÁNER DE CÁMARA (Ahora usa Dialog oficial) */}
-      <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
-        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-md overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{"\u{1F4F7} Escanear código de barras"}</DialogTitle>
-            <DialogDescription>Apunta al código o escríbelo manualmente.</DialogDescription>
-          </DialogHeader>
-          <Escaner
-            onCodigo={(codigo) => {
-              setNuevoCodigoBarras(codigo);
-              setProductoEscaneado(null);
-              setScanError("");
-              setEscanerAbierto(false);
-              escanearCodigo(codigo);
-            }}
-            onCerrar={() => setEscanerAbierto(false)}
-          />
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+        {/* FIX 6: MODAL SECUNDARIO: ESCÁNER DE CÁMARA (Ahora usa Dialog oficial) */}
+        <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
+          <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-md overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{"\u{1F4F7} Escanear código de barras"}</DialogTitle>
+              <DialogDescription>Apunta al código o escríbelo manualmente.</DialogDescription>
+            </DialogHeader>
+            <Escaner
+              onCodigo={(codigo) => {
+                setNuevoCodigoBarras(codigo);
+                setProductoEscaneado(null);
+                setScanError("");
+                setEscanerAbierto(false);
+                escanearCodigo(codigo);
+              }}
+              onCerrar={() => setEscanerAbierto(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      </>
+    );
   }
 
   return (
@@ -1622,9 +1683,10 @@ function UbicacionesPage() {
             resetearFormulario();
             setMostrarFormulario(true);
           }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium inline-flex items-center gap-1.5 shadow-xs transition-colors"
         >
-          + Nueva ubicación
+          <Plus className="w-4 h-4" />
+          <span>Nueva ubicación</span>
         </button>
       </div>
 
@@ -1642,9 +1704,12 @@ function UbicacionesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Quitar producto de esta ubicación?</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que deseas quitar «<strong>{productoAEliminar?.nombre}</strong>» de la ubicación <strong>{ubicacionStockAbierta?.nombre}</strong>?
-              <br /><br />
-              El producto seguirá existiendo en el catálogo general, pero su stock en esta ubicación pasará a 0.
+              ¿Estás seguro de que deseas quitar «<strong>{productoAEliminar?.nombre}</strong>» de
+              la ubicación <strong>{ubicacionStockAbierta?.nombre}</strong>?
+              <br />
+              <br />
+              El producto seguirá existiendo en el catálogo general, pero su stock en esta ubicación
+              pasará a 0.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1671,8 +1736,10 @@ function UbicacionesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>⚠️ ¿Ajustar stock a 0?</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Confirmar que el stock de <strong>{confirmacionStockCero?.producto.nombre}</strong> pasará a 0 en <strong>{ubicacionStockAbierta?.nombre}</strong>?
-              <br /><br />
+              ¿Confirmar que el stock de <strong>{confirmacionStockCero?.producto.nombre}</strong>{" "}
+              pasará a 0 en <strong>{ubicacionStockAbierta?.nombre}</strong>?
+              <br />
+              <br />
               El producto quedará registrado sin existencias en esta ubicación.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1701,8 +1768,10 @@ function UbicacionesPage() {
             <AlertDialogTitle>¿Desactivar esta ubicación?</AlertDialogTitle>
             <AlertDialogDescription>
               ¿Deseas desactivar la ubicación «<strong>{ubicacionADesactivar?.nombre}</strong>»?
-              <br /><br />
-              La ubicación dejará de estar activa para nuevas operaciones, pero se conservarán todos sus datos y movimientos históricos.
+              <br />
+              <br />
+              La ubicación dejará de estar activa para nuevas operaciones, pero se conservarán todos
+              sus datos y movimientos históricos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1731,9 +1800,12 @@ function UbicacionesPage() {
                 <AlertDialogTitle>No se puede borrar la ubicación</AlertDialogTitle>
                 <AlertDialogDescription>
                   No se puede borrar «<strong>{ubicacionABorrar.nombre}</strong>» porque contiene{" "}
-                  <strong>{productosPorUbicacion.get(ubicacionABorrar.id)}</strong> producto(s) en stock.
-                  <br /><br />
-                  Para conservar la trazabilidad, desactiva la ubicación en su lugar usando el botón ⏸️.
+                  <strong>{productosPorUbicacion.get(ubicacionABorrar.id)}</strong> producto(s) en
+                  stock.
+                  <br />
+                  <br />
+                  Para conservar la trazabilidad, desactiva la ubicación en su lugar usando el botón
+                  ⏸️.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1747,8 +1819,10 @@ function UbicacionesPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>⚠️ ¿Borrar ubicación definitivamente?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  ¿Estás seguro de que deseas eliminar permanentemente la ubicación «<strong>{ubicacionABorrar?.nombre}</strong>»?
-                  <br /><br />
+                  ¿Estás seguro de que deseas eliminar permanentemente la ubicación «
+                  <strong>{ubicacionABorrar?.nombre}</strong>»?
+                  <br />
+                  <br />
                   Esta acción no se puede deshacer y borrará la ubicación del sistema por completo.
                 </AlertDialogDescription>
               </AlertDialogHeader>
