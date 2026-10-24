@@ -6,7 +6,8 @@ import {
   ArrowRightLeft, 
   LogOut, 
   Boxes,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMyProfile, cerrarSesion } from '@/hooks/usePermissions';
@@ -21,7 +22,7 @@ const menuItems = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { perfil, isPending } = useMyProfile();
+  const { perfil, isPending, isAdmin, can } = useMyProfile();
 
   if (isPending && !perfil) {
     return (
@@ -30,6 +31,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+
+  const items = [
+    ...menuItems,
+    ...(isAdmin || can('puede_gestionar_usuarios')
+      ? [{ to: '/usuarios', label: 'Usuarios', icon: Users }]
+      : []),
+  ];
 
   return (
     <div className="flex h-screen bg-background">
@@ -54,7 +62,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* MENÚ DE NAVEGACIÓN */}
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {menuItems.map((item) => {
+          {items.map((item) => {
             const isActive = location.pathname === item.to;
             const Icon = item.icon;
             return (
