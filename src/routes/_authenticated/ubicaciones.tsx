@@ -995,7 +995,7 @@ function UbicacionesPage() {
     );
   }
 
-  function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
+   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const numProductos = productosPorUbicacion.get(ubicacion.id) || 0;
     const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id);
     const estaExpandido = expandidos.has(ubicacion.id);
@@ -1004,13 +1004,13 @@ function UbicacionesPage() {
 
     return (
       <div
-        className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors ${
+        className={`grid grid-cols-12 gap-2 px-4 py-3 items-center transition-colors duration-200 border-l-4 ${config.borderColor} ${
           esHijo
-            ? "pl-10 bg-slate-50/70 border-l-2 border-slate-300 ml-4 hover:bg-slate-100/80"
-            : "hover:bg-blue-50/60 bg-white"
+            ? `pl-12 ml-4 ${config.bgColor}/30 hover:${config.bgColor}/50`
+            : `${config.bgColor}/20 hover:${config.bgColor}/40`
         }`}
       >
-        <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+        <div className="col-span-5 flex items-center gap-3 min-w-0">
           {!esHijo && tieneHijos ? (
             <span className="text-gray-400 p-0.5">
               {estaExpandido ? (
@@ -1026,10 +1026,10 @@ function UbicacionesPage() {
           )}
 
           <div
-            className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
+            className={`p-2 rounded-full shrink-0 ${config.iconBgClass}`}
             title={config.label}
           >
-            <IconoUbicacion className={esHijo ? "w-3.5 h-3.5" : "w-4 h-4"} />
+            <IconoUbicacion className="w-5 h-5" />
           </div>
 
           <div className="flex flex-col min-w-0">
@@ -1046,11 +1046,7 @@ function UbicacionesPage() {
           </div>
         </div>
 
-        <div className="col-span-2">
-          <BadgeTipoUbicacion tipo={ubicacion.tipo} size="sm" />
-        </div>
-
-        <div className="col-span-2 text-sm text-gray-600 truncate">{getDetalles(ubicacion)}</div>
+        <div className="col-span-3 text-sm text-gray-600 truncate">{getDetalles(ubicacion)}</div>
         <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(ubicacion)}</div>
 
         <div className="col-span-2 flex justify-end items-center gap-1.5">
@@ -1100,7 +1096,6 @@ function UbicacionesPage() {
       </div>
     );
   }
-
   function renderizarTabla() {
     if (cargando) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
     if (ubicaciones.length === 0) {
@@ -1155,10 +1150,9 @@ function UbicacionesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-100/80 border-b text-xs font-semibold text-gray-600 uppercase tracking-wider">
-          <div className="col-span-4">Ubicación</div>
-          <div className="col-span-2">Tipo</div>
-          <div className="col-span-2">Detalles</div>
+                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-100/80 border-b text-xs font-semibold text-gray-600 uppercase tracking-wider">
+          <div className="col-span-5">Ubicación</div>
+          <div className="col-span-3">Detalles</div>
           <div className="col-span-2">Sección</div>
           <div className="col-span-2 text-right">Acciones</div>
         </div>
