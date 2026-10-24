@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, Fragment, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin, LayoutGrid, History, Trash2, Info } from 'lucide-react';
+import { Plus, Filter, Download, ScanBarcode, Package, ArrowDownToLine, ArrowRightLeft, SlidersHorizontal, AlertCircle, MapPin, LayoutGrid, History, Trash2, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -68,6 +68,30 @@ const CONFIG_TIPOS = {
 type TipoMovimientoForm = 'entrada' | 'traslado' | 'ajuste';
 type VistaActual = 'stock' | 'historial';
 
+type LineaStock = { id_producto: string; sku: string; nombre: string; cantidad: number };
+
+function BotonDesglose({ abierto, n, onClick }: { abierto: boolean; n: number; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+      {abierto ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      {abierto ? 'Ocultar' : 'Ver'} {n} producto{n !== 1 ? 's' : ''}
+    </button>
+  );
+}
+
+function ListaDesglose({ lineas }: { lineas: LineaStock[] }) {
+  return (
+    <div className="border-t bg-gray-50 px-4 py-2 pl-14">
+      {lineas.map(l => (
+        <div key={l.id_producto} className="flex items-center justify-between gap-3 py-1 text-sm">
+          <span className="min-w-0 truncate"><span className="mr-2 font-mono text-xs text-muted-foreground">{l.sku}</span>{l.nombre}</span>
+          <span className="shrink-0 font-semibold">{l.cantidad} uds</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MovimientosPage() {
   const { userId } = Route.useLoaderData();
   const { data } = useSuspenseQuery(inventarioQueryOptions(userId));
@@ -101,6 +125,11 @@ function MovimientosPage() {
   const [stockLineales, setStockLineales] = useState<any[]>([]);
   const [cantidadesReales, setCantidadesReales] = useState<Map<string, number>>(new Map());
   const [ajustando, setAjustando] = useState(false);
+
+  // Estados para desglose de stock
+  const [desglosados, setDesglosados] = useState<Set<string>>(new Set());
+  const toggleDesglose = (id: string) =>
+    setDesglosados(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const [filtros, setFiltros] = useState<FiltrosMovimiento>({
     desde: new Date().toISOString().split('T')[0],
@@ -338,7 +367,7 @@ function MovimientosPage() {
                     .map((h: any) => (
                       <SelectItem key={h.id} value={h.id}>
                         <span className="pl-2">
-                          {h.tipo === 'armario' ? '️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
+                          {h.tipo === 'armario' ? '🗄️' : h.tipo === 'alto' ? '📦' : h.tipo === 'cross' ? '🔄' : h.tipo === 'caja' ? '💳' : '📍'}
                           {' '}{h.nombre} ({h.tipo})
                         </span>
                       </SelectItem>
@@ -352,28 +381,25 @@ function MovimientosPage() {
     );
   }
 
+  // Fuente de verdad: la tabla stock (data.stock), no la reconstrucción desde movimientos.
   function calcularStockPorUbicacion() {
-    const stockMap = new Map<string, { cantidad: number; ultimoMovimiento?: Movimiento }>();
-    
-    data.ubicaciones.forEach(u => {
-      stockMap.set(u.id, { cantidad: 0 });
-    });
-    
-    data.movimientos.forEach(m => {
-      const actual = stockMap.get(m.id_ubicacion);
-      if (actual) {
-        if (m.tipo === 'entrada' || m.tipo === 'reposicion') {
-          actual.cantidad += m.cantidad;
-        } else if (m.tipo === 'salida') {
-          actual.cantidad -= m.cantidad;
-        } else if (m.tipo === 'ajuste') {
-          actual.cantidad = m.cantidad;
-        }
-        actual.ultimoMovimiento = m;
-      }
-    });
-    
-    return stockMap;
+    const mapa = new Map<string, { cantidad: number; lineas: LineaStock[]; ultimoMovimiento?: Movimiento }>();
+    const productosPorId = new Map(data.productos.map(p => [p.id, p]));
+    for (const s of data.stock) {
+      if (s.cantidad <= 0) continue;
+      const p = productosPorId.get(s.id_producto);
+      const act = mapa.get(s.id_ubicacion) ?? { cantidad: 0, lineas: [] as LineaStock[] };
+      act.cantidad += s.cantidad;
+      act.lineas.push({ id_producto: s.id_producto, sku: p?.sku ?? '—', nombre: p?.nombre ?? 'Producto no disponible', cantidad: s.cantidad });
+      mapa.set(s.id_ubicacion, act);
+    }
+    // data.movimientos viene ordenado por fecha desc: el primero de cada ubicación es el último.
+    for (const m of data.movimientos) {
+      const act = mapa.get(m.id_ubicacion);
+      if (act && !act.ultimoMovimiento) act.ultimoMovimiento = m;
+    }
+    for (const act of mapa.values()) act.lineas.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    return mapa;
   }
 
   const stockPorUbicacion = calcularStockPorUbicacion();
@@ -381,23 +407,23 @@ function MovimientosPage() {
   function getStockAgrupado() {
     const padres = data.ubicaciones.filter((u: any) => u.tipo === 'pasillo' || u.tipo === 'reserva');
     const hijos = data.ubicaciones.filter((u: any) => u.tipo !== 'pasillo' && u.tipo !== 'reserva');
-    
+
     return padres.map((padre: any) => {
+      const sp = stockPorUbicacion.get(padre.id);
       const hijosConStock = hijos
         .filter((h: any) => h.id_ubicacion_padre === padre.id)
         .map(hijo => {
-          const stock = stockPorUbicacion.get(hijo.id);
-          return { ...hijo, stock: stock?.cantidad || 0, ultimoMovimiento: stock?.ultimoMovimiento };
+          const s = stockPorUbicacion.get(hijo.id);
+          return { ...hijo, stock: s?.cantidad ?? 0, lineas: s?.lineas ?? [], ultimoMovimiento: s?.ultimoMovimiento };
         })
         .filter(h => h.stock > 0);
-      
-      const stockPadre = stockPorUbicacion.get(padre.id);
-      
+
       return {
         padre,
-        stockPadre: stockPadre?.cantidad || 0,
-        ultimoMovimientoPadre: stockPadre?.ultimoMovimiento,
-        hijos: hijosConStock
+        stockPadre: sp?.cantidad ?? 0,
+        lineasPadre: sp?.lineas ?? [],
+        ultimoMovimientoPadre: sp?.ultimoMovimiento,
+        hijos: hijosConStock,
       };
     }).filter(g => g.stockPadre > 0 || g.hijos.length > 0);
   }
@@ -530,7 +556,7 @@ function MovimientosPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {stockAgrupado.map(({ padre, stockPadre, ultimoMovimientoPadre, hijos }) => {
+                {stockAgrupado.map(({ padre, stockPadre, lineasPadre, ultimoMovimientoPadre, hijos }) => {
                   const esPasillo = padre.tipo === 'pasillo';
                   const esReserva = padre.tipo === 'reserva';
                   
@@ -553,7 +579,7 @@ function MovimientosPage() {
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
-                                <p className="font-semibold mb-1"> Stock NO fiable</p>
+                                <p className="font-semibold mb-1">⚠️ Stock NO fiable</p>
                                 <p className="text-xs">Este stock puede estar inflado porque no se registran las ventas de clientes.</p>
                               </TooltipContent>
                             </Tooltip>
@@ -566,7 +592,7 @@ function MovimientosPage() {
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p className="font-semibold mb-1"> Stock 100% fiable</p>
+                                <p className="font-semibold mb-1">✅ Stock 100% fiable</p>
                                 <p className="text-xs">La reserva es un almacén controlado.</p>
                               </TooltipContent>
                             </Tooltip>
@@ -588,10 +614,14 @@ function MovimientosPage() {
                                   Último: {formatoFecha(ultimoMovimientoPadre.fecha_movimiento)}
                                 </p>
                               )}
+                              {lineasPadre.length > 0 && (
+                                <BotonDesglose abierto={desglosados.has(padre.id)} n={lineasPadre.length} onClick={() => toggleDesglose(padre.id)} />
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
+                      {desglosados.has(padre.id) && lineasPadre.length > 0 && <ListaDesglose lineas={lineasPadre} />}
 
                       {hijos.length > 0 && (
                         <div className="divide-y">
@@ -602,67 +632,73 @@ function MovimientosPage() {
                             const esCaja = hijo.tipo === 'caja';
                             
                             return (
-                              <div key={hijo.id} className="px-4 py-3 pl-12 bg-white flex items-center justify-between hover:bg-gray-50">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground text-xs">└─</span>
-                                  <span className="text-base">
-                                    {hijo.tipo === 'armario' ? '🗄️' : hijo.tipo === 'alto' ? '📦' : hijo.tipo === 'cross' ? '🔄' : hijo.tipo === 'caja' ? '💳' : ''}
-                                  </span>
-                                  <div>
-                                    <span className="font-medium text-sm">{hijo.nombre}</span>
-                                    <Badge variant="outline" className="ml-2 text-xs">{hijo.tipo}</Badge>
-                                    {hijo.posicion_lateral && (
-                                      <span className="text-xs text-muted-foreground ml-2">[{hijo.posicion_lateral}]</span>
+                              <Fragment key={hijo.id}>
+                                <div className="px-4 py-3 pl-12 bg-white flex items-center justify-between hover:bg-gray-50">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground text-xs">└─</span>
+                                    <span className="text-base">
+                                      {hijo.tipo === 'armario' ? '🗄️' : hijo.tipo === 'alto' ? '📦' : hijo.tipo === 'cross' ? '🔄' : hijo.tipo === 'caja' ? '💳' : ''}
+                                    </span>
+                                    <div>
+                                      <span className="font-medium text-sm">{hijo.nombre}</span>
+                                      <Badge variant="outline" className="ml-2 text-xs">{hijo.tipo}</Badge>
+                                      {hijo.posicion_lateral && (
+                                        <span className="text-xs text-muted-foreground ml-2">[{hijo.posicion_lateral}]</span>
+                                      )}
+                                      {hijo.numero && (
+                                        <span className="text-xs text-muted-foreground ml-1">Nº{hijo.numero}</span>
+                                      )}
+                                    </div>
+                                    {esArmarioOAlto && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-300 cursor-help">
+                                            ✅ 100% fiable
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                          <p className="font-semibold mb-1">🟢 Stock 100% fiable</p>
+                                          <p className="text-xs">Armarios y altos tienen stock controlado.</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     )}
-                                    {hijo.numero && (
-                                      <span className="text-xs text-muted-foreground ml-1">Nº{hijo.numero}</span>
+                                    {(esCross || esCaja) && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
+                                            ⚠️ Stock estimado
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                          <p className="font-semibold mb-1">⚠️ Stock NO fiable</p>
+                                          <p className="text-xs">Zonas de venta. El stock puede variar por compras de clientes.</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     )}
                                   </div>
-                                  {esArmarioOAlto && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-300 cursor-help">
-                                          ✅ 100% fiable
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="font-semibold mb-1">🟢 Stock 100% fiable</p>
-                                        <p className="text-xs">Armarios y altos tienen stock controlado.</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {(esCross || esCaja) && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300 cursor-help">
-                                          ⚠️ Stock estimado
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p className="font-semibold mb-1"> Stock NO fiable</p>
-                                        <p className="text-xs">Zonas de venta. El stock puede variar por compras de clientes.</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
+                                  <div className="text-right">
+                                    <Badge 
+                                      variant={esArmarioOAlto ? 'default' : 'secondary'}
+                                      className={`text-lg px-3 py-1 ${
+                                        esArmarioOAlto ? 'bg-green-600 hover:bg-green-700' : 
+                                        esCross || esCaja ? 'bg-yellow-100 text-yellow-800' : ''
+                                      }`}
+                                    >
+                                      {hijo.stock} uds
+                                    </Badge>
+                                    {hijo.ultimoMovimiento && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        <p>{formatoFecha(hijo.ultimoMovimiento.fecha_movimiento)}</p>
+                                        {usuario && <p>por {usuario.nombre_completo}</p>}
+                                      </div>
+                                    )}
+                                    {hijo.lineas.length > 0 && (
+                                      <BotonDesglose abierto={desglosados.has(hijo.id)} n={hijo.lineas.length} onClick={() => toggleDesglose(hijo.id)} />
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="text-right">
-                                  <Badge 
-                                    variant={esArmarioOAlto ? 'default' : 'secondary'}
-                                    className={`text-lg px-3 py-1 ${
-                                      esArmarioOAlto ? 'bg-green-600 hover:bg-green-700' : 
-                                      esCross || esCaja ? 'bg-yellow-100 text-yellow-800' : ''
-                                    }`}
-                                  >
-                                    {hijo.stock} uds
-                                  </Badge>
-                                  {hijo.ultimoMovimiento && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                      <p>{formatoFecha(hijo.ultimoMovimiento.fecha_movimiento)}</p>
-                                      {usuario && <p>por {usuario.nombre_completo}</p>}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                                {desglosados.has(hijo.id) && <ListaDesglose lineas={hijo.lineas} />}
+                              </Fragment>
                             );
                           })}
                         </div>
