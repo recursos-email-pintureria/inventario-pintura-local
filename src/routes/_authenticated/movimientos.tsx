@@ -9,6 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -125,6 +135,7 @@ function MovimientosPage() {
   const [stockLineales, setStockLineales] = useState<any[]>([]);
   const [cantidadesReales, setCantidadesReales] = useState<Map<string, number>>(new Map());
   const [ajustando, setAjustando] = useState(false);
+  const [confirmarLimpiarLineales, setConfirmarLimpiarLineales] = useState(false);
 
   // Estados para desglose de stock
   const [desglosados, setDesglosados] = useState<Set<string>>(new Set());
@@ -510,11 +521,7 @@ function MovimientosPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => {
-                          if (confirm('⚠️ ¿Seguro que quieres limpiar el stock de TODOS los lineales?\n\nEsto pondrá a 0 el stock de todos los pasillos (lineales).\nEl stock de armarios y altos NO se verá afectado.')) {
-                            limpiarLineales.mutate();
-                          }
-                        }}
+                        onClick={() => setConfirmarLimpiarLineales(true)}
                         disabled={limpiarLineales.isPending}
                         className="text-yellow-700 border-yellow-300 hover:bg-yellow-50"
                       >
@@ -1163,6 +1170,33 @@ function MovimientosPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* MODAL CONFIRMACIÓN: LIMPIAR LINEALES A 0 */}
+        <AlertDialog open={confirmarLimpiarLineales} onOpenChange={setConfirmarLimpiarLineales}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>⚠️ ¿Limpiar el stock de todos los lineales?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción pondrá a 0 el stock de todos los pasillos (lineales). El stock de armarios y altos no se verá afectado.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={limpiarLineales.isPending} onClick={() => setConfirmarLimpiarLineales(false)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={limpiarLineales.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  limpiarLineales.mutate();
+                  setConfirmarLimpiarLineales(false);
+                }}
+              >
+                {limpiarLineales.isPending ? "Limpiando..." : "Limpiar lineales a 0"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     </TooltipProvider>
   );

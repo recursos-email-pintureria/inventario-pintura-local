@@ -9,6 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -494,18 +504,29 @@ function Productos() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!desactivando} onOpenChange={o => { if (!o && !desactivar.isPending) setDesactivando(null); }}>
-        <DialogContent className="w-[calc(100%-2rem)]">
-          <DialogHeader><DialogTitle>Desactivar producto</DialogTitle><DialogDescription>¿Desactivar «{desactivando?.nombre}»? Se conservarán su stock y movimientos.</DialogDescription></DialogHeader>
+      <AlertDialog open={!!desactivando} onOpenChange={o => { if (!o && !desactivar.isPending) setDesactivando(null); }}>
+        <AlertDialogContent className="w-[calc(100%-2rem)] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Desactivar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas desactivar «{desactivando?.nombre}»? Se conservarán su stock y movimientos históricos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" disabled={desactivar.isPending} onClick={() => setDesactivando(null)}>Cancelar</Button>
-            <Button variant="destructive" disabled={desactivar.isPending || !editar} onClick={() => desactivar.mutate()}>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={desactivar.isPending} onClick={() => setDesactivando(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={desactivar.isPending || !editar}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => desactivar.mutate()}
+            >
               {desactivar.isPending ? 'Desactivando…' : 'Desactivar'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

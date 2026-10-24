@@ -20,6 +20,16 @@ import type { Producto, ProductoConCantidad } from "../../lib/inventario";
 import { supabase } from "../../lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -95,6 +105,15 @@ function UbicacionesPage() {
   // Ajuste rápido (mini-modal)
   const [ajusteRapido, setAjusteRapido] = useState<ProductoConCantidad | null>(null);
   const [nuevaCantidadAjuste, setNuevaCantidadAjuste] = useState<number | "">("");
+
+  // Estados para diálogos de confirmación crítica
+  const [productoAEliminar, setProductoAEliminar] = useState<ProductoConCantidad | null>(null);
+  const [confirmacionStockCero, setConfirmacionStockCero] = useState<{
+    producto: ProductoConCantidad;
+    tipo: "ajusteRapido" | "edicion";
+  } | null>(null);
+  const [ubicacionADesactivar, setUbicacionADesactivar] = useState<any | null>(null);
+  const [ubicacionABorrar, setUbicacionABorrar] = useState<any | null>(null);
 
   // Formulario "añadir producto" (inline en el modal)
   const [nuevoCodigoBarras, setNuevoCodigoBarras] = useState("");
@@ -267,12 +286,8 @@ function UbicacionesPage() {
     setModalMode("editar");
   }
 
-  async function guardarCantidad() {
+  async function ejecutarGuardarCantidad() {
     if (!ubicacionStockAbierta || !productoEditando) return;
-    if (cantidadEdicion === "" || !Number.isInteger(cantidadEdicion) || cantidadEdicion < 0) {
-      toast.error("Introduce una cantidad entera ≥ 0.");
-      return;
-    }
     try {
       setGuardando(true);
       await crearMovimientoConStock({
@@ -293,19 +308,30 @@ function UbicacionesPage() {
     }
   }
 
-  async function eliminarProducto(producto: ProductoConCantidad) {
-    if (!ubicacionStockAbierta) return;
-    if (
-      !confirm(
-        `¿Quitar "${producto.nombre}" de ${ubicacionStockAbierta.nombre}? El producto seguirá existiendo en el catálogo.`,
-      )
-    )
+  async function guardarCantidad() {
+    if (!ubicacionStockAbierta || !productoEditando) return;
+    if (cantidadEdicion === "" || !Number.isInteger(cantidadEdicion) || cantidadEdicion < 0) {
+      toast.error("Introduce una cantidad entera ≥ 0.");
       return;
+    }
+    if (cantidadEdicion === 0) {
+      setConfirmacionStockCero({
+        producto: productoEditando,
+        tipo: "edicion",
+      });
+      return;
+    }
+    await ejecutarGuardarCantidad();
+  }
+
+  async function confirmarEliminarProducto() {
+    if (!ubicacionStockAbierta || !productoAEliminar) return;
     try {
       setGuardando(true);
-      await actualizarStock(producto.id, ubicacionStockAbierta.id, 0);
+      await actualizarStock(productoAEliminar.id, ubicacionStockAbierta.id, 0);
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`"${producto.nombre}" eliminado de esta ubicación`);
+      toast.success(`"${productoAEliminar.nombre}" eliminado de esta ubicación`);
+      setProductoAEliminar(null);
     } catch (err: any) {
       toast.error(errorInventario(err));
     } finally {
@@ -318,6 +344,26 @@ function UbicacionesPage() {
     setNuevaCantidadAjuste(producto.cantidad);
   }
 
+  async function ejecutarAjusteRapido(prod: ProductoConCantidad, cant: number) {
+    if (!ubicacionStockAbierta) return;
+    try {
+      setGuardando(true);
+      await actualizarStock(
+        prod.id,
+        ubicacionStockAbierta.id,
+        cant,
+      );
+      await recargarProductosUbicacion(ubicacionStockAbierta.id);
+      toast.success(`Ajuste rápido: ${prod.nombre} → ${cant} uds`);
+      setAjusteRapido(null);
+      setNuevaCantidadAjuste("");
+    } catch (err: any) {
+      toast.error(errorInventario(err));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   async function guardarAjusteRapido() {
     if (!ubicacionStockAbierta || !ajusteRapido) return;
     if (
@@ -328,23 +374,24 @@ function UbicacionesPage() {
       toast.error("Introduce una cantidad entera ≥ 0.");
       return;
     }
-    try {
-      setGuardando(true);
-      // actualizarStock (ya corregida) solo inserta movimiento; el trigger actualiza stock
-      await actualizarStock(
-        ajusteRapido.id,
-        ubicacionStockAbierta.id,
-        nuevaCantidadAjuste,
-      );
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`Ajuste rápido: ${ajusteRapido.nombre} → ${nuevaCantidadAjuste} uds`);
-      setAjusteRapido(null);
-      setNuevaCantidadAjuste("");
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setGuardando(false);
+    if (nuevaCantidadAjuste === 0) {
+      setConfirmacionStockCero({
+        producto: ajusteRapido,
+        tipo: "ajusteRapido",
+      });
+      return;
     }
+    await ejecutarAjusteRapido(ajusteRapido, nuevaCantidadAjuste);
+  }
+
+  async function confirmarAjusteCero() {
+    if (!confirmacionStockCero) return;
+    if (confirmacionStockCero.tipo === "ajusteRapido") {
+      await ejecutarAjusteRapido(confirmacionStockCero.producto, 0);
+    } else {
+      await ejecutarGuardarCantidad();
+    }
+    setConfirmacionStockCero(null);
   }
 
   async function escanearCodigo(codigoManual?: string) {
@@ -608,28 +655,42 @@ function UbicacionesPage() {
     }
   }
 
-  async function desactivarUbicacionHandler(id: string) {
-    if (!confirm("¿Desactivar esta ubicación?")) return;
+  function desactivarUbicacionHandler(ubicacion: any) {
+    setUbicacionADesactivar(ubicacion);
+  }
+
+  function borrarDefinitivamente(ubicacion: any) {
+    setUbicacionABorrar(ubicacion);
+  }
+
+  async function confirmarDesactivarUbicacion() {
+    if (!ubicacionADesactivar) return;
     try {
-      await desactivarUbicacion(id);
+      await desactivarUbicacion(ubicacionADesactivar.id);
       await cargarDatos();
+      toast.success(`Ubicación "${ubicacionADesactivar.nombre}" desactivada`);
+      setUbicacionADesactivar(null);
     } catch (err: any) {
       setError(errorInventario(err));
+      toast.error(errorInventario(err));
     }
   }
 
-  async function borrarDefinitivamente(id: string) {
-    const numProductos = productosPorUbicacion.get(id) || 0;
+  async function confirmarBorrarUbicacion() {
+    if (!ubicacionABorrar) return;
+    const numProductos = productosPorUbicacion.get(ubicacionABorrar.id) || 0;
     if (numProductos > 0) {
-      alert("No se puede borrar: hay productos en esta ubicación. Desactívala en su lugar.");
+      setUbicacionABorrar(null);
       return;
     }
-    if (!confirm("⚠️ ¿Borrar DEFINITIVAMENTE?")) return;
     try {
-      await borrarUbicacionDefinitivamente(id);
+      await borrarUbicacionDefinitivamente(ubicacionABorrar.id);
       await cargarDatos();
+      toast.success(`Ubicación "${ubicacionABorrar.nombre}" eliminada definitivamente`);
+      setUbicacionABorrar(null);
     } catch (err: any) {
       setError(errorInventario(err));
+      toast.error(errorInventario(err));
     }
   }
 
@@ -979,7 +1040,10 @@ function UbicacionesPage() {
           </button>
           {numProductos > 0 || tieneHijos ? (
             <button
-              onClick={() => desactivarUbicacionHandler(ubicacion.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                desactivarUbicacionHandler(ubicacion);
+              }}
               className="text-orange-600 hover:text-orange-800 p-1 rounded"
               title="Desactivar"
             >
@@ -987,7 +1051,10 @@ function UbicacionesPage() {
             </button>
           ) : (
             <button
-              onClick={() => borrarDefinitivamente(ubicacion.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                borrarDefinitivamente(ubicacion);
+              }}
               className="text-red-600 hover:text-red-800 p-1 rounded"
               title="Borrar"
             >
@@ -1083,7 +1150,7 @@ function UbicacionesPage() {
         <DialogContent 
           className="max-w-3xl max-h-[85vh] overflow-y-auto"
           onInteractOutside={(e) => {
-            if (escanerAbierto || ajusteRapido) e.preventDefault();
+            if (escanerAbierto || ajusteRapido || productoAEliminar || confirmacionStockCero) e.preventDefault();
           }}
         >
           <DialogHeader>
@@ -1436,8 +1503,8 @@ function UbicacionesPage() {
                               size="sm"
                               variant="ghost"
                               className="text-red-600 hover:text-red-800 h-8 px-2"
-                              onClick={() => eliminarProducto(p)}
-                              disabled={modalMode !== "ver" || !!ajusteRapido}
+                              onClick={() => setProductoAEliminar(p)}
+                              disabled={modalMode !== "ver" || !!ajusteRapido || guardando}
                               title="Quitar de esta ubicación"
                             >
                               🗑️
@@ -1565,6 +1632,141 @@ function UbicacionesPage() {
       {renderizarTabla()}
 
       {renderizarModal()}
+
+      {/* MODAL 1: Confirmación de quitar producto de la ubicación */}
+      <AlertDialog
+        open={!!productoAEliminar}
+        onOpenChange={(open) => !open && !guardando && setProductoAEliminar(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Quitar producto de esta ubicación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas quitar «<strong>{productoAEliminar?.nombre}</strong>» de la ubicación <strong>{ubicacionStockAbierta?.nombre}</strong>?
+              <br /><br />
+              El producto seguirá existiendo en el catálogo general, pero su stock en esta ubicación pasará a 0.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={guardando} onClick={() => setProductoAEliminar(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={guardando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmarEliminarProducto}
+            >
+              {guardando ? "Quitando..." : "Quitar producto"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* MODAL 2: Confirmación de ajuste de stock a 0 */}
+      <AlertDialog
+        open={!!confirmacionStockCero}
+        onOpenChange={(open) => !open && !guardando && setConfirmacionStockCero(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>⚠️ ¿Ajustar stock a 0?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Confirmar que el stock de <strong>{confirmacionStockCero?.producto.nombre}</strong> pasará a 0 en <strong>{ubicacionStockAbierta?.nombre}</strong>?
+              <br /><br />
+              El producto quedará registrado sin existencias en esta ubicación.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={guardando} onClick={() => setConfirmacionStockCero(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={guardando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmarAjusteCero}
+            >
+              {guardando ? "Ajustando…" : "Confirmar stock a 0"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* MODAL 3: Confirmación de desactivar ubicación */}
+      <AlertDialog
+        open={!!ubicacionADesactivar}
+        onOpenChange={(open) => !open && setUbicacionADesactivar(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Desactivar esta ubicación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Deseas desactivar la ubicación «<strong>{ubicacionADesactivar?.nombre}</strong>»?
+              <br /><br />
+              La ubicación dejará de estar activa para nuevas operaciones, pero se conservarán todos sus datos y movimientos históricos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUbicacionADesactivar(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={confirmarDesactivarUbicacion}
+            >
+              Desactivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* MODAL 4: Confirmación de borrar ubicación definitivamente */}
+      <AlertDialog
+        open={!!ubicacionABorrar}
+        onOpenChange={(open) => !open && setUbicacionABorrar(null)}
+      >
+        <AlertDialogContent>
+          {ubicacionABorrar && (productosPorUbicacion.get(ubicacionABorrar.id) || 0) > 0 ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>No se puede borrar la ubicación</AlertDialogTitle>
+                <AlertDialogDescription>
+                  No se puede borrar «<strong>{ubicacionABorrar.nombre}</strong>» porque contiene{" "}
+                  <strong>{productosPorUbicacion.get(ubicacionABorrar.id)}</strong> producto(s) en stock.
+                  <br /><br />
+                  Para conservar la trazabilidad, desactiva la ubicación en su lugar usando el botón ⏸️.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setUbicacionABorrar(null)}>
+                  Entendido
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>⚠️ ¿Borrar ubicación definitivamente?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  ¿Estás seguro de que deseas eliminar permanentemente la ubicación «<strong>{ubicacionABorrar?.nombre}</strong>»?
+                  <br /><br />
+                  Esta acción no se puede deshacer y borrará la ubicación del sistema por completo.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setUbicacionABorrar(null)}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={confirmarBorrarUbicacion}
+                >
+                  Borrar definitivamente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
