@@ -18,10 +18,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { PageHeader } from "@/components/layout/AppLayout";
 import { pageHead } from "@/lib/meta";
 import { supabase } from "@/lib/supabase";
@@ -58,7 +71,12 @@ function Usuarios() {
     motivos: string[];
   } | null>(null);
 
-  const { data: usuarios, isLoading, isError, refetch } = useQuery({
+  const {
+    data: usuarios,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["usuarios"],
     enabled: isAdmin,
     queryFn: cargarUsuarios,
@@ -118,7 +136,10 @@ function Usuarios() {
     if (editando.activo && !activo) {
       advertencias.push("Desactivar la cuenta del usuario (perderá acceso al sistema)");
     }
-    if (editando.permisos_usuario?.puede_gestionar_usuarios && !permisos["puede_gestionar_usuarios"]) {
+    if (
+      editando.permisos_usuario?.puede_gestionar_usuarios &&
+      !permisos["puede_gestionar_usuarios"]
+    ) {
       advertencias.push("Quitar el permiso crítico 'Gestionar usuarios'");
     }
     if (editando.permisos_usuario?.puede_crear_productos && !permisos["puede_crear_productos"]) {
@@ -146,11 +167,19 @@ function Usuarios() {
       <PageHeader title="Usuarios" />
       <Card className="p-4">
         {isLoading || cargandoPerfil ? (
-          <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
         ) : isError ? (
           <div role="alert" className="space-y-3">
-            <p className="text-sm text-destructive">No se pudieron cargar los usuarios. Inténtalo de nuevo.</p>
-            <Button variant="outline" onClick={() => refetch()}>Reintentar</Button>
+            <p className="text-sm text-destructive">
+              No se pudieron cargar los usuarios. Inténtalo de nuevo.
+            </p>
+            <Button variant="outline" onClick={() => refetch()}>
+              Reintentar
+            </Button>
           </div>
         ) : (
           <Table>
@@ -175,7 +204,12 @@ function Usuarios() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => abrirEdicion(u)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Editar"
+                      onClick={() => abrirEdicion(u)}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -200,7 +234,9 @@ function Usuarios() {
               <div className="space-y-2">
                 <Label>Rol</Label>
                 <Select value={rol} onValueChange={setRol}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="vendedor">Vendedor</SelectItem>
@@ -224,16 +260,17 @@ function Usuarios() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Advertencia visual para el propio usuario */}
               {editando.id === miPerfil?.id && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
                   <p className="text-xs text-amber-800 font-medium">
-                    ⚠️ Estás editando tu propia cuenta. No puedes quitarte el rol de admin ni el permiso de gestionar usuarios.
+                    ⚠️ Estás editando tu propia cuenta. No puedes quitarte el rol de admin ni el
+                    permiso de gestionar usuarios.
                   </p>
                 </div>
               )}
-              
+
               <Button className="w-full" onClick={verificarYGuardar} disabled={guardar.isPending}>
                 {guardar.isPending ? "Guardando…" : "Guardar cambios"}
               </Button>
@@ -251,7 +288,10 @@ function Usuarios() {
             <AlertDialogTitle>¿Confirmar cambios críticos?</AlertDialogTitle>
             <AlertDialogDescription>
               Estás a punto de aplicar cambios importantes en la cuenta de{" "}
-              <strong className="text-foreground">{confirmacionCritica?.usuario.nombre_completo}</strong>:
+              <strong className="text-foreground">
+                {confirmacionCritica?.usuario.nombre_completo}
+              </strong>
+              :
             </AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="my-2 list-disc list-inside space-y-1.5 text-sm text-muted-foreground">

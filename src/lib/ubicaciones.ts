@@ -50,24 +50,30 @@ export function puedeGestionarUbicaciones(permisos: PermisosUsuario | null | und
 }
 
 export function filtrarUbicaciones(items: Ubicacion[], seccion: "pasillos" | "altos") {
-  return items.filter((u) => u.activo && (seccion === "pasillos" ? u.tipo === "pasillo" : u.tipo === "alto" || u.tipo === "armario"));
+  return items.filter(
+    (u) =>
+      u.activo &&
+      (seccion === "pasillos" ? u.tipo === "pasillo" : u.tipo === "alto" || u.tipo === "armario"),
+  );
 }
 
 export async function cargarUbicaciones(): Promise<Ubicacion[]> {
   const { data, error } = await supabase
     .from("ubicaciones")
-    .select(`
+    .select(
+      `
       *,
       seccion:seccion(id, nombre),
       seccion_origen:seccion_origen(id, nombre),
       ubicacion_padre:id_ubicacion_padre(id, nombre, tipo)
-    `)
+    `,
+    )
     .eq("activo", true)
     .order("tipo")
     .order("nombre");
-  
+
   if (error) throw error;
-  
+
   return (data ?? []).map((u: any) => ({
     ...u,
     seccion_nombre: u.seccion?.nombre || null,
@@ -76,19 +82,20 @@ export async function cargarUbicaciones(): Promise<Ubicacion[]> {
   })) as Ubicacion[];
 }
 
-export const ubicacionesQueryOptions = (userId: string) => queryOptions({
-  queryKey: ["ubicaciones", userId],
-  queryFn: cargarUbicaciones,
-});
+export const ubicacionesQueryOptions = (userId: string) =>
+  queryOptions({
+    queryKey: ["ubicaciones", userId],
+    queryFn: cargarUbicaciones,
+  });
 
 export async function guardarUbicacion(datos: DatosUbicacion, id?: string) {
   const nombre = datos.nombre.trim();
   if (!nombre) throw new Error("Introduce el nombre de la ubicación.");
-  
+
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!auth.user) throw new Error("Inicia sesión para guardar la ubicación.");
-  
+
   const valores = {
     nombre,
     tipo: datos.tipo,
@@ -100,11 +107,11 @@ export async function guardarUbicacion(datos: DatosUbicacion, id?: string) {
     posicion_longitudinal: datos.posicion_longitudinal || null,
     numero: datos.numero || null,
   };
-  
+
   const query = id
     ? supabase.from("ubicaciones").update(valores).eq("id", id)
     : supabase.from("ubicaciones").insert({ ...valores, creado_por: auth.user.id });
-  
+
   const { data, error } = await query.select("*").single();
   if (error) throw error;
   return data as Ubicacion;
@@ -117,15 +124,18 @@ export async function desactivarUbicacion(id: string) {
     .eq("id", id)
     .select("id")
     .single();
-  
+
   if (error) throw error;
   return data;
 }
 
 export function errorUbicaciones(error: unknown): string {
   const e = error as { code?: string; message?: string };
-  if (e?.code === "23505") return "Ya existe una ubicación con ese nombre, aunque esté desactivada.";
-  if (e?.code === "42P01" || e?.code === "PGRST205") return "Falta crear la tabla de ubicaciones. Ejecuta primero el SQL de la Fase 4.";
-  if (e?.code === "42501" || e?.code === "PGRST116") return "No tienes permiso para realizar esta operación o la ubicación ya no está disponible.";
+  if (e?.code === "23505")
+    return "Ya existe una ubicación con ese nombre, aunque esté desactivada.";
+  if (e?.code === "42P01" || e?.code === "PGRST205")
+    return "Falta crear la tabla de ubicaciones. Ejecuta primero el SQL de la Fase 4.";
+  if (e?.code === "42501" || e?.code === "PGRST116")
+    return "No tienes permiso para realizar esta operación o la ubicación ya no está disponible.";
   return e?.message || "No se pudo completar la operación. Inténtalo de nuevo.";
 }

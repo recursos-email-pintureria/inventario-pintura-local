@@ -11,7 +11,10 @@ import { supabase, authErrorMessage } from "@/lib/supabase";
 
 const schema = z
   .object({ password: z.string().min(8, "Mínimo 8 caracteres"), confirm: z.string() })
-  .refine((v) => v.password === v.confirm, { message: "Las contraseñas no coinciden", path: ["confirm"] });
+  .refine((v) => v.password === v.confirm, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirm"],
+  });
 type Values = z.infer<typeof schema>;
 
 export default function ResetPassword() {
@@ -19,7 +22,11 @@ export default function ResetPassword() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<Values>({
     resolver: zodResolver(schema),
   });
 
@@ -30,7 +37,10 @@ export default function ResetPassword() {
     });
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) setReady(true);
-      else if (!window.location.hash.includes("type=recovery") && !window.location.search.includes("code="))
+      else if (
+        !window.location.hash.includes("type=recovery") &&
+        !window.location.search.includes("code=")
+      )
         setError("El enlace no es válido o ha caducado. Solicita uno nuevo.");
     });
     return () => data.subscription.unsubscribe();
@@ -51,19 +61,31 @@ export default function ResetPassword() {
         <FormMessage type="success" text={success} />
         <div className="space-y-2">
           <Label htmlFor="password">Nueva contraseña</Label>
-          <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            {...register("password")}
+          />
           {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm">Repite la contraseña</Label>
-          <Input id="confirm" type="password" autoComplete="new-password" {...register("confirm")} />
+          <Input
+            id="confirm"
+            type="password"
+            autoComplete="new-password"
+            {...register("confirm")}
+          />
           {errors.confirm && <p className="text-sm text-destructive">{errors.confirm.message}</p>}
         </div>
         <Button type="submit" className="w-full" disabled={isSubmitting || !ready || !!success}>
           {isSubmitting && <Spinner />} {isSubmitting ? "Guardando..." : "Guardar contraseña"}
         </Button>
         <p className="text-center text-sm">
-          <Link to="/forgot-password" className="font-medium text-primary hover:underline">Solicitar nuevo enlace</Link>
+          <Link to="/forgot-password" className="font-medium text-primary hover:underline">
+            Solicitar nuevo enlace
+          </Link>
         </p>
       </form>
     </AuthLayout>

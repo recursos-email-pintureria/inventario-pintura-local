@@ -16,14 +16,21 @@ const schema = z
     password: z.string().min(8, "Mínimo 8 caracteres"),
     confirm: z.string(),
   })
-  .refine((v) => v.password === v.confirm, { message: "Las contraseñas no coinciden", path: ["confirm"] });
+  .refine((v) => v.password === v.confirm, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirm"],
+  });
 type Values = z.infer<typeof schema>;
 
 export default function Register() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<Values>({
     resolver: zodResolver(schema),
   });
 
@@ -48,12 +55,22 @@ export default function Register() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Contraseña</Label>
-          <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            {...register("password")}
+          />
           {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm">Repite la contraseña</Label>
-          <Input id="confirm" type="password" autoComplete="new-password" {...register("confirm")} />
+          <Input
+            id="confirm"
+            type="password"
+            autoComplete="new-password"
+            {...register("confirm")}
+          />
           {errors.confirm && <p className="text-sm text-destructive">{errors.confirm.message}</p>}
         </div>
         <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -61,7 +78,9 @@ export default function Register() {
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           ¿Ya tienes cuenta?{" "}
-          <Link to="/login" className="font-medium text-primary hover:underline">Inicia sesión</Link>
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            Inicia sesión
+          </Link>
         </p>
       </form>
     </AuthLayout>

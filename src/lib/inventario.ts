@@ -212,7 +212,7 @@ export async function guardarProducto(
   const query = id
     ? supabase.from("productos").update(valores).eq("id", id)
     : supabase.from("productos").insert({ ...valores, creado_por: user.id });
-  
+
   const { data, error } = await query.select("id").single();
   if (error) {
     if (error.code === "42501" || error.code === "PGRST116")
@@ -562,7 +562,7 @@ export async function crearMovimientoConStock(datos: {
     throw new Error("Selecciona producto y ubicación.");
   if (!Number.isInteger(datos.cantidad) || datos.cantidad < 0)
     throw new Error("La cantidad debe ser un entero mayor o igual a cero.");
-  
+
   // Solo el ajuste admite 0 (se traduce a una salida); movimientos.cantidad exige > 0.
   if (datos.cantidad === 0 && datos.tipo !== "ajuste")
     throw new Error("La cantidad debe ser un entero mayor que cero.");
@@ -623,7 +623,7 @@ export async function crearTraslado(datos: {
     realizado_por: user.id,
     fecha_movimiento: fecha,
   };
-  
+
   // Un solo INSERT = una transacción atómica. El trigger valida el stock de la salida.
   const { error } = await supabase.from("movimientos").insert([
     {
@@ -826,7 +826,7 @@ export async function ajustarStockLineal(datos: {
   if (cantidadSistema === datos.cantidad_real) return { ajustado: false, diferencia: 0 };
 
   const diferencia = datos.cantidad_real - cantidadSistema;
-  
+
   // Bajar (incluido llegar a 0) = salida; subir = entrada. El trigger actualiza stock.
   const { error } = await supabase.from("movimientos").insert({
     id_producto: datos.id_producto,
@@ -870,7 +870,7 @@ export async function buscarProductosPorCodigo(texto: string): Promise<Producto[
     .eq("activo", true)
     .order("nombre", { ascending: true })
     .limit(50); // Limitamos a 50 para que el autocompletado sea rápido
-  
+
   if (error) {
     console.error("Error buscando productos:", error);
     return [];
@@ -890,10 +890,10 @@ export async function descargarCatalogoCompleto(tamPagina = 1000): Promise<Produ
       .order("nombre", { ascending: true })
       .order("id", { ascending: true }) // Desempate para orden estable entre páginas
       .range(desde, desde + tamPagina - 1);
-    
+
     if (error) throw error;
     if (!data || data.length === 0) break;
-    
+
     todos.push(...(data as Producto[]));
     if (data.length < tamPagina) break; // Si trae menos de lo pedido, es el final
     desde += tamPagina;

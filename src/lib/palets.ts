@@ -27,7 +27,7 @@ export interface CrearPaletParams {
 export function generarCodigoBarrasPalet(
   numeroPalet: number,
   usuario: string,
-  fecha: Date = new Date()
+  fecha: Date = new Date(),
 ): string {
   const padNumero = String(numeroPalet).padStart(3, "0");
   const usuarioLimpio =
@@ -73,7 +73,7 @@ export async function getSiguienteNumeroPalet(idReserva: string): Promise<number
  */
 export async function cargarPaletsPorReserva(
   idReserva: string,
-  soloActivos: boolean = true
+  soloActivos: boolean = true,
 ): Promise<Palet[]> {
   let query = supabase
     .from("palets")
@@ -96,10 +96,12 @@ export async function cargarPaletsPorReserva(
 export async function cargarPalets(soloActivos: boolean = true): Promise<Palet[]> {
   let query = supabase
     .from("palets")
-    .select(`
+    .select(
+      `
       *,
       ubicacion:id_reserva(id, nombre)
-    `)
+    `,
+    )
     .order("creado_en", { ascending: false });
 
   if (soloActivos) {

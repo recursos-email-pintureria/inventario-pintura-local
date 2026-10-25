@@ -21,7 +21,10 @@ function Configuracion() {
       <div className="space-y-4">
         {SECTIONS.map((s) => (
           <Card key={s.t}>
-            <CardHeader><CardTitle className="text-lg">{s.t}</CardTitle><CardDescription>{s.d}</CardDescription></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-lg">{s.t}</CardTitle>
+              <CardDescription>{s.d}</CardDescription>
+            </CardHeader>
             <CardContent className="text-sm text-muted-foreground">Próximamente.</CardContent>
           </Card>
         ))}

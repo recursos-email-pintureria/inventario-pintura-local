@@ -42,7 +42,10 @@ export function useMyProfile() {
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
-      return { perfil: perfil as PerfilUsuario, permisos: (permisos as PermisosUsuario | null) ?? null };
+      return {
+        perfil: perfil as PerfilUsuario,
+        permisos: (permisos as PermisosUsuario | null) ?? null,
+      };
     },
   });
 

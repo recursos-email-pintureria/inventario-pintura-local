@@ -65,12 +65,15 @@ import {
   Printer,
   Eye,
   Loader2,
+  Boxes,
 } from "lucide-react";
 
 // Componentes propios
 import Escaner from "@/components/inventario/Escaner";
 import { BadgeTipoUbicacion } from "@/components/inventario/BadgeTipoUbicacion";
 import { getConfigTipo, CONFIG_TIPOS } from "@/lib/tiposUbicacion";
+import { useMyProfile } from "@/hooks/usePermissions";
+import { SeccionPaletsReserva, ModalCrearPalet } from "@/components/inventario/PaletsReserva";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
   component: UbicacionesPage,
@@ -110,12 +113,35 @@ function UbicacionesPage() {
   const [filtroPasillo, setFiltroPasillo] = useState("todos");
   const [soloConStock, setSoloConStock] = useState(false);
 
+  // Estados para Palets en Reservas (Fase 5.3)
+  const [reservasExpandidas, setReservasExpandidas] = useState<Set<string>>(new Set());
+  const [reservaParaNuevoPalet, setReservaParaNuevoPalet] = useState<any | null>(null);
+
+  // Perfil y permisos del usuario actual
+  const { perfil, isAdmin, can } = useMyProfile();
+  const puedeGestionarPalets = Boolean(
+    isAdmin || can("puede_crear_ubicaciones") || can("puede_editar_ubicaciones"),
+  );
+  const usuarioNombre = perfil?.nombre_completo || "Usuario";
+
+  function toggleReservaExpandida(id: string) {
+    setReservasExpandidas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
   // Estados para Informe Detallado Imprimible (A4)
   const [cargandoInforme, setCargandoInforme] = useState(false);
   const [productosInforme, setProductosInforme] = useState<Map<string, ProductoConCantidad[]>>(
     new Map(),
   );
-  const [modalVistaPrevia, setModalVistaPrevia] = useState(false);
+  const [mostrarInforme, setMostrarInforme] = useState(false);
 
   // Estado del modal de gestión de productos de una ubicación
   const [ubicacionStockAbierta, setUbicacionStockAbierta] = useState<any>(null);
@@ -177,7 +203,7 @@ function UbicacionesPage() {
     cargarDatos();
   }, []);
 
-  // FIX 8: Cargar catálogo al abrir el formulario de añadir (recarga cada vez para evitar datos obsoletos)
+  // Cargar catálogo al abrir el formulario de añadir (recarga cada vez para evitar datos obsoletos)
   useEffect(() => {
     if (modalMode !== "anadir") return;
     let cancelado = false;
@@ -1096,21 +1122,31 @@ function UbicacionesPage() {
         <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(ubicacion)}</div>
 
         <div className="col-span-2 flex justify-end items-center gap-1.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              abrirStockUbicacion(ubicacion);
-            }}
-            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${
-              numProductos > 0
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-            }`}
-            title="Gestionar productos de esta ubicación"
-          >
-            <Package className="w-3.5 h-3.5" />
-            <span>{numProductos > 0 ? `${numProductos} prod.` : "+ prod."}</span>
-          </button>
+          {ubicacion.tipo === "reserva" ? (
+            <span
+              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border bg-gray-50 text-gray-500 border-gray-200 cursor-default select-none"
+              title="Las reservas no contienen productos sueltos. La mercancía se almacena en palets."
+            >
+              <Package className="w-3.5 h-3.5 text-gray-400" />
+              <span>0 prod.</span>
+            </span>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                abrirStockUbicacion(ubicacion);
+              }}
+              className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${
+                numProductos > 0
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+              }`}
+              title="Gestionar productos de esta ubicación"
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>{numProductos > 0 ? `${numProductos} prod.` : "+ prod."}</span>
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -1241,6 +1277,7 @@ function UbicacionesPage() {
       setCargandoInforme(true);
       const mapa = await cargarProductosInforme();
       if (!mapa) return;
+      setMostrarInforme(true);
       toast.success("Informe detallado listo");
       setTimeout(() => {
         window.print();
@@ -1257,7 +1294,7 @@ function UbicacionesPage() {
       setCargandoInforme(true);
       const mapa = await cargarProductosInforme();
       if (!mapa) return;
-      setModalVistaPrevia(true);
+      setMostrarInforme(true);
     } catch (err: any) {
       toast.error(`Error al preparar vista previa: ${errorInventario(err)}`);
     } finally {
@@ -1406,19 +1443,25 @@ function UbicacionesPage() {
               </span>
             </div>
             <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Sección:</span>
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">
+                Sección:
+              </span>
               <span className="font-medium text-gray-800">
                 {filtroSeccion === "todas" ? "Todas las secciones" : filtroSeccion}
               </span>
             </div>
             <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Pasillo:</span>
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">
+                Pasillo:
+              </span>
               <span className="font-medium text-gray-800 truncate block">
                 {filtroPasillo === "todos" ? "Todos" : filtroPasillo}
               </span>
             </div>
             <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Filtro stock:</span>
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">
+                Filtro stock:
+              </span>
               <span className="font-medium text-gray-800">
                 {soloConStock ? "Solo con stock (>0)" : "Todas (con y sin stock)"}
               </span>
@@ -1734,7 +1777,7 @@ function UbicacionesPage() {
                   onChange={(e) => setFiltroPasillo(e.target.value)}
                   className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500 max-w-[200px]"
                 >
-                  <option value="todos">Todos los pasillos/reservas</option>
+                  <option value="todos">Todos los pasillos</option>
                   {pasillosDisp.map((p: any) => (
                     <option key={p.id} value={p.nombre}>
                       {p.nombre}
@@ -1816,56 +1859,145 @@ function UbicacionesPage() {
                 const numProductos = productosPorUbicacion.get(u.id) || 0;
                 const config = getConfigTipo(u.tipo);
                 const IconoUbicacion = config.icon;
+                const esReserva = u.tipo === "reserva";
+                const estaExpandida = reservasExpandidas.has(u.id);
 
                 return (
-                  <div
-                    key={u.id}
-                    onClick={() => abrirStockUbicacion(u)}
-                    className="grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors hover:bg-blue-50/70 cursor-pointer group bg-white"
-                  >
-                    {/* Col 4: Icono y Nombre */}
-                    <div className="col-span-4 flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
-                        title={config.label}
-                      >
-                        <IconoUbicacion className="w-4 h-4" />
+                  <div key={u.id} className="border-b last:border-b-0">
+                    <div
+                      onClick={() => {
+                        if (esReserva) {
+                          toggleReservaExpandida(u.id);
+                        } else {
+                          abrirStockUbicacion(u);
+                        }
+                      }}
+                      className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors cursor-pointer group ${
+                        esReserva && estaExpandida
+                          ? "bg-amber-50/60 hover:bg-amber-100/70"
+                          : esReserva
+                            ? "hover:bg-amber-50/50 bg-white"
+                            : "hover:bg-blue-50/70 bg-white"
+                      }`}
+                    >
+                      {/* Col 4: Icono, Chevron para reserva y Nombre */}
+                      <div className="col-span-4 flex items-center gap-2 min-w-0">
+                        {esReserva ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleReservaExpandida(u.id);
+                            }}
+                            className="p-1 hover:bg-amber-200/80 rounded text-amber-800 transition-colors shrink-0"
+                            title={
+                              estaExpandida
+                                ? "Ocultar palets de la reserva"
+                                : "Ver palets de la reserva"
+                            }
+                          >
+                            {estaExpandida ? (
+                              <ChevronDown className="w-4 h-4 text-amber-900" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-amber-700" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="w-4 shrink-0" />
+                        )}
+
+                        <div
+                          className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
+                          title={config.label}
+                        >
+                          <IconoUbicacion className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+                            {u.nombre}
+                          </span>
+                          {u.descripcion && (
+                            <span className="text-xs text-gray-500 truncate">{u.descripcion}</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
-                          {u.nombre}
-                        </span>
-                        {u.descripcion && (
-                          <span className="text-xs text-gray-500 truncate">{u.descripcion}</span>
+
+                      {/* Col 2: Tipo Badge */}
+                      <div className="col-span-2">
+                        <BadgeTipoUbicacion tipo={u.tipo} size="sm" />
+                      </div>
+
+                      {/* Col 2: Sección */}
+                      <div className="col-span-2 text-sm text-gray-600 truncate">
+                        {getSeccionReal(u)}
+                      </div>
+
+                      {/* Col 2: Detalles */}
+                      <div className="col-span-2 text-sm text-gray-600 truncate">
+                        {getDetalles(u)}
+                      </div>
+
+                      {/* Col 2: Stock, Botón Nuevo Palet y Flechita */}
+                      <div className="col-span-2 flex justify-end items-center gap-1.5">
+                        {esReserva && puedeGestionarPalets && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReservaParaNuevoPalet(u);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md font-semibold border bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs"
+                            title="Dar de alta un nuevo palet en esta reserva"
+                          >
+                            <Plus className="w-3 h-3 text-amber-700" />
+                            <span className="hidden sm:inline">Nuevo palet</span>
+                          </button>
+                        )}
+
+                        {esReserva ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border bg-gray-50 text-gray-500 border-gray-200 cursor-default select-none"
+                            title="Las reservas no contienen productos sueltos. La mercancía se almacena en palets."
+                          >
+                            <Package className="w-3.5 h-3.5 text-gray-400" />
+                            <span>0 prod.</span>
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border ${
+                              numProductos > 0
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-gray-50 text-gray-500 border-gray-200"
+                            }`}
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            <span>{numProductos > 0 ? `${numProductos} prod.` : "0 prod."}</span>
+                          </span>
+                        )}
+
+                        {esReserva ? (
+                          <span className="p-0.5 text-amber-700">
+                            {estaExpandida ? (
+                              <ChevronDown className="w-4 h-4 text-amber-800" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-amber-600" />
+                            )}
+                          </span>
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
                         )}
                       </div>
                     </div>
 
-                    {/* Col 2: Tipo Badge */}
-                    <div className="col-span-2">
-                      <BadgeTipoUbicacion tipo={u.tipo} size="sm" />
-                    </div>
-
-                    {/* Col 2: Sección */}
-                    <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(u)}</div>
-
-                    {/* Col 2: Detalles */}
-                    <div className="col-span-2 text-sm text-gray-600 truncate">{getDetalles(u)}</div>
-
-                    {/* Col 2: Stock con flechita hover */}
-                    <div className="col-span-2 flex justify-end items-center gap-1.5">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border ${
-                          numProductos > 0
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-gray-50 text-gray-500 border-gray-200"
-                        }`}
-                      >
-                        <Package className="w-3.5 h-3.5" />
-                        <span>{numProductos > 0 ? `${numProductos} prod.` : "0 prod."}</span>
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
-                    </div>
+                    {/* Sección expandible de palets de la reserva */}
+                    {esReserva && estaExpandida && (
+                      <SeccionPaletsReserva
+                        reserva={u}
+                        puedeGestionar={puedeGestionarPalets}
+                        usuarioNombre={usuarioNombre}
+                        onNuevoPalet={() => setReservaParaNuevoPalet(u)}
+                      />
+                    )}
                   </div>
                 );
               })
@@ -2020,7 +2152,6 @@ function UbicacionesPage() {
                             <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0 z-10">
                               Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
                               {resultadosBusqueda.length} productos
-                              {/* FIX 8: Aviso de inactivos */}
                               {totalRealesTabla !== null &&
                                 totalRealesTabla > catalogoProductos.length && (
                                   <span className="text-amber-600">
@@ -2356,7 +2487,7 @@ function UbicacionesPage() {
           </DialogContent>
         </Dialog>
 
-        {/* FIX 6: MODAL SECUNDARIO: ESCÁNER DE CÁMARA (Ahora usa Dialog oficial) */}
+        {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA */}
         <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
           <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-md overflow-y-auto">
             <DialogHeader>
@@ -2382,221 +2513,238 @@ function UbicacionesPage() {
   return (
     <>
       <div className="p-6 max-w-7xl mx-auto screen-only">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ubicaciones</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Gestiona la estructura jerárquica de tu tienda.
-          </p>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Ubicaciones</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Gestiona la estructura jerárquica de tu tienda.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              resetearFormulario();
+              setMostrarFormulario(true);
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium inline-flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva ubicación</span>
+          </button>
         </div>
-        <button
-          onClick={() => {
-            resetearFormulario();
-            setMostrarFormulario(true);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium inline-flex items-center gap-1.5 shadow-xs transition-colors"
+
+        {mostrarFormulario && renderizarFormulario()}
+        {renderizarTabla()}
+
+        {renderizarModal()}
+
+        {/* MODAL 1: Confirmación de quitar producto de la ubicación */}
+        <AlertDialog
+          open={!!productoAEliminar}
+          onOpenChange={(open) => !open && !guardando && setProductoAEliminar(null)}
         >
-          <Plus className="w-4 h-4" />
-          <span>Nueva ubicación</span>
-        </button>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Quitar producto de esta ubicación?</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Estás seguro de que deseas quitar «<strong>{productoAEliminar?.nombre}</strong>» de
+                la ubicación <strong>{ubicacionStockAbierta?.nombre}</strong>?
+                <br />
+                <br />
+                El producto seguirá existiendo en el catálogo general, pero su stock en esta
+                ubicación pasará a 0.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={guardando} onClick={() => setProductoAEliminar(null)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={guardando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={confirmarEliminarProducto}
+              >
+                {guardando ? "Quitando..." : "Quitar producto"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* MODAL 2: Confirmación de ajuste de stock a 0 */}
+        <AlertDialog
+          open={!!confirmacionStockCero}
+          onOpenChange={(open) => !open && !guardando && setConfirmacionStockCero(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>⚠️ ¿Ajustar stock a 0?</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Confirmar que el stock de <strong>{confirmacionStockCero?.producto.nombre}</strong>{" "}
+                pasará a 0 en <strong>{ubicacionStockAbierta?.nombre}</strong>?
+                <br />
+                <br />
+                El producto quedará registrado sin existencias en esta ubicación.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                disabled={guardando}
+                onClick={() => setConfirmacionStockCero(null)}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={guardando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={confirmarAjusteCero}
+              >
+                {guardando ? "Ajustando…" : "Confirmar stock a 0"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* MODAL 3: Confirmación de desactivar ubicación */}
+        <AlertDialog
+          open={!!ubicacionADesactivar}
+          onOpenChange={(open) => !open && setUbicacionADesactivar(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Desactivar esta ubicación?</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Deseas desactivar la ubicación «<strong>{ubicacionADesactivar?.nombre}</strong>»?
+                <br />
+                <br />
+                La ubicación dejará de estar activa para nuevas operaciones, pero se conservarán
+                todos sus datos y movimientos históricos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setUbicacionADesactivar(null)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={confirmarDesactivarUbicacion}
+              >
+                Desactivar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* MODAL 4: Confirmación de borrar ubicación definitivamente */}
+        <AlertDialog
+          open={!!ubicacionABorrar}
+          onOpenChange={(open) => !open && setUbicacionABorrar(null)}
+        >
+          <AlertDialogContent>
+            {ubicacionABorrar && (productosPorUbicacion.get(ubicacionABorrar.id) || 0) > 0 ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>No se puede borrar la ubicación</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    No se puede borrar «<strong>{ubicacionABorrar.nombre}</strong>» porque contiene{" "}
+                    <strong>{productosPorUbicacion.get(ubicacionABorrar.id)}</strong> producto(s) en
+                    stock.
+                    <br />
+                    <br />
+                    Para conservar la trazabilidad, desactiva la ubicación en su lugar usando el
+                    botón ⏸️.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogAction onClick={() => setUbicacionABorrar(null)}>
+                    Entendido
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>⚠️ ¿Borrar ubicación definitivamente?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    ¿Estás seguro de que deseas eliminar permanentemente la ubicación «
+                    <strong>{ubicacionABorrar?.nombre}</strong>»?
+                    <br />
+                    <br />
+                    Esta acción no se puede deshacer y borrará la ubicación del sistema por
+                    completo.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setUbicacionABorrar(null)}>
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={confirmarBorrarUbicacion}
+                  >
+                    Borrar definitivamente
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* MODAL PARA CREACIÓN DE PALET EN RESERVA (FASE 5.3) */}
+        <ModalCrearPalet
+          abierto={Boolean(reservaParaNuevoPalet)}
+          onOpenChange={(open) => {
+            if (!open) setReservaParaNuevoPalet(null);
+          }}
+          reserva={reservaParaNuevoPalet}
+          usuarioNombre={usuarioNombre}
+          onPaletCreado={(nuevo) => {
+            if (reservaParaNuevoPalet) {
+              setReservasExpandidas((prev) => new Set(prev).add(reservaParaNuevoPalet.id));
+            }
+          }}
+        />
       </div>
 
-      {mostrarFormulario && renderizarFormulario()}
-      {renderizarTabla()}
+      {/* ========================================================= */}
+      {/* INFORME IMPRIMIBLE EN A4 (Renderizado solo en @media print) */}
+      {/* ========================================================= */}
+      <div className="print-only p-4 bg-white text-black">{renderizarInformeImprimible()}</div>
 
-      {renderizarModal()}
+      {/* ========================================================= */}
+      {/* MODAL: Vista Previa del Informe Detallado                  */}
+      {/* ========================================================= */}
+      <Dialog open={mostrarInforme} onOpenChange={setMostrarInforme}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto no-print">
+          <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <Printer className="w-5 h-5 text-blue-600" />
+                <span>Vista Previa del Informe Imprimible (A4)</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-gray-500">
+                Documento jerárquico detallado con existencias reales.
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  window.print();
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir ahora</span>
+              </Button>
+            </div>
+          </DialogHeader>
 
-      {/* MODAL 1: Confirmación de quitar producto de la ubicación */}
-      <AlertDialog
-        open={!!productoAEliminar}
-        onOpenChange={(open) => !open && !guardando && setProductoAEliminar(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Quitar producto de esta ubicación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que deseas quitar «<strong>{productoAEliminar?.nombre}</strong>» de
-              la ubicación <strong>{ubicacionStockAbierta?.nombre}</strong>?
-              <br />
-              <br />
-              El producto seguirá existiendo en el catálogo general, pero su stock en esta ubicación
-              pasará a 0.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={guardando} onClick={() => setProductoAEliminar(null)}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={guardando}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmarEliminarProducto}
-            >
-              {guardando ? "Quitando..." : "Quitar producto"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* MODAL 2: Confirmación de ajuste de stock a 0 */}
-      <AlertDialog
-        open={!!confirmacionStockCero}
-        onOpenChange={(open) => !open && !guardando && setConfirmacionStockCero(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>⚠️ ¿Ajustar stock a 0?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Confirmar que el stock de <strong>{confirmacionStockCero?.producto.nombre}</strong>{" "}
-              pasará a 0 en <strong>{ubicacionStockAbierta?.nombre}</strong>?
-              <br />
-              <br />
-              El producto quedará registrado sin existencias en esta ubicación.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={guardando} onClick={() => setConfirmacionStockCero(null)}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={guardando}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmarAjusteCero}
-            >
-              {guardando ? "Ajustando…" : "Confirmar stock a 0"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* MODAL 3: Confirmación de desactivar ubicación */}
-      <AlertDialog
-        open={!!ubicacionADesactivar}
-        onOpenChange={(open) => !open && setUbicacionADesactivar(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar esta ubicación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Deseas desactivar la ubicación «<strong>{ubicacionADesactivar?.nombre}</strong>»?
-              <br />
-              <br />
-              La ubicación dejará de estar activa para nuevas operaciones, pero se conservarán todos
-              sus datos y movimientos históricos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setUbicacionADesactivar(null)}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-              onClick={confirmarDesactivarUbicacion}
-            >
-              Desactivar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* MODAL 4: Confirmación de borrar ubicación definitivamente */}
-      <AlertDialog
-        open={!!ubicacionABorrar}
-        onOpenChange={(open) => !open && setUbicacionABorrar(null)}
-      >
-        <AlertDialogContent>
-          {ubicacionABorrar && (productosPorUbicacion.get(ubicacionABorrar.id) || 0) > 0 ? (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>No se puede borrar la ubicación</AlertDialogTitle>
-                <AlertDialogDescription>
-                  No se puede borrar «<strong>{ubicacionABorrar.nombre}</strong>» porque contiene{" "}
-                  <strong>{productosPorUbicacion.get(ubicacionABorrar.id)}</strong> producto(s) en
-                  stock.
-                  <br />
-                  <br />
-                  Para conservar la trazabilidad, desactiva la ubicación en su lugar usando el botón
-                  ⏸️.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogAction onClick={() => setUbicacionABorrar(null)}>
-                  Entendido
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </>
-          ) : (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>⚠️ ¿Borrar ubicación definitivamente?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  ¿Estás seguro de que deseas eliminar permanentemente la ubicación «
-                  <strong>{ubicacionABorrar?.nombre}</strong>»?
-                  <br />
-                  <br />
-                  Esta acción no se puede deshacer y borrará la ubicación del sistema por completo.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setUbicacionABorrar(null)}>
-                  Cancelar
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={confirmarBorrarUbicacion}
-                >
-                  Borrar definitivamente
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </>
-          )}
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-
-    {/* ========================================================= */}
-    {/* INFORME IMPRIMIBLE EN A4 (Renderizado solo en @media print) */}
-    {/* ========================================================= */}
-    <div className="print-only p-4 bg-white text-black">
-      {renderizarInformeImprimible()}
-    </div>
-
-    {/* ========================================================= */}
-    {/* MODAL: Vista Previa del Informe Detallado                  */}
-    {/* ========================================================= */}
-    <Dialog open={modalVistaPrevia} onOpenChange={setModalVistaPrevia}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto no-print">
-        <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between">
-          <div>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <Printer className="w-5 h-5 text-blue-600" />
-              <span>Vista Previa del Informe Imprimible (A4)</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500">
-              Documento jerárquico detallado con existencias reales.
-            </DialogDescription>
+          <div className="py-4 bg-gray-100 p-3 sm:p-5 rounded-md overflow-x-auto">
+            <div className="bg-white p-6 rounded shadow-sm border border-gray-300 max-w-[210mm] mx-auto">
+              {mostrarInforme && renderizarInformeImprimible()}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => {
-                window.print();
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Imprimir ahora</span>
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <div className="py-4 bg-gray-100 p-3 sm:p-5 rounded-md overflow-x-auto">
-          <div className="bg-white p-6 rounded shadow-sm border border-gray-300 max-w-[210mm] mx-auto">
-            {renderizarInformeImprimible()}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -59,17 +59,31 @@ export default function Login() {
         <FormMessage type="error" text={error} />
         <div className="space-y-2">
           <Label htmlFor="email">Email corporativo</Label>
-          <Input id="email" type="email" autoComplete="email" placeholder="nombre@empresa.com" {...register("email")} />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="nombre@empresa.com"
+            {...register("email")}
+          />
           {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Contraseña</Label>
-            <Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-medium text-primary hover:underline"
+            >
               ¿Olvidaste tu contraseña?
             </Link>
           </div>
-          <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            {...register("password")}
+          />
           {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
         </div>
         <div className="flex items-center gap-2">
@@ -78,14 +92,18 @@ export default function Login() {
             checked={watch("remember")}
             onCheckedChange={(c) => setValue("remember", c === true)}
           />
-          <Label htmlFor="remember" className="font-normal">Recordar sesión</Label>
+          <Label htmlFor="remember" className="font-normal">
+            Recordar sesión
+          </Label>
         </div>
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting && <Spinner />} {isSubmitting ? "Entrando..." : "Entrar"}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           ¿No tienes cuenta?{" "}
-          <Link to="/register" className="font-medium text-primary hover:underline">Regístrate</Link>
+          <Link to="/register" className="font-medium text-primary hover:underline">
+            Regístrate
+          </Link>
         </p>
       </form>
     </AuthLayout>

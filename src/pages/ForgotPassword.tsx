@@ -17,7 +17,11 @@ type Values = z.infer<typeof schema>;
 export default function ForgotPassword() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<Values>({
     resolver: zodResolver(schema),
   });
 
@@ -32,7 +36,10 @@ export default function ForgotPassword() {
   };
 
   return (
-    <AuthLayout title="¿Olvidaste tu contraseña?" description="Te enviaremos un enlace de recuperación">
+    <AuthLayout
+      title="¿Olvidaste tu contraseña?"
+      description="Te enviaremos un enlace de recuperación"
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormMessage type="error" text={error} />
         <FormMessage type="success" text={success} />
@@ -45,7 +52,9 @@ export default function ForgotPassword() {
           {isSubmitting && <Spinner />} {isSubmitting ? "Enviando..." : "Enviar enlace"}
         </Button>
         <p className="text-center text-sm">
-          <Link to="/login" className="font-medium text-primary hover:underline">Volver al login</Link>
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            Volver al login
+          </Link>
         </p>
       </form>
     </AuthLayout>

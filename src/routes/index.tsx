@@ -7,9 +7,15 @@ export const Route = createFileRoute("/")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { title: "Inventario Pintura - LM" },
-      { name: "description", content: "Control de existencias y ubicaciones de la sección de pintura." },
+      {
+        name: "description",
+        content: "Control de existencias y ubicaciones de la sección de pintura.",
+      },
       { property: "og:title", content: "Inventario Pintura - LM" },
-      { property: "og:description", content: "Control de existencias y ubicaciones de la sección de pintura." },
+      {
+        property: "og:description",
+        content: "Control de existencias y ubicaciones de la sección de pintura.",
+      },
     ],
   }),
   beforeLoad: () => {
