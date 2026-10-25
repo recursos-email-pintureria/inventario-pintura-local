@@ -163,3 +163,28 @@
 @layer base {
   body { font-family: var(--font-sans); }
 }
+
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print,
+  button:not(.print-include) {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  main, .flex-1, div {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  table, tr, .divide-y > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -49,7 +49,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Escaner from "@/components/inventario/Escaner";
-import { Pencil, Pause, Trash2, Package, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Pencil, Pause, Trash2, Package, ChevronDown, ChevronRight, Plus, List, FolderTree, Printer } from "lucide-react";
 import { BadgeTipoUbicacion } from "@/components/inventario/BadgeTipoUbicacion";
 import { getConfigTipo, CONFIG_TIPOS } from "@/lib/tiposUbicacion";
 
@@ -83,6 +83,13 @@ function UbicacionesPage() {
   const [productosPorUbicacion, setProductosPorUbicacion] = useState<Map<string, number>>(
     new Map(),
   );
+
+  // Estados para Vista Listado y Filtros
+  const [vistaListado, setVistaListado] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroSeccion, setFiltroSeccion] = useState("todas");
+  const [filtroPasillo, setFiltroPasillo] = useState("todos");
+  const [soloConStock, setSoloConStock] = useState(false);
 
   // Estado del modal de gestión de productos de una ubicación
   const [ubicacionStockAbierta, setUbicacionStockAbierta] = useState<any>(null);
@@ -288,7 +295,7 @@ function UbicacionesPage() {
         id_producto: productoEditando.id,
         id_ubicacion: ubicacionStockAbierta.id,
         tipo: "ajuste",
-        cantidad: cantidadEdicion,
+        cantidad: Number(cantidadEdicion),
         notas: "Edición de cantidad desde armario (ajuste)",
       });
       await recargarProductosUbicacion(ubicacionStockAbierta.id);
@@ -399,9 +406,10 @@ function UbicacionesPage() {
     try {
       setBuscandoProductos(true);
       const coincidencias = await buscarProductosPorCodigo(codigo);
-      if (coincidencias.length === 1) {
-        seleccionarProductoBusqueda(coincidencias[0]);
-        toast.success(`Producto encontrado: ${coincidencias[0].nombre}`);
+      const unico = coincidencias[0];
+      if (coincidencias.length === 1 && unico) {
+        seleccionarProductoBusqueda(unico);
+        toast.success(`Producto encontrado: ${unico.nombre}`);
       } else if (coincidencias.length > 1) {
         setResultadosBusqueda(coincidencias);
         toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
@@ -995,7 +1003,7 @@ function UbicacionesPage() {
     );
   }
 
-   function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
+  function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
     const numProductos = productosPorUbicacion.get(ubicacion.id) || 0;
     const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id);
     const estaExpandido = expandidos.has(ubicacion.id);
@@ -1004,13 +1012,13 @@ function UbicacionesPage() {
 
     return (
       <div
-        className={`grid grid-cols-12 gap-2 px-4 py-3 items-center transition-colors duration-200 border-l-4 ${config.borderColor} ${
+        className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors ${
           esHijo
-            ? `pl-12 ml-4 ${config.bgColor}/30 hover:${config.bgColor}/50`
-            : `${config.bgColor}/20 hover:${config.bgColor}/40`
+            ? "pl-10 bg-slate-50/70 border-l-2 border-slate-300 ml-4 hover:bg-slate-100/80"
+            : "hover:bg-blue-50/60 bg-white"
         }`}
       >
-        <div className="col-span-5 flex items-center gap-3 min-w-0">
+        <div className="col-span-4 flex items-center gap-2.5 min-w-0">
           {!esHijo && tieneHijos ? (
             <span className="text-gray-400 p-0.5">
               {estaExpandido ? (
@@ -1026,10 +1034,10 @@ function UbicacionesPage() {
           )}
 
           <div
-            className={`p-2 rounded-full shrink-0 ${config.iconBgClass}`}
+            className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
             title={config.label}
           >
-            <IconoUbicacion className="w-5 h-5" />
+            <IconoUbicacion className={esHijo ? "w-3.5 h-3.5" : "w-4 h-4"} />
           </div>
 
           <div className="flex flex-col min-w-0">
@@ -1046,12 +1054,19 @@ function UbicacionesPage() {
           </div>
         </div>
 
-        <div className="col-span-3 text-sm text-gray-600 truncate">{getDetalles(ubicacion)}</div>
+        <div className="col-span-2">
+          <BadgeTipoUbicacion tipo={ubicacion.tipo} size="sm" />
+        </div>
+
+        <div className="col-span-2 text-sm text-gray-600 truncate">{getDetalles(ubicacion)}</div>
         <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(ubicacion)}</div>
 
         <div className="col-span-2 flex justify-end items-center gap-1.5">
           <button
-            onClick={() => abrirStockUbicacion(ubicacion)}
+            onClick={(e) => {
+              e.stopPropagation();
+              abrirStockUbicacion(ubicacion);
+            }}
             className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${
               numProductos > 0
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
@@ -1063,7 +1078,10 @@ function UbicacionesPage() {
             <span>{numProductos > 0 ? `${numProductos} prod.` : "+ prod."}</span>
           </button>
           <button
-            onClick={() => editarUbicacion(ubicacion)}
+            onClick={(e) => {
+              e.stopPropagation();
+              editarUbicacion(ubicacion);
+            }}
             className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
             title="Editar ubicación"
           >
@@ -1096,6 +1114,50 @@ function UbicacionesPage() {
       </div>
     );
   }
+
+  function getPasillosDisponibles() {
+    return ubicaciones
+      .filter((u: any) => {
+        const esPasilloReserva = u.tipo === "pasillo" || u.tipo === "reserva";
+        if (!esPasilloReserva) return false;
+        if (filtroSeccion !== "todas") {
+          return getSeccionReal(u) === filtroSeccion;
+        }
+        return true;
+      })
+      .sort((a: any, b: any) => (a.nombre || "").localeCompare(b.nombre || ""));
+  }
+
+  function getUbicacionesFiltradas() {
+    return ubicaciones.filter((u: any) => {
+      // 1. Filtro Tipo
+      if (filtroTipo !== "todos" && u.tipo !== filtroTipo) {
+        return false;
+      }
+      // 2. Filtro Sección
+      if (filtroSeccion !== "todas" && getSeccionReal(u) !== filtroSeccion) {
+        return false;
+      }
+      // 3. Filtro Pasillo
+      if (filtroPasillo !== "todos") {
+        const esPasilloReserva = u.tipo === "pasillo" || u.tipo === "reserva";
+        if (esPasilloReserva) {
+          if (u.nombre !== filtroPasillo) return false;
+        } else {
+          const padre = ubicaciones.find((p: any) => p.id === u.id_ubicacion_padre);
+          const nombrePadre = u.ubicacion_padre_nombre || padre?.nombre;
+          if (nombrePadre !== filtroPasillo) return false;
+        }
+      }
+      // 4. Filtro Stock
+      if (soloConStock) {
+        const stock = productosPorUbicacion.get(u.id) || 0;
+        if (stock <= 0) return false;
+      }
+      return true;
+    });
+  }
+
   function renderizarTabla() {
     if (cargando) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
     if (ubicaciones.length === 0) {
@@ -1107,9 +1169,12 @@ function UbicacionesPage() {
     }
 
     const agrupadas = getUbicacionesAgrupadas();
+    const pasillosDisp = getPasillosDisponibles();
+    const ubicacionesFiltradas = getUbicacionesFiltradas();
 
     return (
       <div className="bg-white rounded-lg shadow-xs border overflow-hidden">
+        {/* CABECERA PRINCIPAL */}
         <div className="bg-gray-50 px-4 py-3 border-b flex flex-wrap justify-between items-center gap-2">
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-gray-700">
@@ -1134,49 +1199,240 @@ function UbicacionesPage() {
               })}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 no-print">
+            {/* Toggle Vista Listado / Vista Árbol */}
+            <button
+              onClick={() => setVistaListado(!vistaListado)}
+              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium border shadow-2xs transition-colors ${
+                vistaListado
+                  ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+              title={vistaListado ? "Cambiar a Vista Árbol" : "Cambiar a Vista Listado"}
+            >
+              {vistaListado ? (
+                <>
+                  <FolderTree className="w-3.5 h-3.5" />
+                  <span>Vista Árbol</span>
+                </>
+              ) : (
+                <>
+                  <List className="w-3.5 h-3.5" />
+                  <span>Vista Listado</span>
+                </>
+              )}
+            </button>
+
+            {/* Expandir / Colapsar todos (deshabilitados en vista listado) */}
             <button
               onClick={expandirTodos}
-              className="text-xs bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors"
+              disabled={vistaListado}
+              className={`text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors ${
+                vistaListado ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50"
+              }`}
             >
               ▼ Expandir todos
             </button>
             <button
               onClick={colapsarTodos}
-              className="text-xs bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors"
+              disabled={vistaListado}
+              className={`text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors ${
+                vistaListado ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50"
+              }`}
             >
               ▶ Colapsar todos
             </button>
           </div>
         </div>
 
-                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-100/80 border-b text-xs font-semibold text-gray-600 uppercase tracking-wider">
-          <div className="col-span-5">Ubicación</div>
-          <div className="col-span-3">Detalles</div>
-          <div className="col-span-2">Sección</div>
-          <div className="col-span-2 text-right">Acciones</div>
+        {/* BARRA DE FILTROS PARA VISTA LISTADO */}
+        {vistaListado && (
+          <div className="bg-blue-50/70 border-b border-blue-100 p-3 flex flex-wrap items-center justify-between gap-3 no-print">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Filtro Tipo */}
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-blue-900">Tipo:</label>
+                <select
+                  value={filtroTipo}
+                  onChange={(e) => setFiltroTipo(e.target.value)}
+                  className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="todos">Todos los tipos</option>
+                  <option value="pasillo">Pasillo</option>
+                  <option value="armario">Armario</option>
+                  <option value="alto">Alto</option>
+                  <option value="cross">Cross</option>
+                  <option value="caja">Caja</option>
+                  <option value="reserva">Reserva</option>
+                </select>
+              </div>
+
+              {/* Filtro Sección */}
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-blue-900">Sección:</label>
+                <select
+                  value={filtroSeccion}
+                  onChange={(e) => {
+                    setFiltroSeccion(e.target.value);
+                    setFiltroPasillo("todos");
+                  }}
+                  className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="todas">Todas las secciones</option>
+                  {secciones.map((s: any) => (
+                    <option key={s.id} value={s.nombre}>
+                      {s.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro Pasillo */}
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-blue-900">Pasillo:</label>
+                <select
+                  value={filtroPasillo}
+                  onChange={(e) => setFiltroPasillo(e.target.value)}
+                  className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500 max-w-[200px]"
+                >
+                  <option value="todos">Todos los pasillos/reservas</option>
+                  {pasillosDisp.map((p: any) => (
+                    <option key={p.id} value={p.nombre}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Checkbox Solo con stock */}
+              <label className="flex items-center gap-1.5 text-xs text-blue-950 font-medium cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={soloConStock}
+                  onChange={(e) => setSoloConStock(e.target.checked)}
+                  className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                />
+                <span>Solo con stock</span>
+              </label>
+
+              {/* Contador */}
+              <span className="text-xs font-semibold text-blue-800 bg-blue-100/90 border border-blue-200/80 px-2.5 py-1 rounded-md">
+                {ubicacionesFiltradas.length} encontradas
+              </span>
+
+              {/* Botón Imprimir */}
+              <button
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1 text-xs bg-white border border-blue-200 hover:bg-blue-50 text-blue-900 px-3 py-1.5 rounded-md font-medium shadow-2xs transition-colors"
+                title="Imprimir listado"
+              >
+                <Printer className="w-3.5 h-3.5 text-blue-700" />
+                <span>Imprimir</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ENCABEZADOS DE COLUMNA */}
+        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-100/80 border-b text-xs font-semibold text-gray-600 uppercase tracking-wider">
+          <div className="col-span-4">Ubicación</div>
+          <div className="col-span-2">Tipo</div>
+          <div className="col-span-2">{vistaListado ? "Sección" : "Detalles"}</div>
+          <div className="col-span-2">{vistaListado ? "Detalles" : "Sección"}</div>
+          <div className="col-span-2 text-right">{vistaListado ? "Stock" : "Acciones"}</div>
         </div>
 
-        <div className="divide-y divide-gray-100">
-          {agrupadas.map(({ padre, hijos }: any) => {
-            const estaExpandido = expandidos.has(padre.id);
-            const tieneHijos = hijos.length > 0;
-            return (
-              <div key={padre.id}>
-                <div
-                  className={tieneHijos ? "cursor-pointer" : ""}
-                  onClick={() => tieneHijos && toggleExpandir(padre.id)}
-                >
-                  <FilaUbicacion ubicacion={padre} esHijo={false} />
-                </div>
-                {estaExpandido &&
-                  hijos.map((hijo: any) => (
-                    <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
-                  ))}
+        {/* FILAS DE LA TABLA (CONDICIONAL: LISTADO O ÁRBOL) */}
+        {vistaListado ? (
+          <div className="divide-y divide-gray-100">
+            {ubicacionesFiltradas.length === 0 ? (
+              <div className="text-center py-10 text-gray-500 text-sm">
+                No se encontraron ubicaciones con los filtros seleccionados.
               </div>
-            );
-          })}
-        </div>
+            ) : (
+              ubicacionesFiltradas.map((u: any) => {
+                const numProductos = productosPorUbicacion.get(u.id) || 0;
+                const config = getConfigTipo(u.tipo);
+                const IconoUbicacion = config.icon;
+
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => abrirStockUbicacion(u)}
+                    className="grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors hover:bg-blue-50/70 cursor-pointer group bg-white"
+                  >
+                    {/* Col 4: Icono y Nombre */}
+                    <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
+                        title={config.label}
+                      >
+                        <IconoUbicacion className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+                          {u.nombre}
+                        </span>
+                        {u.descripcion && (
+                          <span className="text-xs text-gray-500 truncate">{u.descripcion}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Col 2: Tipo Badge */}
+                    <div className="col-span-2">
+                      <BadgeTipoUbicacion tipo={u.tipo} size="sm" />
+                    </div>
+
+                    {/* Col 2: Sección */}
+                    <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(u)}</div>
+
+                    {/* Col 2: Detalles */}
+                    <div className="col-span-2 text-sm text-gray-600 truncate">{getDetalles(u)}</div>
+
+                    {/* Col 2: Stock con flechita hover */}
+                    <div className="col-span-2 flex justify-end items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border ${
+                          numProductos > 0
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-gray-50 text-gray-500 border-gray-200"
+                        }`}
+                      >
+                        <Package className="w-3.5 h-3.5" />
+                        <span>{numProductos > 0 ? `${numProductos} prod.` : "0 prod."}</span>
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {agrupadas.map(({ padre, hijos }: any) => {
+              const estaExpandido = expandidos.has(padre.id);
+              const tieneHijos = hijos.length > 0;
+              return (
+                <div key={padre.id}>
+                  <div
+                    className={tieneHijos ? "cursor-pointer" : ""}
+                    onClick={() => tieneHijos && toggleExpandir(padre.id)}
+                  >
+                    <FilaUbicacion ubicacion={padre} esHijo={false} />
+                  </div>
+                  {estaExpandido &&
+                    hijos.map((hijo: any) => (
+                      <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }

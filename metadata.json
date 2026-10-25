@@ -1,0 +1,6 @@
+{
+  "name": "Inventario Pintura - LM",
+  "description": "Control de existencias y ubicaciones de la sección de pintura.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

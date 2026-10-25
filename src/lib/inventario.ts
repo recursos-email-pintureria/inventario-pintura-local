@@ -430,6 +430,7 @@ export async function crearUbicacion(ubicacion: {
   numero?: number | null;
   descripcion?: string | null;
 }) {
+  const user = await usuarioActual();
   if (ubicacion.id_ubicacion_padre) {
     const { data: existe } = await supabase
       .from("ubicaciones")
@@ -454,7 +455,11 @@ export async function crearUbicacion(ubicacion: {
     }
   }
 
-  const { data, error } = await supabase.from("ubicaciones").insert([ubicacion]).select().single();
+  const { data, error } = await supabase
+    .from("ubicaciones")
+    .insert([{ ...ubicacion, creado_por: user.id }])
+    .select()
+    .single();
 
   if (error) throw error;
   return data;
