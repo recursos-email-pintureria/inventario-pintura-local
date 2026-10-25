@@ -18,12 +18,14 @@ import {
 } from "../../lib/inventario";
 import type { Producto, ProductoConCantidad } from "../../lib/inventario";
 import { supabase } from "../../lib/supabase";
+
+// UI Components (shadcn/ui)
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -47,9 +49,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+// Librerías externas
 import { toast } from "sonner";
+import {
+  Pencil,
+  Pause,
+  Trash2,
+  Package,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  List,
+  FolderTree,
+  Printer,
+  Eye,
+  Loader2,
+} from "lucide-react";
+
+// Componentes propios
 import Escaner from "@/components/inventario/Escaner";
-import { Pencil, Pause, Trash2, Package, ChevronDown, ChevronRight, Plus, List, FolderTree, Printer, Eye, Loader2 } from "lucide-react";
 import { BadgeTipoUbicacion } from "@/components/inventario/BadgeTipoUbicacion";
 import { getConfigTipo, CONFIG_TIPOS } from "@/lib/tiposUbicacion";
 
