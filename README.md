@@ -122,7 +122,14 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 - [x] Estilos de impresión optimizados (sin cortes entre páginas)
 - [x] Botones "Vista previa" e "Imprimir informe"
 - [x] Corrección de imports faltantes (Dialog, Button, Eye, Loader2)
-
+   - [x] **Fase 5: Sistema de Palets (v1.4.0-palets)**
+     - [x] Tabla `palets` en Supabase con RLS y columna `id_palet` en `stock`.
+     - [x] Librería `src/lib/palets.ts` con funciones CRUD y autodestrucción.
+     - [x] UI de gestión de palets en reservas (`PaletsReserva.tsx`).
+     - [x] Modal de productos por palet (`ModalProductosPalet.tsx`) con impresión de etiqueta y listado A4.
+     - [x] Badge de productos en reservas como elemento inactivo (cursor-default).
+     - [x] Expandir/colapsar palets al hacer clic en fila de reserva (Vista Listado).
+     - [x] Corrección de permisos RLS para tabla `stock` con `id_palet`.
 ## 🐛 Bugs Críticos Corregidos
 | # | Bug | Causa raíz | Solución |
 | --- | --- | --- | --- |
@@ -135,7 +142,7 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 
 ## 🏷️ Versiones y Recuperación de Emergencia
 
-**Versión Actual Estable:** `v1.3.0-informe-imprimible`
+   🏷️ Versión estable actual: [v1.4.0-palets]`
 **Fecha:** 25/10/2026
 **Estado:** ✅ Producción en Vercel
 **Tag:** [v1.3.0-informe-imprimible](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.3.0-informe-imprimible)
@@ -181,6 +188,7 @@ git fetch --prune        # Limpiar referencias remotas obsoletas
 git push origin main     # Vercel despliega automáticamente
 📋 Próximas Fases Planificadas
 Fase 5: Sistema de Palets (v1.4.0-palets)
+   - `v1.4.0-palets` (26/10/2026): Sistema completo de palets, autodestrucción automática e impresión de etiquetas/listados.
 Tabla independiente palets relacionada con ubicaciones tipo "Reserva"
 Creación manual de palets con código de barras automático (PAL-###-Usuario-Fecha)
 Gestión de productos dentro del palet (igual que armarios)
