@@ -164,11 +164,18 @@
   body { font-family: var(--font-sans); }
 }
 
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
 @media print {
   aside,
   header,
   nav,
   .no-print,
+  .screen-only,
   button:not(.print-include) {
     display: none !important;
   }
@@ -183,8 +190,17 @@
     height: auto !important;
   }
 
-  table, tr, .divide-y > div {
+  .print-only {
+    display: block !important;
+  }
+
+  table, tr, .divide-y > div, .break-inside-avoid {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm 15mm 10mm;
   }
 }

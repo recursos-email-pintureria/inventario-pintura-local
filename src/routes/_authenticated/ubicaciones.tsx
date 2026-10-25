@@ -49,7 +49,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Escaner from "@/components/inventario/Escaner";
-import { Pencil, Pause, Trash2, Package, ChevronDown, ChevronRight, Plus, List, FolderTree, Printer } from "lucide-react";
+import { Pencil, Pause, Trash2, Package, ChevronDown, ChevronRight, Plus, List, FolderTree, Printer, Eye, Loader2 } from "lucide-react";
 import { BadgeTipoUbicacion } from "@/components/inventario/BadgeTipoUbicacion";
 import { getConfigTipo, CONFIG_TIPOS } from "@/lib/tiposUbicacion";
 
@@ -90,6 +90,13 @@ function UbicacionesPage() {
   const [filtroSeccion, setFiltroSeccion] = useState("todas");
   const [filtroPasillo, setFiltroPasillo] = useState("todos");
   const [soloConStock, setSoloConStock] = useState(false);
+
+  // Estados para Informe Detallado Imprimible (A4)
+  const [cargandoInforme, setCargandoInforme] = useState(false);
+  const [productosInforme, setProductosInforme] = useState<Map<string, ProductoConCantidad[]>>(
+    new Map(),
+  );
+  const [modalVistaPrevia, setModalVistaPrevia] = useState(false);
 
   // Estado del modal de gestión de productos de una ubicación
   const [ubicacionStockAbierta, setUbicacionStockAbierta] = useState<any>(null);
@@ -725,6 +732,14 @@ function UbicacionesPage() {
         if (typeof ubicacion.seccion === "string") return ubicacion.seccion;
         if (ubicacion.seccion?.nombre) return ubicacion.seccion.nombre;
         if (ubicacion.seccion?.id) return ubicacion.seccion.id;
+
+        // Si no tiene sección propia, hereda del pasillo padre
+        if (ubicacion.id_ubicacion_padre) {
+          const padre = ubicaciones.find((u: any) => u.id === ubicacion.id_ubicacion_padre);
+          if (padre) {
+            return getSeccionReal(padre);
+          }
+        }
         return "-";
       }
     } catch (e) {
@@ -1121,7 +1136,12 @@ function UbicacionesPage() {
         const esPasilloReserva = u.tipo === "pasillo" || u.tipo === "reserva";
         if (!esPasilloReserva) return false;
         if (filtroSeccion !== "todas") {
-          return getSeccionReal(u) === filtroSeccion;
+          const sec = getSeccionReal(u);
+          if (sec === filtroSeccion) return true;
+          // Comprobar si algún hijo tiene esta sección asociada
+          return ubicaciones.some(
+            (h: any) => h.id_ubicacion_padre === u.id && getSeccionReal(h) === filtroSeccion,
+          );
         }
         return true;
       })
@@ -1149,13 +1169,413 @@ function UbicacionesPage() {
           if (nombrePadre !== filtroPasillo) return false;
         }
       }
-      // 4. Filtro Stock
+      // 4. Filtro Stock (Solo con stock)
       if (soloConStock) {
         const stock = productosPorUbicacion.get(u.id) || 0;
         if (stock <= 0) return false;
       }
       return true;
     });
+  }
+
+  // =========================================================
+  // FUNCIONES PARA INFORME DETALLADO IMPRIMIBLE (A4)
+  // =========================================================
+
+  async function cargarProductosInforme(): Promise<Map<string, ProductoConCantidad[]> | null> {
+    const filtradas = getUbicacionesFiltradas();
+    if (filtradas.length === 0) {
+      toast.info("No hay ubicaciones que coincidan con los filtros seleccionados.");
+      return null;
+    }
+    const ids = filtradas.map((u: any) => u.id);
+
+    // Query JOIN optimizada a Supabase (solo existencias > 0)
+    const { data, error } = await supabase
+      .from("stock")
+      .select("id_ubicacion, cantidad, producto:productos(*)")
+      .in("id_ubicacion", ids)
+      .gt("cantidad", 0);
+
+    if (error) {
+      throw error;
+    }
+
+    const mapa = new Map<string, ProductoConCantidad[]>();
+    data?.forEach((row: any) => {
+      if (row.producto && row.id_ubicacion) {
+        const lista = mapa.get(row.id_ubicacion) || [];
+        lista.push({
+          ...row.producto,
+          cantidad: row.cantidad,
+        });
+        mapa.set(row.id_ubicacion, lista);
+      }
+    });
+
+    setProductosInforme(mapa);
+    return mapa;
+  }
+
+  async function generarEImprimirInforme() {
+    try {
+      setCargandoInforme(true);
+      const mapa = await cargarProductosInforme();
+      if (!mapa) return;
+      toast.success("Informe detallado listo");
+      setTimeout(() => {
+        window.print();
+      }, 250);
+    } catch (err: any) {
+      toast.error(`Error al preparar el informe: ${errorInventario(err)}`);
+    } finally {
+      setCargandoInforme(false);
+    }
+  }
+
+  async function abrirVistaPreviaInforme() {
+    try {
+      setCargandoInforme(true);
+      const mapa = await cargarProductosInforme();
+      if (!mapa) return;
+      setModalVistaPrevia(true);
+    } catch (err: any) {
+      toast.error(`Error al preparar vista previa: ${errorInventario(err)}`);
+    } finally {
+      setCargandoInforme(false);
+    }
+  }
+
+  interface ItemUbicacionHijo {
+    ubicacion: any;
+    productos: ProductoConCantidad[];
+  }
+
+  interface GrupoPasilloInforme {
+    pasillo: any;
+    productosPasillo: ProductoConCantidad[];
+    hijos: ItemUbicacionHijo[];
+  }
+
+  function getJerarquiaInforme(): GrupoPasilloInforme[] {
+    const filtradas = getUbicacionesFiltradas();
+    const mapaPasillos = new Map<string, GrupoPasilloInforme>();
+
+    filtradas.forEach((u: any) => {
+      const prods = productosInforme.get(u.id) || [];
+      const esRaiz = u.tipo === "pasillo" || u.tipo === "reserva" || !u.id_ubicacion_padre;
+
+      if (esRaiz) {
+        if (!mapaPasillos.has(u.id)) {
+          mapaPasillos.set(u.id, {
+            pasillo: u,
+            productosPasillo: prods,
+            hijos: [],
+          });
+        }
+      } else {
+        // En el informe impreso SOLO mostrar sub-ubicaciones que tengan productos con stock
+        if (prods.length === 0) return;
+
+        const padreId = u.id_ubicacion_padre;
+        let grupo = mapaPasillos.get(padreId);
+        if (!grupo) {
+          const padre = ubicaciones.find((p: any) => p.id === padreId) || {
+            id: padreId,
+            nombre: u.ubicacion_padre_nombre || "Pasillo sin asignar",
+            tipo: "pasillo",
+            seccion_nombre: u.seccion_nombre || "-",
+          };
+          grupo = {
+            pasillo: padre,
+            productosPasillo: productosInforme.get(padre.id) || [],
+            hijos: [],
+          };
+          mapaPasillos.set(padreId, grupo);
+        }
+        grupo.hijos.push({
+          ubicacion: u,
+          productos: prods,
+        });
+      }
+    });
+
+    // Solo mostrar pasillos que contengan productos directos o sub-ubicaciones con productos
+    const resultado = Array.from(mapaPasillos.values())
+      .filter((g) => g.productosPasillo.length > 0 || g.hijos.length > 0)
+      .sort((a, b) => (a.pasillo.nombre || "").localeCompare(b.pasillo.nombre || ""));
+
+    resultado.forEach((g) => {
+      g.hijos.sort((a, b) => (a.ubicacion.nombre || "").localeCompare(b.ubicacion.nombre || ""));
+    });
+
+    return resultado;
+  }
+
+  function getMetricasInforme() {
+    const jerarquia = getJerarquiaInforme();
+    let totalUbicacionesConProductos = 0;
+    let totalUnidades = 0;
+    const productosDistintos = new Set<string>();
+
+    jerarquia.forEach((g) => {
+      if (g.productosPasillo.length > 0) {
+        totalUbicacionesConProductos += 1;
+        g.productosPasillo.forEach((p) => {
+          totalUnidades += p.cantidad;
+          productosDistintos.add(p.id);
+        });
+      }
+      g.hijos.forEach((h) => {
+        totalUbicacionesConProductos += 1;
+        h.productos.forEach((p) => {
+          totalUnidades += p.cantidad;
+          productosDistintos.add(p.id);
+        });
+      });
+    });
+
+    return {
+      totalUbicaciones: totalUbicacionesConProductos,
+      totalProductosDistintos: productosDistintos.size,
+      totalUnidades,
+    };
+  }
+
+  function renderizarInformeImprimible() {
+    const jerarquia = getJerarquiaInforme();
+    const metricas = getMetricasInforme();
+    const fechaHora = new Date().toLocaleString("es-ES", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    return (
+      <div className="max-w-[210mm] mx-auto text-gray-900 font-sans">
+        {/* CABECERA FORMAL DEL INFORME A4 */}
+        <div className="border-b-2 border-gray-800 pb-3 mb-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-lg tracking-tight text-gray-900">
+                  INVENTARIO LM
+                </span>
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded font-semibold">
+                  Almacén
+                </span>
+              </div>
+              <h1 className="text-xl font-bold text-gray-900 mt-1">
+                Informe Detallado de Ubicaciones y Stock
+              </h1>
+              <p className="text-xs text-gray-600">
+                Desglose jerárquico de existencias (Pasillo → Armario → Productos)
+              </p>
+            </div>
+            <div className="text-right text-xs text-gray-600">
+              <div className="font-semibold text-gray-800">Fecha de emisión:</div>
+              <div>{fechaHora}</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">Control y auditoría física</div>
+            </div>
+          </div>
+
+          {/* RESUMEN DE FILTROS APLICADOS */}
+          <div className="mt-3 pt-2.5 border-t border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Tipo:</span>
+              <span className="font-medium capitalize text-gray-800">
+                {filtroTipo === "todos" ? "Todos los tipos" : filtroTipo}
+              </span>
+            </div>
+            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Sección:</span>
+              <span className="font-medium text-gray-800">
+                {filtroSeccion === "todas" ? "Todas las secciones" : filtroSeccion}
+              </span>
+            </div>
+            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Pasillo:</span>
+              <span className="font-medium text-gray-800 truncate block">
+                {filtroPasillo === "todos" ? "Todos" : filtroPasillo}
+              </span>
+            </div>
+            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
+              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Filtro stock:</span>
+              <span className="font-medium text-gray-800">
+                {soloConStock ? "Solo con stock (>0)" : "Todas (con y sin stock)"}
+              </span>
+            </div>
+          </div>
+
+          {/* TOTALES / METRICAS */}
+          <div className="mt-2.5 flex items-center justify-between bg-blue-50/70 border border-blue-200 px-3 py-1.5 rounded text-xs text-blue-950">
+            <div>
+              <strong>{metricas.totalUbicaciones}</strong> ubicaciones
+            </div>
+            <div>
+              <strong>{metricas.totalProductosDistintos}</strong> productos distintos
+            </div>
+            <div>
+              Total: <strong>{metricas.totalUnidades}</strong> unidades físicas
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENIDO JERÁRQUICO */}
+        {jerarquia.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 text-sm border border-dashed rounded-lg">
+            No hay ubicaciones ni productos que coincidan con los filtros seleccionados.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {jerarquia.map((grupo) => {
+              const totalUnidadesPasillo =
+                grupo.productosPasillo.reduce((acc, p) => acc + p.cantidad, 0) +
+                grupo.hijos.reduce(
+                  (acc, h) => acc + h.productos.reduce((pAcc, p) => pAcc + p.cantidad, 0),
+                  0,
+                );
+
+              return (
+                <div
+                  key={grupo.pasillo.id}
+                  className="border border-gray-300 rounded-md overflow-hidden break-inside-avoid bg-white"
+                >
+                  {/* CABECERA DE PASILLO / RESERVA (NIVEL 1) */}
+                  <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 flex flex-wrap justify-between items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-gray-800 text-white font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded">
+                        {grupo.pasillo.tipo || "Pasillo"}
+                      </span>
+                      <span className="font-bold text-sm text-gray-900">
+                        {grupo.pasillo.nombre}
+                      </span>
+                      <span className="text-xs text-gray-600 font-medium">
+                        · Sección: {getSeccionReal(grupo.pasillo)}
+                      </span>
+                      {grupo.pasillo.descripcion && (
+                        <span className="text-xs text-gray-500 italic">
+                          ({grupo.pasillo.descripcion})
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-700 font-medium">
+                      {grupo.hijos.length > 0 && `${grupo.hijos.length} sub-ubicaciones · `}
+                      <span className="font-bold">{totalUnidadesPasillo} uds</span>
+                    </div>
+                  </div>
+
+                  {/* PRODUCTOS DIRECTOS DEL PASILLO (SI TIENE) */}
+                  {grupo.productosPasillo.length > 0 && (
+                    <div className="p-2.5 border-b border-gray-200 bg-gray-50/50">
+                      <div className="text-[11px] font-semibold text-gray-700 mb-1 flex justify-between">
+                        <span>Productos en suelo/palet de {grupo.pasillo.nombre}:</span>
+                        <span>{grupo.productosPasillo.length} productos</span>
+                      </div>
+                      <table className="w-full text-left text-xs border border-gray-200 border-collapse">
+                        <thead>
+                          <tr className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200 text-[10px] uppercase">
+                            <th className="py-1 px-2 w-32">Código barras</th>
+                            <th className="py-1 px-2 w-28">SKU</th>
+                            <th className="py-1 px-2">Nombre</th>
+                            <th className="py-1 px-2 text-right w-24">Cantidad</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {grupo.productosPasillo.map((prod) => (
+                            <tr key={prod.id} className="text-[11px]">
+                              <td className="py-1 px-2 font-mono text-gray-600">
+                                {prod.codigo_barras || "-"}
+                              </td>
+                              <td className="py-1 px-2 font-mono font-medium text-gray-800">
+                                {prod.sku || "-"}
+                              </td>
+                              <td className="py-1 px-2 text-gray-900 font-medium">{prod.nombre}</td>
+                              <td className="py-1 px-2 text-right font-bold text-gray-900">
+                                {prod.cantidad} uds
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* SUB-UBICACIONES HIJAS (ARMARIOS, ALTOS, CAJAS, CROSS) (NIVEL 2 & 3) */}
+                  {grupo.hijos.length > 0 && (
+                    <div className="divide-y divide-gray-200">
+                      {grupo.hijos.map(({ ubicacion: hijo, productos }) => {
+                        const totalUdsHijo = productos.reduce((sum, p) => sum + p.cantidad, 0);
+
+                        return (
+                          <div key={hijo.id} className="p-2.5 break-inside-avoid">
+                            {/* SUB-CABECERA DEL ARMARIO */}
+                            <div className="flex justify-between items-center mb-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border border-gray-300 bg-gray-50 text-gray-700">
+                                  {hijo.tipo}
+                                </span>
+                                <span className="font-bold text-xs text-gray-900">
+                                  {hijo.nombre}
+                                </span>
+                                <span className="text-[11px] text-gray-500">
+                                  · {getDetalles(hijo)}
+                                </span>
+                              </div>
+                              <div className="text-xs">
+                                <span className="font-semibold text-gray-800">
+                                  {productos.length} prod. ({totalUdsHijo} uds)
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* TABLA DE PRODUCTOS (NIVEL 3) */}
+                            <table className="w-full text-left text-xs border border-gray-200 border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200 text-[10px] uppercase">
+                                  <th className="py-1 px-2 w-32">Código barras</th>
+                                  <th className="py-1 px-2 w-28">SKU</th>
+                                  <th className="py-1 px-2">Nombre</th>
+                                  <th className="py-1 px-2 text-right w-24">Cantidad</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                {productos.map((prod) => (
+                                  <tr key={prod.id} className="text-[11px]">
+                                    <td className="py-1 px-2 font-mono text-gray-600">
+                                      {prod.codigo_barras || "-"}
+                                    </td>
+                                    <td className="py-1 px-2 font-mono font-medium text-gray-800">
+                                      {prod.sku || "-"}
+                                    </td>
+                                    <td className="py-1 px-2 text-gray-900 font-medium">
+                                      {prod.nombre}
+                                    </td>
+                                    <td className="py-1 px-2 text-right font-bold text-gray-900">
+                                      {prod.cantidad} uds
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* PIE DE PÁGINA FORMAL DEL INFORME A4 */}
+        <div className="mt-6 pt-3 border-t border-gray-300 flex justify-between items-center text-[10px] text-gray-500">
+          <div>Inventario LM · Software de gestión logística</div>
+          <div>Documento para control y reposición de almacén</div>
+          <div>Pág. 1</div>
+        </div>
+      </div>
+    );
   }
 
   function renderizarTabla() {
@@ -1322,14 +1742,35 @@ function UbicacionesPage() {
                 {ubicacionesFiltradas.length} encontradas
               </span>
 
-              {/* Botón Imprimir */}
+              {/* Botón Vista Previa */}
               <button
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1 text-xs bg-white border border-blue-200 hover:bg-blue-50 text-blue-900 px-3 py-1.5 rounded-md font-medium shadow-2xs transition-colors"
-                title="Imprimir listado"
+                onClick={abrirVistaPreviaInforme}
+                disabled={cargandoInforme}
+                className="inline-flex items-center gap-1 text-xs bg-white border border-blue-200 hover:bg-blue-50 text-blue-900 px-2.5 py-1.5 rounded-md font-medium shadow-2xs transition-colors disabled:opacity-50"
+                title="Vista previa del informe A4"
               >
-                <Printer className="w-3.5 h-3.5 text-blue-700" />
-                <span>Imprimir</span>
+                <Eye className="w-3.5 h-3.5 text-blue-700" />
+                <span className="hidden sm:inline">Vista previa</span>
+              </button>
+
+              {/* Botón Imprimir Detallado */}
+              <button
+                onClick={generarEImprimirInforme}
+                disabled={cargandoInforme}
+                className="inline-flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium shadow-2xs transition-colors disabled:opacity-50"
+                title="Cargar productos e imprimir informe A4"
+              >
+                {cargandoInforme ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Cargando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Imprimir informe</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1920,7 +2361,8 @@ function UbicacionesPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <>
+      <div className="p-6 max-w-7xl mx-auto screen-only">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ubicaciones</h1>
@@ -2092,5 +2534,50 @@ function UbicacionesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+
+    {/* ========================================================= */}
+    {/* INFORME IMPRIMIBLE EN A4 (Renderizado solo en @media print) */}
+    {/* ========================================================= */}
+    <div className="print-only p-4 bg-white text-black">
+      {renderizarInformeImprimible()}
+    </div>
+
+    {/* ========================================================= */}
+    {/* MODAL: Vista Previa del Informe Detallado                  */}
+    {/* ========================================================= */}
+    <Dialog open={modalVistaPrevia} onOpenChange={setModalVistaPrevia}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto no-print">
+        <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <Printer className="w-5 h-5 text-blue-600" />
+              <span>Vista Previa del Informe Imprimible (A4)</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              Documento jerárquico detallado con existencias reales.
+            </DialogDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                window.print();
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir ahora</span>
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <div className="py-4 bg-gray-100 p-3 sm:p-5 rounded-md overflow-x-auto">
+          <div className="bg-white p-6 rounded shadow-sm border border-gray-300 max-w-[210mm] mx-auto">
+            {renderizarInformeImprimible()}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
