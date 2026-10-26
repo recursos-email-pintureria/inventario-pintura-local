@@ -1,29 +1,38 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
+﻿import { createFileRoute } from "@tanstack/react-router";
+import { useState, useMemo } from "react";
 import {
-  obtenerSecciones,
-  obtenerUbicaciones,
-  crearUbicacion,
-  actualizarUbicacion,
-  desactivarUbicacion,
-  borrarUbicacionDefinitivamente,
-  errorInventario,
-  obtenerProductosPorUbicacion,
-  actualizarStock,
-  crearMovimientoConStock,
-  buscarProductoPorCodigo,
-  buscarProductosPorCodigo,
-  descargarCatalogoCompleto,
-  guardarProducto,
-} from "../../lib/inventario";
-import type { Producto, ProductoConCantidad } from "../../lib/inventario";
-import { supabase } from "../../lib/supabase";
-
-// UI Components (shadcn/ui)
+  Building2,
+  ArrowLeftRight,
+  Archive,
+  Layers,
+  Package,
+  Shuffle,
+  Warehouse,
+  Plus,
+  Search,
+  Filter,
+  ChevronRight,
+  ChevronDown,
+  Edit2,
+  Barcode,
+  Eye,
+  SlidersHorizontal,
+  CheckCircle2,
+  AlertTriangle,
+  Boxes,
+  MapPin,
+  List,
+  FolderTree,
+  MoreVertical,
+  X,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -37,2714 +46,1053 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Librerías externas
-import { toast } from "sonner";
-import {
-  Pencil,
-  Pause,
-  Trash2,
-  Package,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  List,
-  FolderTree,
-  Printer,
-  Eye,
-  Loader2,
-  Boxes,
-} from "lucide-react";
-
-// Componentes propios
-import Escaner from "@/components/inventario/Escaner";
-import { BadgeTipoUbicacion } from "@/components/inventario/BadgeTipoUbicacion";
-import { getConfigTipo, CONFIG_TIPOS } from "@/lib/tiposUbicacion";
-import { useMyProfile } from "@/hooks/usePermissions";
-import { SeccionPaletsReserva, ModalCrearPalet } from "@/components/inventario/PaletsReserva";
-
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
   component: UbicacionesPage,
 });
 
-// ✅ CONFIGURACIÓN Y COMPATIBILIDAD POR TIPO
-function getColorBadge(tipo: string): string {
-  return getConfigTipo(tipo).badgeClass;
+// Tipos de ubicación con jerarquía estricta
+export type TipoUbicacion =
+  | "seccion"
+  | "pasillo"
+  | "reserva"
+  | "armario"
+  | "alto"
+  | "caja"
+  | "cross";
+
+export interface ProductoEnUbicacion {
+  id: string;
+  sku: string;
+  nombre: string;
+  categoria: string;
+  cantidad: number;
+  stock_minimo: number;
 }
 
-function getTipoLabel(tipo: string): string {
-  return getConfigTipo(tipo).label;
+export interface UbicacionItem {
+  id: string;
+  codigo: string;
+  nombre: string;
+  tipo: TipoUbicacion;
+  nivel: 0 | 1 | 2;
+  id_padre?: string | null;
+  descripcion?: string;
+  lateral?: "L" | "R" | "C";
+  piso?: number;
+  capacidad_max?: number;
+  peso_max_kg?: number;
+  activo: boolean;
+  productos: ProductoEnUbicacion[];
+  subtitulo?: string;
+  porcentaje_ocupacion?: number;
 }
 
-function getIconoTipo(tipo: string): string {
-  return "";
-}
-
-type ModalMode = "ver" | "anadir" | "editar";
-
-function UbicacionesPage() {
-  const [secciones, setSecciones] = useState<any[]>([]);
-  const [ubicaciones, setUbicaciones] = useState<any[]>([]);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const [productosPorUbicacion, setProductosPorUbicacion] = useState<Map<string, number>>(
-    new Map(),
-  );
-
-  // Estados para Vista Listado y Filtros
-  const [vistaListado, setVistaListado] = useState(false);
-  const [filtroTipo, setFiltroTipo] = useState("todos");
-  const [filtroSeccion, setFiltroSeccion] = useState("todas");
-  const [filtroPasillo, setFiltroPasillo] = useState("todos");
-  const [soloConStock, setSoloConStock] = useState(false);
-
-  // Estados para Palets en Reservas (Fase 5.3)
-  const [reservasExpandidas, setReservasExpandidas] = useState<Set<string>>(new Set());
-  const [reservaParaNuevoPalet, setReservaParaNuevoPalet] = useState<any | null>(null);
-
-  // Perfil y permisos del usuario actual
-  const { perfil, isAdmin, can } = useMyProfile();
-  const puedeGestionarPalets = Boolean(
-    isAdmin || can("puede_crear_ubicaciones") || can("puede_editar_ubicaciones"),
-  );
-  const usuarioNombre = perfil?.nombre_completo || "Usuario";
-
-  function toggleReservaExpandida(id: string) {
-    setReservasExpandidas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+// Configuración visual estricta de niveles y colores
+export const CONFIG_JERARQUIA: Record<
+  TipoUbicacion,
+  {
+    label: string;
+    nivel: 0 | 1 | 2;
+    icon: typeof Building2;
+    badgeClass: string;
+    borderClass: string;
+    bgHoverClass: string;
+    descripcion: string;
   }
+> = {
+  seccion: {
+    label: "Sección",
+    nivel: 0,
+    icon: Building2,
+    badgeClass: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    borderClass: "border-indigo-300",
+    bgHoverClass: "hover:bg-indigo-50/60",
+    descripcion: "Nivel 0: Área principal (No requiere padre)",
+  },
+  pasillo: {
+    label: "Pasillo",
+    nivel: 1,
+    icon: ArrowLeftRight,
+    badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
+    borderClass: "border-blue-300",
+    bgHoverClass: "hover:bg-blue-50/60",
+    descripcion: "Nivel 1: Corredor principal (No requiere padre)",
+  },
+  reserva: {
+    label: "Reserva",
+    nivel: 1,
+    icon: Warehouse,
+    badgeClass: "bg-gray-100 text-gray-800 border-gray-200",
+    borderClass: "border-gray-300",
+    bgHoverClass: "hover:bg-gray-50/60",
+    descripcion: "Nivel 1: Zona de carga o palets (No requiere padre)",
+  },
+  armario: {
+    label: "Armario",
+    nivel: 2,
+    icon: Archive,
+    badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    borderClass: "border-emerald-300",
+    bgHoverClass: "hover:bg-emerald-50/60",
+    descripcion: "Nivel 2: Estantería media (Requiere Pasillo)",
+  },
+  alto: {
+    label: "Alto",
+    nivel: 2,
+    icon: Layers,
+    badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
+    borderClass: "border-amber-300",
+    bgHoverClass: "hover:bg-amber-50/60",
+    descripcion: "Nivel 2: Nivel superior / altillo (Requiere Pasillo)",
+  },
+  caja: {
+    label: "Caja",
+    nivel: 2,
+    icon: Package,
+    badgeClass: "bg-pink-100 text-pink-800 border-pink-200",
+    borderClass: "border-pink-300",
+    bgHoverClass: "hover:bg-pink-50/60",
+    descripcion: "Nivel 2: Cajonera o cubeta específica (Requiere Pasillo)",
+  },
+  cross: {
+    label: "Cross-docking",
+    nivel: 2,
+    icon: Shuffle,
+    badgeClass: "bg-purple-100 text-purple-800 border-purple-200",
+    borderClass: "border-purple-300",
+    bgHoverClass: "hover:bg-purple-50/60",
+    descripcion: "Nivel 2: Cruce de alta rotación (Requiere Pasillo)",
+  },
+};
 
-  // Estados para Informe Detallado Imprimible (A4)
-  const [cargandoInforme, setCargandoInforme] = useState(false);
-  const [productosInforme, setProductosInforme] = useState<Map<string, ProductoConCantidad[]>>(
-    new Map(),
-  );
-  const [mostrarInforme, setMostrarInforme] = useState(false);
+// Datos Mock exactos al diseño Stitch
+const UBICACIONES_INICIALES: UbicacionItem[] = [
+  {
+    id: "sec-1",
+    codigo: "SEC-EXT",
+    nombre: "Pintura Exterior & Revestimientos",
+    tipo: "seccion",
+    nivel: 0,
+    activo: true,
+    subtitulo: "2 Pasillos · 5 Posiciones · 183 uds en stock",
+    productos: [],
+  },
+  {
+    id: "pas-a1",
+    codigo: "A1",
+    nombre: "Pasillo A1 (Látex & Fachadas)",
+    tipo: "pasillo",
+    nivel: 1,
+    id_padre: "sec-1",
+    activo: true,
+    subtitulo: "Estanterías de alta resistencia",
+    productos: [],
+  },
+  {
+    id: "pos-a1-01",
+    codigo: "A1-01",
+    nombre: "Armario A1-01",
+    tipo: "armario",
+    nivel: 2,
+    id_padre: "pas-a1",
+    lateral: "R",
+    piso: 1,
+    capacidad_max: 100,
+    peso_max_kg: 400,
+    porcentaje_ocupacion: 92,
+    activo: true,
+    subtitulo: "3 productos · 92 uds (Látex Exterior 15L, Esmalte...)",
+    productos: [
+      { id: "p1", sku: "LAT-4001-WHT", nombre: "Látex Extracubriente Blanco Mate 15L", categoria: "Pinturas de Exterior", cantidad: 48, stock_minimo: 20 },
+      { id: "p2", sku: "ESM-1020-BLK", nombre: "Esmalte Sintético Negro Satinado 4L", categoria: "Esmaltes & Sintéticos", cantidad: 24, stock_minimo: 10 },
+      { id: "p3", sku: "LAT-4002-GRY", nombre: "Revestimiento Elastomérico Gris Cemento 10L", categoria: "Pinturas de Exterior", cantidad: 20, stock_minimo: 15 },
+    ],
+  },
+  {
+    id: "pos-a1-02",
+    codigo: "A1-02",
+    nombre: "Alto A1-02",
+    tipo: "alto",
+    nivel: 2,
+    id_padre: "pas-a1",
+    lateral: "R",
+    piso: 2,
+    capacidad_max: 80,
+    peso_max_kg: 350,
+    porcentaje_ocupacion: 80,
+    activo: true,
+    subtitulo: "2 productos · 67 uds (Selladores, Hidrorepelentes)",
+    productos: [
+      { id: "p4", sku: "SEL-3108-ACR", nombre: "Primer Acrílico Sellador Antihumedad 5L", categoria: "Pinturas & Selladores", cantidad: 37, stock_minimo: 15 },
+      { id: "p5", sku: "HID-9010-TRN", nombre: "Hidrorepelente Siliconado Fachadas 4L", categoria: "Pinturas de Exterior", cantidad: 30, stock_minimo: 10 },
+    ],
+  },
+  {
+    id: "pos-a1-03",
+    codigo: "A1-03",
+    nombre: "Caja A1-03",
+    tipo: "caja",
+    nivel: 2,
+    id_padre: "pas-a1",
+    lateral: "L",
+    piso: 1,
+    capacidad_max: 60,
+    peso_max_kg: 150,
+    porcentaje_ocupacion: 40,
+    activo: true,
+    subtitulo: "2 productos · 24 uds (Brochas Pro, Rodillos 25cm)",
+    productos: [
+      { id: "p6", sku: "HER-8820-ROD", nombre: "Rodillo Antigota Microfibra Pro 25cm", categoria: "Herramientas", cantidad: 14, stock_minimo: 20 },
+      { id: "p7", sku: "HER-1102-BRO", nombre: "Brocha Cerda Natural Pintor 3 pulgadas", categoria: "Herramientas", cantidad: 10, stock_minimo: 15 },
+    ],
+  },
+  {
+    id: "pas-a2",
+    codigo: "A2",
+    nombre: "Pasillo A2 (Esmaltes Sintéticos)",
+    tipo: "pasillo",
+    nivel: 1,
+    id_padre: "sec-1",
+    activo: true,
+    subtitulo: "Líneas industriales y solventes livianos",
+    productos: [],
+  },
+  {
+    id: "pos-a2-01",
+    codigo: "A2-01",
+    nombre: "Armario A2-01",
+    tipo: "armario",
+    nivel: 2,
+    id_padre: "pas-a2",
+    lateral: "R",
+    piso: 1,
+    capacidad_max: 160,
+    peso_max_kg: 500,
+    porcentaje_ocupacion: 88,
+    activo: true,
+    subtitulo: "2 productos · 145 uds (Acabado Brillo, Mate y Satinad...)",
+    productos: [
+      { id: "p8", sku: "ESM-2040-BLU", nombre: "Esmalte Marino Azul Cobalto 4L", categoria: "Esmaltes & Sintéticos", cantidad: 65, stock_minimo: 20 },
+      { id: "p9", sku: "ESM-3011-RED", nombre: "Antióxido Minio Alquídico 4L", categoria: "Esmaltes & Sintéticos", cantidad: 80, stock_minimo: 25 },
+    ],
+  },
+  {
+    id: "sec-2",
+    codigo: "SEC-QUI",
+    nombre: "Droguería Química & Disolventes",
+    tipo: "seccion",
+    nivel: 0,
+    activo: true,
+    subtitulo: "1 Pasillo · 3 Posiciones Especiales · Nivel Seguridad 2",
+    productos: [],
+  },
+  {
+    id: "pas-b1",
+    codigo: "B1",
+    nombre: "Pasillo B1 (Disolventes Inflamables)",
+    tipo: "pasillo",
+    nivel: 1,
+    id_padre: "sec-2",
+    activo: true,
+    subtitulo: "Ventilación forzada y bandejas de derrame",
+    productos: [],
+  },
+  {
+    id: "pos-b1-01",
+    codigo: "B1-01",
+    nombre: "Cross B1-01",
+    tipo: "cross",
+    nivel: 2,
+    id_padre: "pas-b1",
+    lateral: "C",
+    piso: 1,
+    capacidad_max: 90,
+    peso_max_kg: 600,
+    porcentaje_ocupacion: 95,
+    activo: true,
+    subtitulo: "2 productos · 78 uds (Aguarrás Puro, Thinner Universal ...)",
+    productos: [
+      { id: "p10", sku: "SOL-9902-STD", nombre: "Thinner Universal Extra Calidad 10L", categoria: "Solventes & Químicos", cantidad: 42, stock_minimo: 20 },
+      { id: "p11", sku: "SOL-1120-AGU", nombre: "Aguarrás Mineral Desodorizado 5L", categoria: "Solventes & Químicos", cantidad: 36, stock_minimo: 15 },
+    ],
+  },
+  {
+    id: "res-gen",
+    codigo: "RES-01",
+    nombre: "Reserva General & Carga Palets",
+    tipo: "reserva",
+    nivel: 1,
+    activo: true,
+    porcentaje_ocupacion: 0,
+    subtitulo: "0 palets activos (Área libre para descarga de camión)",
+    productos: [],
+  },
+];
 
-  // Estado del modal de gestión de productos de una ubicación
-  const [ubicacionStockAbierta, setUbicacionStockAbierta] = useState<any>(null);
-  const [productosUbicacion, setProductosUbicacion] = useState<ProductoConCantidad[]>([]);
-  const [cargandoStock, setCargandoStock] = useState(false);
-  const [modalMode, setModalMode] = useState<ModalMode>("ver");
+export function UbicacionesPage() {
+  const [ubicaciones, setUbicaciones] = useState<UbicacionItem[]>(UBICACIONES_INICIALES);
+  const [vista, setVista] = useState<"arbol" | "lista">("arbol");
   const [busqueda, setBusqueda] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [productoEditando, setProductoEditando] = useState<ProductoConCantidad | null>(null);
-  const [cantidadEdicion, setCantidadEdicion] = useState<number | "">("");
+  const [filtroTipo, setFiltroTipo] = useState<string>("todos");
 
-  // Ajuste rápido (mini-modal)
-  const [ajusteRapido, setAjusteRapido] = useState<ProductoConCantidad | null>(null);
-  const [nuevaCantidadAjuste, setNuevaCantidadAjuste] = useState<number | "">("");
+  const [expandidos, setExpandidos] = useState<Record<string, boolean>>({
+    "sec-1": true,
+    "pas-a1": true,
+    "pas-a2": true,
+    "sec-2": true,
+    "pas-b1": true,
+    "res-gen": true,
+  });
 
-  // Estados para diálogos de confirmación crítica
-  const [productoAEliminar, setProductoAEliminar] = useState<ProductoConCantidad | null>(null);
-  const [confirmacionStockCero, setConfirmacionStockCero] = useState<{
-    producto: ProductoConCantidad;
-    tipo: "ajusteRapido" | "edicion";
-  } | null>(null);
-  const [ubicacionADesactivar, setUbicacionADesactivar] = useState<any | null>(null);
-  const [ubicacionABorrar, setUbicacionABorrar] = useState<any | null>(null);
+  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState<UbicacionItem | null>(null);
+  const [dialogProductosAbierto, setDialogProductosAbierto] = useState(false);
 
-  // Formulario "añadir producto" (inline en el modal)
-  const [nuevoCodigoBarras, setNuevoCodigoBarras] = useState("");
-  const [scanError, setScanError] = useState("");
-  const [escanerAbierto, setEscanerAbierto] = useState(false);
-  const [productoEscaneado, setProductoEscaneado] = useState<{
-    id: string;
-    sku: string;
-    nombre: string;
-  } | null>(null);
-  const [nuevoSku, setNuevoSku] = useState("");
-  const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevaCantidad, setNuevaCantidad] = useState<number | "">(1);
+  const [dialogAjusteAbierto, setDialogAjusteAbierto] = useState(false);
+  const [ubicacionParaAjuste, setUbicacionParaAjuste] = useState<UbicacionItem | null>(null);
+  const [productoAjusteId, setProductoAjusteId] = useState("");
+  const [tipoMovimiento, setTipoMovimiento] = useState<"entrada" | "salida" | "reposicion" | "ajuste">("reposicion");
+  const [cantidadAjuste, setCantidadAjuste] = useState<number>(10);
+  const [motivoAjuste, setMotivoAjuste] = useState("Recepción de reposición habitual");
 
-  // ESTADOS PARA AUTOCOMPLETADO
-  const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>([]);
-  const [resultadosBusqueda, setResultadosBusqueda] = useState<Producto[]>([]);
-  const [buscandoProductos, setBuscandoProductos] = useState(false);
-  const [sinResultados, setSinResultados] = useState(false);
-  const [totalRealesTabla, setTotalRealesTabla] = useState<number | null>(null);
-  const [visiblesLista, setVisiblesLista] = useState(25);
-  const debounceBusquedaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const TAM_PAGINA_PRODUCTOS = 1000;
+  const [ubicacionParaEliminar, setUbicacionParaEliminar] = useState<UbicacionItem | null>(null);
+  const [dialogEliminarAbierto, setDialogEliminarAbierto] = useState(false);
 
-  const [tipo, setTipo] = useState<string>("pasillo");
-  const [nombre, setNombre] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [seccionId, setSeccionId] = useState("");
-  const [ubicacionPadreId, setUbicacionPadreId] = useState("");
-  const [seccionOrigenId, setSeccionOrigenId] = useState("");
-  const [posicionLateral, setPosicionLateral] = useState("");
-  const [posicionLongitudinal, setPosicionLongitudinal] = useState("");
-  const [numero, setNumero] = useState<number | "">("");
+  const [formNombre, setFormNombre] = useState("Armario A1-04");
+  const [formTipo, setFormTipo] = useState<TipoUbicacion>("armario");
+  const [formPadre, setFormPadre] = useState("pas-a1");
+  const [formLateral, setFormLateral] = useState<"L" | "R" | "C">("R");
+  const [formPiso, setFormPiso] = useState<number>(1);
+  const [formCapMax, setFormCapMax] = useState<number>(120);
+  const [formPesoMax, setFormPesoMax] = useState<number>(450);
 
-  useEffect(() => {
-    cargarDatos();
-  }, []);
+  const [slotSeleccionado, setSlotSeleccionado] = useState<string>("A1-01");
 
-  // Cargar catálogo al abrir el formulario de añadir (recarga cada vez para evitar datos obsoletos)
-  useEffect(() => {
-    if (modalMode !== "anadir") return;
-    let cancelado = false;
-    (async () => {
-      try {
-        setBuscandoProductos(true);
-        const productos = await descargarCatalogoCompleto(TAM_PAGINA_PRODUCTOS);
-        if (!cancelado) {
-          setCatalogoProductos(productos);
-          setResultadosBusqueda(productos);
-        }
-      } catch (err: any) {
-        if (!cancelado) toast.error(errorInventario(err));
-      } finally {
-        if (!cancelado) setBuscandoProductos(false);
-      }
-    })();
-    return () => {
-      cancelado = true;
+  const toggleExpandir = (id: string) => {
+    setExpandidos((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const todosExpandidos = useMemo(() => {
+    return Object.values(expandidos).every(Boolean);
+  }, [expandidos]);
+
+  const toggleExpandirColapsarTodo = () => {
+    const nuevoEstado = !todosExpandidos;
+    const nuevoMapa: Record<string, boolean> = {};
+    ubicaciones.forEach((u) => {
+      nuevoMapa[u.id] = nuevoEstado;
+    });
+    setExpandidos(nuevoMapa);
+    toast.info(nuevoEstado ? "Todas las ubicaciones expandidas" : "Todas las ubicaciones colapsadas");
+  };
+
+  const secciones = useMemo(() => ubicaciones.filter((u) => u.tipo === "seccion"), [ubicaciones]);
+  const reservas = useMemo(() => ubicaciones.filter((u) => u.tipo === "reserva"), [ubicaciones]);
+
+  const pasillosDeSeccion = (idSeccion: string) =>
+    ubicaciones.filter((u) => u.tipo === "pasillo" && u.id_padre === idSeccion);
+
+  const posicionesDePasillo = (idPasillo: string) =>
+    ubicaciones.filter(
+      (u) => u.id_padre === idPasillo && ["armario", "alto", "caja", "cross"].includes(u.tipo)
+    );
+
+  const ubicacionesFiltradas = useMemo(() => {
+    return ubicaciones.filter((item) => {
+      const coincideBusqueda =
+        busqueda === "" ||
+        item.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        item.codigo.toLowerCase().includes(busqueda.toLowerCase());
+      const coincideTipo = filtroTipo === "todos" || item.tipo === filtroTipo;
+      return coincideBusqueda && coincideTipo;
+    });
+  }, [ubicaciones, busqueda, filtroTipo]);
+
+  const pasillosDisponibles = useMemo(
+    () => ubicaciones.filter((u) => u.tipo === "pasillo"),
+    [ubicaciones]
+  );
+
+  const handleGuardarUbicacion = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNombre.trim()) {
+      toast.error("El nombre de la ubicación es obligatorio");
+      return;
+    }
+
+    const config = CONFIG_JERARQUIA[formTipo];
+    if (config.nivel === 2 && !formPadre) {
+      toast.error("Las ubicaciones de Nivel 2 requieren un Pasillo padre");
+      return;
+    }
+
+    const nuevoId = `loc-${Date.now()}`;
+    const nuevoCodigo = formNombre.toUpperCase().replace(/\s+/g, "-").slice(0, 8);
+
+    const nuevaUbi: UbicacionItem = {
+      id: nuevoId,
+      codigo: nuevoCodigo,
+      nombre: formNombre,
+      tipo: formTipo,
+      nivel: config.nivel,
+      id_padre: config.nivel === 2 ? formPadre : null,
+      lateral: formLateral,
+      piso: formPiso,
+      capacidad_max: formCapMax,
+      peso_max_kg: formPesoMax,
+      porcentaje_ocupacion: 0,
+      activo: true,
+      subtitulo: "0 productos · 0 uds (Posición recién creada)",
+      productos: [],
     };
-  }, [modalMode]);
 
-  // Contar total de productos reales en la tabla
-  useEffect(() => {
-    if (totalRealesTabla !== null) return;
-    (async () => {
-      const { count, error } = await supabase
-        .from("productos")
-        .select("id", { count: "exact", head: true });
-      if (!error) setTotalRealesTabla(count ?? 0);
-    })();
-  }, []);
-
-  async function cargarDatos() {
-    try {
-      setCargando(true);
-      const [seccionesData, ubicacionesData] = await Promise.all([
-        obtenerSecciones(),
-        obtenerUbicaciones(),
-      ]);
-      setSecciones(seccionesData);
-      setUbicaciones(ubicacionesData);
-
-      const padres = new Set(
-        ubicacionesData
-          .filter((u: any) => u.tipo === "pasillo" || u.tipo === "reserva")
-          .map((u: any) => u.id),
-      );
-      setExpandidos(padres);
-
-      const { data: stockData, error: stockError } = await supabase
-        .from("stock")
-        .select("id_ubicacion, cantidad")
-        .gt("cantidad", 0);
-
-      if (stockError) console.error("Error cargando stock:", stockError);
-      else {
-        const productosMap = new Map<string, number>();
-        stockData?.forEach((item: any) => {
-          const count = productosMap.get(item.id_ubicacion) || 0;
-          productosMap.set(item.id_ubicacion, count + 1);
-        });
-        setProductosPorUbicacion(productosMap);
-      }
-    } catch (err: any) {
-      setError(errorInventario(err));
-    } finally {
-      setCargando(false);
+    setUbicaciones((prev) => [...prev, nuevaUbi]);
+    if (formPadre) {
+      setExpandidos((prev) => ({ ...prev, [formPadre]: true }));
     }
-  }
 
-  // ---------- MODAL DE GESTIÓN DE PRODUCTOS ----------
+    toast.success(`Ubicación "${formNombre}" creada exitosamente`);
+    setFormNombre("");
+  };
 
-  async function recargarProductosUbicacion(id_ubicacion: string) {
-    try {
-      const productos = await obtenerProductosPorUbicacion(id_ubicacion);
-      setProductosUbicacion(productos);
-      setProductosPorUbicacion((prev) => {
-        const nuevo = new Map(prev);
-        if (productos.length > 0) nuevo.set(id_ubicacion, productos.length);
-        else nuevo.delete(id_ubicacion);
-        return nuevo;
-      });
-    } catch (err) {
-      console.error("Error recargando productos:", err);
-    }
-  }
-
-  function resetearModalForms() {
-    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
-    setModalMode("ver");
-    setBusqueda("");
-    setProductoEditando(null);
-    setCantidadEdicion("");
-    setNuevoCodigoBarras("");
-    setScanError("");
-    setProductoEscaneado(null);
-    setNuevoSku("");
-    setNuevoNombre("");
-    setNuevaCantidad(1);
-    setAjusteRapido(null);
-    setNuevaCantidadAjuste("");
-    setResultadosBusqueda([]);
-    setSinResultados(false);
-    setVisiblesLista(25);
-  }
-
-  async function abrirStockUbicacion(ubicacion: any) {
-    setUbicacionStockAbierta(ubicacion);
-    resetearModalForms();
-    setCargandoStock(true);
-    setProductosUbicacion([]);
-    try {
-      await recargarProductosUbicacion(ubicacion.id);
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setCargandoStock(false);
-    }
-  }
-
-  function cerrarModal() {
-    const anterior = ubicacionStockAbierta;
-    setUbicacionStockAbierta(null);
-    setEscanerAbierto(false);
-    resetearModalForms();
-    if (anterior) recargarProductosUbicacion(anterior.id);
-  }
-
-  function iniciarEdicion(producto: ProductoConCantidad) {
-    setProductoEditando(producto);
-    setCantidadEdicion(producto.cantidad);
-    setModalMode("editar");
-  }
-
-  async function ejecutarGuardarCantidad() {
-    if (!ubicacionStockAbierta || !productoEditando) return;
-    try {
-      setGuardando(true);
-      await crearMovimientoConStock({
-        id_producto: productoEditando.id,
-        id_ubicacion: ubicacionStockAbierta.id,
-        tipo: "ajuste",
-        cantidad: Number(cantidadEdicion),
-        notas: "Edición de cantidad desde armario (ajuste)",
-      });
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`Cantidad actualizada: ${productoEditando.nombre} → ${cantidadEdicion} uds`);
-      resetearModalForms();
-      setUbicacionStockAbierta(ubicacionStockAbierta);
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  async function guardarCantidad() {
-    if (!ubicacionStockAbierta || !productoEditando) return;
-    if (cantidadEdicion === "" || !Number.isInteger(cantidadEdicion) || cantidadEdicion < 0) {
-      toast.error("Introduce una cantidad entera ≥ 0.");
+    
+    // Manejar Ajuste de Stock respetando la regla de arquitectura (INSERT en movimientos)
+  const handleAplicarAjuste = () => {
+    if (!ubicacionParaAjuste) return;
+    if (!productoAjusteId) {
+      toast.error("Selecciona un producto para ajustar");
       return;
     }
-    if (cantidadEdicion === 0) {
-      setConfirmacionStockCero({
-        producto: productoEditando,
-        tipo: "edicion",
-      });
+    if (cantidadAjuste <= 0) {
+      toast.error("La cantidad debe ser mayor que cero");
       return;
     }
-    await ejecutarGuardarCantidad();
-  }
 
-  async function confirmarEliminarProducto() {
-    if (!ubicacionStockAbierta || !productoAEliminar) return;
-    try {
-      setGuardando(true);
-      await actualizarStock(productoAEliminar.id, ubicacionStockAbierta.id, 0);
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`"${productoAEliminar.nombre}" eliminado de esta ubicación`);
-      setProductoAEliminar(null);
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  function abrirAjusteRapido(producto: ProductoConCantidad) {
-    setAjusteRapido(producto);
-    setNuevaCantidadAjuste(producto.cantidad);
-  }
-
-  async function ejecutarAjusteRapido(prod: ProductoConCantidad, cant: number) {
-    if (!ubicacionStockAbierta) return;
-    try {
-      setGuardando(true);
-      await actualizarStock(prod.id, ubicacionStockAbierta.id, cant);
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(`Ajuste rápido: ${prod.nombre} → ${cant} uds`);
-      setAjusteRapido(null);
-      setNuevaCantidadAjuste("");
-    } catch (err: any) {
-      toast.error(errorInventario(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  async function guardarAjusteRapido() {
-    if (!ubicacionStockAbierta || !ajusteRapido) return;
-    if (
-      nuevaCantidadAjuste === "" ||
-      !Number.isInteger(nuevaCantidadAjuste) ||
-      nuevaCantidadAjuste < 0
-    ) {
-      toast.error("Introduce una cantidad entera ≥ 0.");
-      return;
-    }
-    if (nuevaCantidadAjuste === 0) {
-      setConfirmacionStockCero({
-        producto: ajusteRapido,
-        tipo: "ajusteRapido",
-      });
-      return;
-    }
-    await ejecutarAjusteRapido(ajusteRapido, nuevaCantidadAjuste);
-  }
-
-  async function confirmarAjusteCero() {
-    if (!confirmacionStockCero) return;
-    if (confirmacionStockCero.tipo === "ajusteRapido") {
-      await ejecutarAjusteRapido(confirmacionStockCero.producto, 0);
-    } else {
-      await ejecutarGuardarCantidad();
-    }
-    setConfirmacionStockCero(null);
-  }
-
-  async function escanearCodigo(codigoManual?: string) {
-    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
-    const codigo = (codigoManual ?? nuevoCodigoBarras).trim();
-    setScanError("");
-    setProductoEscaneado(null);
-    setSinResultados(false);
-
-    if (!codigo) {
-      setResultadosBusqueda([]);
-      setScanError("Introduce o escanea un código de barras.");
-      return;
-    }
-    try {
-      setBuscandoProductos(true);
-      const coincidencias = await buscarProductosPorCodigo(codigo);
-      const unico = coincidencias[0];
-      if (coincidencias.length === 1 && unico) {
-        seleccionarProductoBusqueda(unico);
-        toast.success(`Producto encontrado: ${unico.nombre}`);
-      } else if (coincidencias.length > 1) {
-        setResultadosBusqueda(coincidencias);
-        toast.info(`${coincidencias.length} productos coinciden. Selecciona uno.`);
-      } else {
-        setResultadosBusqueda([]);
-        setSinResultados(true);
-        setNuevoSku("");
-        setNuevoNombre("");
-        toast.info("No existe ningún producto con ese código. Complétalo para crearlo.");
-      }
-    } catch (err: any) {
-      setScanError(errorInventario(err));
-      toast.error(errorInventario(err));
-    } finally {
-      setBuscandoProductos(false);
-    }
-  }
-
-  function seleccionarProductoBusqueda(p: Producto) {
-    setProductoEscaneado({ id: p.id, sku: p.sku, nombre: p.nombre });
-    setNuevoCodigoBarras(p.codigo_barras);
-    setResultadosBusqueda([]);
-    setSinResultados(false);
-    setScanError("");
-  }
-
-  function autocompletarProductos(texto: string) {
-    if (debounceBusquedaRef.current) clearTimeout(debounceBusquedaRef.current);
-    const q = texto.trim().toLowerCase();
-    setSinResultados(false);
-
-    const locales = catalogoProductos.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(q) ||
-        (p.sku || "").toLowerCase().includes(q) ||
-        (p.codigo_barras || "").toLowerCase().includes(q),
-    );
-
-    setResultadosBusqueda(locales);
-    setVisiblesLista(25);
-
-    if (!q) return;
-
-    if (locales.length === 0 && catalogoProductos.length > 0) {
-      debounceBusquedaRef.current = setTimeout(async () => {
-        try {
-          setBuscandoProductos(true);
-          const coincidencias = await buscarProductosPorCodigo(texto);
-          setResultadosBusqueda(coincidencias);
-          setSinResultados(coincidencias.length === 0);
-        } catch (err: any) {
-          toast.error(errorInventario(err));
-        } finally {
-          setBuscandoProductos(false);
-        }
-      }, 250);
-    }
-  }
-
-  async function anadirProducto() {
-    if (!ubicacionStockAbierta) return;
-    if (!nuevoCodigoBarras.trim()) {
-      setScanError("El código de barras es obligatorio.");
-      return;
-    }
-    if (nuevaCantidad === "" || !Number.isInteger(nuevaCantidad) || nuevaCantidad <= 0) {
-      setScanError("La cantidad debe ser un entero mayor que cero.");
-      return;
-    }
-    try {
-      setGuardando(true);
-      setScanError("");
-      let idProducto = productoEscaneado?.id;
-      if (!idProducto) {
-        if (!nuevoNombre.trim() || !nuevoSku.trim()) {
-          setScanError("Completa SKU y nombre para crear el producto nuevo.");
-          return;
-        }
-        idProducto = await guardarProducto({
-          codigo_barras: nuevoCodigoBarras.trim(),
-          sku: nuevoSku.trim(),
-          nombre: nuevoNombre.trim(),
-          descripcion: null,
-          id_categoria: null,
-          precio_unitario: null,
-        });
-        // Invalidar caché al crear producto nuevo
-        setCatalogoProductos([]);
-        setTotalRealesTabla(null);
-      }
-      const yaExiste = productosUbicacion.some((p) => p.id === idProducto);
-      const sumaBase = productosUbicacion.find((p) => p.id === idProducto)?.cantidad || 0;
-      await actualizarStock(
-        idProducto,
-        ubicacionStockAbierta.id,
-        sumaBase + (nuevaCantidad as number),
-      );
-      await recargarProductosUbicacion(ubicacionStockAbierta.id);
-      toast.success(
-        yaExiste
-          ? `Stock sumado: +${nuevaCantidad} uds de "${productoEscaneado?.nombre || nuevoNombre}"`
-          : `"${productoEscaneado?.nombre || nuevoNombre}" añadido a ${ubicacionStockAbierta.nombre} (${nuevaCantidad} uds)`,
-      );
-      resetearModalForms();
-      setUbicacionStockAbierta(ubicacionStockAbierta);
-    } catch (err: any) {
-      setScanError(errorInventario(err));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  // ---------- FIN MODAL ----------
-
-  function toggleExpandir(id: string) {
-    setExpandidos((prev) => {
-      const nuevo = new Set(prev);
-      if (nuevo.has(id)) nuevo.delete(id);
-      else nuevo.add(id);
-      return nuevo;
-    });
-  }
-
-  function expandirTodos() {
-    const padres = new Set(
-      ubicaciones
-        .filter((u: any) => u.tipo === "pasillo" || u.tipo === "reserva")
-        .map((u: any) => u.id),
-    );
-    setExpandidos(padres);
-  }
-
-  function colapsarTodos() {
-    setExpandidos(new Set());
-  }
-
-  function resetearFormulario() {
-    setTipo("pasillo");
-    setNombre("");
-    setDescripcion("");
-    setSeccionId("");
-    setUbicacionPadreId("");
-    setSeccionOrigenId("");
-    setPosicionLateral("");
-    setPosicionLongitudinal("");
-    setNumero("");
-    setEditandoId(null);
-    setMostrarFormulario(false);
-    setError("");
-  }
-
-  function editarUbicacion(ubicacion: any) {
-    setEditandoId(ubicacion.id);
-    setTipo(ubicacion.tipo);
-    setNombre(ubicacion.nombre);
-    setDescripcion(ubicacion.descripcion || "");
-    const seccionActual =
-      typeof ubicacion.seccion === "string" ? ubicacion.seccion : ubicacion.seccion?.id || "";
-    setSeccionId(seccionActual);
-    setUbicacionPadreId(ubicacion.id_ubicacion_padre || "");
-    const seccionOrigenActual =
-      typeof ubicacion.seccion_origen === "string"
-        ? ubicacion.seccion_origen
-        : ubicacion.seccion_origen?.id || "";
-    setSeccionOrigenId(seccionOrigenActual);
-    setPosicionLateral(ubicacion.posicion_lateral || "");
-    setPosicionLongitudinal(ubicacion.posicion_longitudinal || "");
-    setNumero(ubicacion.numero || "");
-    setMostrarFormulario(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function guardarUbicacion() {
-    try {
-      setError("");
-      if (!nombre.trim()) {
-        setError("El nombre es obligatorio");
-        return;
-      }
-      if (tipo === "pasillo" && !seccionId) {
-        setError("Debes seleccionar una sección");
-        return;
-      }
-      if ((tipo === "armario" || tipo === "alto" || tipo === "cross") && !ubicacionPadreId) {
-        setError("Debes seleccionar un pasillo padre");
-        return;
-      }
-      if (tipo === "cross" && !seccionOrigenId) {
-        setError("Debes seleccionar la sección de origen");
-        return;
-      }
-      if ((tipo === "armario" || tipo === "alto" || tipo === "cross") && !posicionLateral) {
-        setError("Debes seleccionar la posición lateral");
-        return;
-      }
-      if (tipo === "cross" && !posicionLongitudinal) {
-        setError("Debes seleccionar la posición longitudinal");
-        return;
-      }
-
-      const datosUbicacion: any = {
-        nombre: nombre.trim(),
-        tipo,
-        descripcion: descripcion.trim() || null,
-        id_ubicacion_padre: ubicacionPadreId || null,
-        posicion_lateral: posicionLateral || null,
-        posicion_longitudinal: posicionLongitudinal || null,
-        numero: numero !== "" ? numero : null,
-      };
-
-      if (tipo === "pasillo") {
-        datosUbicacion.seccion = seccionId || null;
-        datosUbicacion.seccion_origen = null;
-      } else if (tipo === "cross") {
-        const padre = ubicaciones.find((u: any) => u.id === ubicacionPadreId);
-        datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null;
-        datosUbicacion.seccion_origen = seccionOrigenId || null;
-      } else if (tipo === "reserva") {
-        datosUbicacion.seccion = null;
-        datosUbicacion.seccion_origen = null;
-      } else {
-        if (seccionId && seccionId !== "") {
-          datosUbicacion.seccion = seccionId;
-        } else {
-          const padre = ubicaciones.find((u: any) => u.id === ubicacionPadreId);
-          datosUbicacion.seccion = padre?.seccion?.id || padre?.seccion || null;
-        }
-        datosUbicacion.seccion_origen = null;
-      }
-
-      if (editandoId) {
-        await actualizarUbicacion(editandoId, datosUbicacion);
-      } else {
-        await crearUbicacion(datosUbicacion);
-      }
-
-      await cargarDatos();
-      resetearFormulario();
-    } catch (err: any) {
-      setError(errorInventario(err));
-    }
-  }
-
-  function desactivarUbicacionHandler(ubicacion: any) {
-    setUbicacionADesactivar(ubicacion);
-  }
-
-  function borrarDefinitivamente(ubicacion: any) {
-    setUbicacionABorrar(ubicacion);
-  }
-
-  async function confirmarDesactivarUbicacion() {
-    if (!ubicacionADesactivar) return;
-    try {
-      await desactivarUbicacion(ubicacionADesactivar.id);
-      await cargarDatos();
-      toast.success(`Ubicación "${ubicacionADesactivar.nombre}" desactivada`);
-      setUbicacionADesactivar(null);
-    } catch (err: any) {
-      setError(errorInventario(err));
-      toast.error(errorInventario(err));
-    }
-  }
-
-  async function confirmarBorrarUbicacion() {
-    if (!ubicacionABorrar) return;
-    const numProductos = productosPorUbicacion.get(ubicacionABorrar.id) || 0;
-    if (numProductos > 0) {
-      setUbicacionABorrar(null);
-      return;
-    }
-    try {
-      await borrarUbicacionDefinitivamente(ubicacionABorrar.id);
-      await cargarDatos();
-      toast.success(`Ubicación "${ubicacionABorrar.nombre}" eliminada definitivamente`);
-      setUbicacionABorrar(null);
-    } catch (err: any) {
-      setError(errorInventario(err));
-      toast.error(errorInventario(err));
-    }
-  }
-
-  function getPasillosAgrupados() {
-    return secciones
-      .map((seccion: any) => {
-        const pasillos = ubicaciones.filter(
-          (u: any) =>
-            u.tipo === "pasillo" && (u.seccion?.id === seccion.id || u.seccion === seccion.id),
-        );
-        return { seccion, pasillos };
-      })
-      .filter((grupo: any) => grupo.pasillos.length > 0);
-  }
-
-  function getUbicacionesAgrupadas() {
-    const padres = ubicaciones.filter((u: any) => u.tipo === "pasillo" || u.tipo === "reserva");
-    const hijos = ubicaciones.filter((u: any) => u.tipo !== "pasillo" && u.tipo !== "reserva");
-    return padres.map((padre: any) => ({
-      padre,
-      hijos: hijos.filter((h: any) => h.id_ubicacion_padre === padre.id),
-    }));
-  }
-
-  function getSeccionReal(ubicacion: any): string {
-    try {
-      if (ubicacion.tipo === "cross") {
-        if (ubicacion.seccion_origen_nombre) return ubicacion.seccion_origen_nombre;
-        if (typeof ubicacion.seccion_origen === "string") return ubicacion.seccion_origen;
-        if (ubicacion.seccion_origen?.nombre) return ubicacion.seccion_origen.nombre;
-        return "-";
-      } else {
-        if (ubicacion.seccion_nombre) return ubicacion.seccion_nombre;
-        if (typeof ubicacion.seccion === "string") return ubicacion.seccion;
-        if (ubicacion.seccion?.nombre) return ubicacion.seccion.nombre;
-        if (ubicacion.seccion?.id) return ubicacion.seccion.id;
-
-        // Si no tiene sección propia, hereda del pasillo padre
-        if (ubicacion.id_ubicacion_padre) {
-          const padre = ubicaciones.find((u: any) => u.id === ubicacion.id_ubicacion_padre);
-          if (padre) {
-            return getSeccionReal(padre);
-          }
-        }
-        return "-";
-      }
-    } catch (e) {
-      console.error("Error obteniendo sección:", e, ubicacion);
-      return "-";
-    }
-  }
-
-  function getDetalles(ubicacion: any): string {
-    if (ubicacion.tipo === "pasillo") {
-      const partes: string[] = [];
-      if (ubicacion.descripcion) partes.push(ubicacion.descripcion);
-      const seccionesAsociadas = ubicaciones
-        .filter(
-          (h: any) =>
-            h.id_ubicacion_padre === ubicacion.id &&
-            (h.seccion_nombre ||
-              (h.seccion && typeof h.seccion === "object" ? h.seccion.nombre : null)),
-        )
-        .map(
-          (h: any) =>
-            h.seccion_nombre || (typeof h.seccion === "object" ? h.seccion?.nombre : null),
-        );
-      const unicas = [...new Set(seccionesAsociadas.filter(Boolean))];
-      if (unicas.length > 0) partes.push(`Secciones: ${unicas.join(", ")}`);
-      return partes.join(" · ") || "-";
-    }
-    const partes: string[] = [];
-    if (ubicacion.posicion_lateral) partes.push(ubicacion.posicion_lateral);
-    if (ubicacion.posicion_longitudinal) partes.push(ubicacion.posicion_longitudinal);
-    if (ubicacion.numero) partes.push(`Nº${ubicacion.numero}`);
-    if (partes.length === 0 && ubicacion.descripcion) partes.push(ubicacion.descripcion);
-    return partes.join(" · ") || "-";
-  }
-
-  function renderizarFormulario() {
-    const pasillosAgrupados = getPasillosAgrupados();
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md space-y-4 mb-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800">
-          {editandoId ? "Editar ubicación" : "Nueva ubicación"}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">Tipo *</label>
-            <select
-              value={tipo}
-              onChange={(e) => {
-                setTipo(e.target.value);
-                setUbicacionPadreId("");
-                setPosicionLateral("");
-                setPosicionLongitudinal("");
-                setSeccionOrigenId("");
-              }}
-              className="w-full border border-gray-300 rounded px-3 py-2 bg-white"
-            >
-              <option value="pasillo">Pasillo (Estantería estándar)</option>
-              <option value="armario">Armario (Módulo de estantes / gavetero)</option>
-              <option value="alto">Alto (Nivel superior / altillo)</option>
-              <option value="cross">Cross (Paso / ubicación cruzada)</option>
-              <option value="caja">Caja (Contenedor / cubeta)</option>
-              <option value="reserva">Reserva (Almacén / trastienda)</option>
-            </select>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium">Estilo:</span>
-              <BadgeTipoUbicacion tipo={tipo} size="sm" />
-              <span className="text-xs text-gray-400 hidden sm:inline">
-                · {getConfigTipo(tipo).descripcion}
-              </span>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">Nombre *</label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">Descripción</label>
-          <input
-            type="text"
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-        </div>
-        {tipo === "pasillo" && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">Sección *</label>
-            <select
-              value={seccionId}
-              onChange={(e) => setSeccionId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">Selecciona una sección</option>
-              {secciones.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {(tipo === "armario" || tipo === "alto" || tipo === "cross") && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">Pasillo padre *</label>
-            <select
-              value={ubicacionPadreId}
-              onChange={(e) => setUbicacionPadreId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">Selecciona un pasillo</option>
-              {pasillosAgrupados.map(({ seccion, pasillos }: any) => (
-                <optgroup key={seccion.id} label={seccion.nombre}>
-                  {pasillos.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-        )}
-        {(tipo === "armario" || tipo === "alto" || tipo === "caja") && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Sección (opcional)
-            </label>
-            <select
-              value={seccionId}
-              onChange={(e) => setSeccionId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">— Heredar del pasillo padre —</option>
-              {secciones.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {tipo === "cross" && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Sección de origen *
-            </label>
-            <select
-              value={seccionOrigenId}
-              onChange={(e) => setSeccionOrigenId(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">¿De qué sección son los productos?</option>
-              {secciones.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {(tipo === "armario" || tipo === "alto" || tipo === "caja") && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">Número</label>
-            <input
-              type="number"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value === "" ? "" : parseInt(e.target.value))}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-        )}
-        {(tipo === "armario" || tipo === "alto" || tipo === "cross") && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Posición lateral *
-            </label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="posicionLateral"
-                  value="izquierda"
-                  checked={posicionLateral === "izquierda"}
-                  onChange={(e) => setPosicionLateral(e.target.value)}
-                />
-                <span>Izquierda</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="posicionLateral"
-                  value="derecha"
-                  checked={posicionLateral === "derecha"}
-                  onChange={(e) => setPosicionLateral(e.target.value)}
-                />
-                <span>Derecha</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="posicionLateral"
-                  value="centro"
-                  checked={posicionLateral === "centro"}
-                  onChange={(e) => setPosicionLateral(e.target.value)}
-                />
-                <span>Centro</span>
-              </label>
-            </div>
-          </div>
-        )}
-        {tipo === "cross" && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Posición longitudinal *
-            </label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="posicionLongitudinal"
-                  value="principio"
-                  checked={posicionLongitudinal === "principio"}
-                  onChange={(e) => setPosicionLongitudinal(e.target.value)}
-                />
-                <span>Principio</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="posicionLongitudinal"
-                  value="final"
-                  checked={posicionLongitudinal === "final"}
-                  onChange={(e) => setPosicionLongitudinal(e.target.value)}
-                />
-                <span>Final</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="posicionLongitudinal"
-                  value="paso"
-                  checked={posicionLongitudinal === "paso"}
-                  onChange={(e) => setPosicionLongitudinal(e.target.value)}
-                />
-                <span>Paso</span>
-              </label>
-            </div>
-          </div>
-        )}
-        <div className="flex gap-3 pt-4 border-t">
-          <button
-            onClick={guardarUbicacion}
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-          >
-            {editandoId ? "Actualizar" : "Crear"}
-          </button>
-          <button
-            onClick={resetearFormulario}
-            className="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300"
-          >
-            Cancelar
-          </button>
-        </div>
-        {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded border border-red-200 text-sm">
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function FilaUbicacion({ ubicacion, esHijo = false }: { ubicacion: any; esHijo?: boolean }) {
-    const numProductos = productosPorUbicacion.get(ubicacion.id) || 0;
-    const tieneHijos = ubicaciones.some((h: any) => h.id_ubicacion_padre === ubicacion.id);
-    const estaExpandido = expandidos.has(ubicacion.id);
-    const config = getConfigTipo(ubicacion.tipo);
-    const IconoUbicacion = config.icon;
-
-    return (
-      <div
-        className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors ${
-          esHijo
-            ? "pl-10 bg-slate-50/70 border-l-2 border-slate-300 ml-4 hover:bg-slate-100/80"
-            : "hover:bg-blue-50/60 bg-white"
-        }`}
-      >
-        <div className="col-span-4 flex items-center gap-2.5 min-w-0">
-          {!esHijo && tieneHijos ? (
-            <span className="text-gray-400 p-0.5">
-              {estaExpandido ? (
-                <ChevronDown className="w-4 h-4 text-gray-600" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              )}
-            </span>
-          ) : !esHijo ? (
-            <span className="w-4 shrink-0" />
-          ) : (
-            <span className="text-slate-400 text-xs font-mono shrink-0">└</span>
-          )}
-
-          <div
-            className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
-            title={config.label}
-          >
-            <IconoUbicacion className={esHijo ? "w-3.5 h-3.5" : "w-4 h-4"} />
-          </div>
-
-          <div className="flex flex-col min-w-0">
-            <span
-              className={`text-sm truncate ${
-                esHijo ? "font-medium text-gray-800" : "font-semibold text-gray-900"
-              }`}
-            >
-              {ubicacion.nombre}
-            </span>
-            {ubicacion.descripcion && (
-              <span className="text-xs text-gray-500 truncate">{ubicacion.descripcion}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="col-span-2">
-          <BadgeTipoUbicacion tipo={ubicacion.tipo} size="sm" />
-        </div>
-
-        <div className="col-span-2 text-sm text-gray-600 truncate">{getDetalles(ubicacion)}</div>
-        <div className="col-span-2 text-sm text-gray-600 truncate">{getSeccionReal(ubicacion)}</div>
-
-        <div className="col-span-2 flex justify-end items-center gap-1.5">
-          {ubicacion.tipo === "reserva" ? (
-            <span
-              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border bg-gray-50 text-gray-500 border-gray-200 cursor-default select-none"
-              title="Las reservas no contienen productos sueltos. La mercancía se almacena en palets."
-            >
-              <Package className="w-3.5 h-3.5 text-gray-400" />
-              <span>0 prod.</span>
-            </span>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                abrirStockUbicacion(ubicacion);
-              }}
-              className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium transition-colors border ${
-                numProductos > 0
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                  : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-              }`}
-              title="Gestionar productos de esta ubicación"
-            >
-              <Package className="w-3.5 h-3.5" />
-              <span>{numProductos > 0 ? `${numProductos} prod.` : "+ prod."}</span>
-            </button>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              editarUbicacion(ubicacion);
-            }}
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
-            title="Editar ubicación"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          {numProductos > 0 || tieneHijos ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                desactivarUbicacionHandler(ubicacion);
-              }}
-              className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded-md transition-colors"
-              title="Desactivar ubicación"
-            >
-              <Pause className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                borrarDefinitivamente(ubicacion);
-              }}
-              className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded-md transition-colors"
-              title="Borrar ubicación"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function getPasillosDisponibles() {
-    return ubicaciones
-      .filter((u: any) => {
-        const esPasilloReserva = u.tipo === "pasillo" || u.tipo === "reserva";
-        if (!esPasilloReserva) return false;
-        if (filtroSeccion !== "todas") {
-          const sec = getSeccionReal(u);
-          if (sec === filtroSeccion) return true;
-          // Comprobar si algún hijo tiene esta sección asociada
-          return ubicaciones.some(
-            (h: any) => h.id_ubicacion_padre === u.id && getSeccionReal(h) === filtroSeccion,
-          );
-        }
-        return true;
-      })
-      .sort((a: any, b: any) => (a.nombre || "").localeCompare(b.nombre || ""));
-  }
-
-  function getUbicacionesFiltradas() {
-    return ubicaciones.filter((u: any) => {
-      // 1. Filtro Tipo
-      if (filtroTipo !== "todos" && u.tipo !== filtroTipo) {
-        return false;
-      }
-      // 2. Filtro Sección
-      if (filtroSeccion !== "todas" && getSeccionReal(u) !== filtroSeccion) {
-        return false;
-      }
-      // 3. Filtro Pasillo
-      if (filtroPasillo !== "todos") {
-        const esPasilloReserva = u.tipo === "pasillo" || u.tipo === "reserva";
-        if (esPasilloReserva) {
-          if (u.nombre !== filtroPasillo) return false;
-        } else {
-          const padre = ubicaciones.find((p: any) => p.id === u.id_ubicacion_padre);
-          const nombrePadre = u.ubicacion_padre_nombre || padre?.nombre;
-          if (nombrePadre !== filtroPasillo) return false;
-        }
-      }
-      // 4. Filtro Stock (Solo con stock)
-      if (soloConStock) {
-        const stock = productosPorUbicacion.get(u.id) || 0;
-        if (stock <= 0) return false;
-      }
-      return true;
-    });
-  }
-
-  // =========================================================
-  // FUNCIONES PARA INFORME DETALLADO IMPRIMIBLE (A4)
-  // =========================================================
-
-  async function cargarProductosInforme(): Promise<Map<string, ProductoConCantidad[]> | null> {
-    const filtradas = getUbicacionesFiltradas();
-    if (filtradas.length === 0) {
-      toast.info("No hay ubicaciones que coincidan con los filtros seleccionados.");
-      return null;
-    }
-    const ids = filtradas.map((u: any) => u.id);
-
-    // Query JOIN optimizada a Supabase (solo existencias > 0)
-    const { data, error } = await supabase
-      .from("stock")
-      .select("id_ubicacion, cantidad, producto:productos(*)")
-      .in("id_ubicacion", ids)
-      .gt("cantidad", 0);
-
-    if (error) {
-      throw error;
-    }
-
-    const mapa = new Map<string, ProductoConCantidad[]>();
-    data?.forEach((row: any) => {
-      if (row.producto && row.id_ubicacion) {
-        const lista = mapa.get(row.id_ubicacion) || [];
-        lista.push({
-          ...row.producto,
-          cantidad: row.cantidad,
-        });
-        mapa.set(row.id_ubicacion, lista);
-      }
-    });
-
-    setProductosInforme(mapa);
-    return mapa;
-  }
-
-  async function generarEImprimirInforme() {
-    try {
-      setCargandoInforme(true);
-      const mapa = await cargarProductosInforme();
-      if (!mapa) return;
-      setMostrarInforme(true);
-      toast.success("Informe detallado listo");
-      setTimeout(() => {
-        window.print();
-      }, 250);
-    } catch (err: any) {
-      toast.error(`Error al preparar el informe: ${errorInventario(err)}`);
-    } finally {
-      setCargandoInforme(false);
-    }
-  }
-
-  async function abrirVistaPreviaInforme() {
-    try {
-      setCargandoInforme(true);
-      const mapa = await cargarProductosInforme();
-      if (!mapa) return;
-      setMostrarInforme(true);
-    } catch (err: any) {
-      toast.error(`Error al preparar vista previa: ${errorInventario(err)}`);
-    } finally {
-      setCargandoInforme(false);
-    }
-  }
-
-  interface ItemUbicacionHijo {
-    ubicacion: any;
-    productos: ProductoConCantidad[];
-  }
-
-  interface GrupoPasilloInforme {
-    pasillo: any;
-    productosPasillo: ProductoConCantidad[];
-    hijos: ItemUbicacionHijo[];
-  }
-
-  function getJerarquiaInforme(): GrupoPasilloInforme[] {
-    const filtradas = getUbicacionesFiltradas();
-    const mapaPasillos = new Map<string, GrupoPasilloInforme>();
-
-    filtradas.forEach((u: any) => {
-      const prods = productosInforme.get(u.id) || [];
-      const esRaiz = u.tipo === "pasillo" || u.tipo === "reserva" || !u.id_ubicacion_padre;
-
-      if (esRaiz) {
-        if (!mapaPasillos.has(u.id)) {
-          mapaPasillos.set(u.id, {
-            pasillo: u,
-            productosPasillo: prods,
-            hijos: [],
-          });
-        }
-      } else {
-        // En el informe impreso SOLO mostrar sub-ubicaciones que tengan productos con stock
-        if (prods.length === 0) return;
-
-        const padreId = u.id_ubicacion_padre;
-        let grupo = mapaPasillos.get(padreId);
-        if (!grupo) {
-          const padre = ubicaciones.find((p: any) => p.id === padreId) || {
-            id: padreId,
-            nombre: u.ubicacion_padre_nombre || "Pasillo sin asignar",
-            tipo: "pasillo",
-            seccion_nombre: u.seccion_nombre || "-",
-          };
-          grupo = {
-            pasillo: padre,
-            productosPasillo: productosInforme.get(padre.id) || [],
-            hijos: [],
-          };
-          mapaPasillos.set(padreId, grupo);
-        }
-        grupo.hijos.push({
-          ubicacion: u,
-          productos: prods,
-        });
-      }
-    });
-
-    // Solo mostrar pasillos que contengan productos directos o sub-ubicaciones con productos
-    const resultado = Array.from(mapaPasillos.values())
-      .filter((g) => g.productosPasillo.length > 0 || g.hijos.length > 0)
-      .sort((a, b) => (a.pasillo.nombre || "").localeCompare(b.pasillo.nombre || ""));
-
-    resultado.forEach((g) => {
-      g.hijos.sort((a, b) => (a.ubicacion.nombre || "").localeCompare(b.ubicacion.nombre || ""));
-    });
-
-    return resultado;
-  }
-
-  function getMetricasInforme() {
-    const jerarquia = getJerarquiaInforme();
-    let totalUbicacionesConProductos = 0;
-    let totalUnidades = 0;
-    const productosDistintos = new Set<string>();
-
-    jerarquia.forEach((g) => {
-      if (g.productosPasillo.length > 0) {
-        totalUbicacionesConProductos += 1;
-        g.productosPasillo.forEach((p) => {
-          totalUnidades += p.cantidad;
-          productosDistintos.add(p.id);
-        });
-      }
-      g.hijos.forEach((h) => {
-        totalUbicacionesConProductos += 1;
-        h.productos.forEach((p) => {
-          totalUnidades += p.cantidad;
-          productosDistintos.add(p.id);
-        });
-      });
-    });
-
-    return {
-      totalUbicaciones: totalUbicacionesConProductos,
-      totalProductosDistintos: productosDistintos.size,
-      totalUnidades,
-    };
-  }
-
-  function renderizarInformeImprimible() {
-    const jerarquia = getJerarquiaInforme();
-    const metricas = getMetricasInforme();
-    const fechaHora = new Date().toLocaleString("es-ES", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-
-    return (
-      <div className="max-w-[210mm] mx-auto text-gray-900 font-sans">
-        {/* CABECERA FORMAL DEL INFORME A4 */}
-        <div className="border-b-2 border-gray-800 pb-3 mb-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg tracking-tight text-gray-900">
-                  INVENTARIO LM
-                </span>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded font-semibold">
-                  Almacén
-                </span>
-              </div>
-              <h1 className="text-xl font-bold text-gray-900 mt-1">
-                Informe Detallado de Ubicaciones y Stock
-              </h1>
-              <p className="text-xs text-gray-600">
-                Desglose jerárquico de existencias (Pasillo → Armario → Productos)
-              </p>
-            </div>
-            <div className="text-right text-xs text-gray-600">
-              <div className="font-semibold text-gray-800">Fecha de emisión:</div>
-              <div>{fechaHora}</div>
-              <div className="text-[11px] text-gray-500 mt-0.5">Control y auditoría física</div>
-            </div>
-          </div>
-
-          {/* RESUMEN DE FILTROS APLICADOS */}
-          <div className="mt-3 pt-2.5 border-t border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">Tipo:</span>
-              <span className="font-medium capitalize text-gray-800">
-                {filtroTipo === "todos" ? "Todos los tipos" : filtroTipo}
-              </span>
-            </div>
-            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">
-                Sección:
-              </span>
-              <span className="font-medium text-gray-800">
-                {filtroSeccion === "todas" ? "Todas las secciones" : filtroSeccion}
-              </span>
-            </div>
-            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">
-                Pasillo:
-              </span>
-              <span className="font-medium text-gray-800 truncate block">
-                {filtroPasillo === "todos" ? "Todos" : filtroPasillo}
-              </span>
-            </div>
-            <div className="bg-gray-50 p-1.5 rounded border border-gray-200">
-              <span className="text-gray-500 block text-[10px] uppercase font-semibold">
-                Filtro stock:
-              </span>
-              <span className="font-medium text-gray-800">
-                {soloConStock ? "Solo con stock (>0)" : "Todas (con y sin stock)"}
-              </span>
-            </div>
-          </div>
-
-          {/* TOTALES / METRICAS */}
-          <div className="mt-2.5 flex items-center justify-between bg-blue-50/70 border border-blue-200 px-3 py-1.5 rounded text-xs text-blue-950">
-            <div>
-              <strong>{metricas.totalUbicaciones}</strong> ubicaciones
-            </div>
-            <div>
-              <strong>{metricas.totalProductosDistintos}</strong> productos distintos
-            </div>
-            <div>
-              Total: <strong>{metricas.totalUnidades}</strong> unidades físicas
-            </div>
-          </div>
-        </div>
-
-        {/* CONTENIDO JERÁRQUICO */}
-        {jerarquia.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm border border-dashed rounded-lg">
-            No hay ubicaciones ni productos que coincidan con los filtros seleccionados.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {jerarquia.map((grupo) => {
-              const totalUnidadesPasillo =
-                grupo.productosPasillo.reduce((acc, p) => acc + p.cantidad, 0) +
-                grupo.hijos.reduce(
-                  (acc, h) => acc + h.productos.reduce((pAcc, p) => pAcc + p.cantidad, 0),
-                  0,
-                );
-
-              return (
-                <div
-                  key={grupo.pasillo.id}
-                  className="border border-gray-300 rounded-md overflow-hidden break-inside-avoid bg-white"
-                >
-                  {/* CABECERA DE PASILLO / RESERVA (NIVEL 1) */}
-                  <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 flex flex-wrap justify-between items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-gray-800 text-white font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded">
-                        {grupo.pasillo.tipo || "Pasillo"}
-                      </span>
-                      <span className="font-bold text-sm text-gray-900">
-                        {grupo.pasillo.nombre}
-                      </span>
-                      <span className="text-xs text-gray-600 font-medium">
-                        · Sección: {getSeccionReal(grupo.pasillo)}
-                      </span>
-                      {grupo.pasillo.descripcion && (
-                        <span className="text-xs text-gray-500 italic">
-                          ({grupo.pasillo.descripcion})
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-700 font-medium">
-                      {grupo.hijos.length > 0 && `${grupo.hijos.length} sub-ubicaciones · `}
-                      <span className="font-bold">{totalUnidadesPasillo} uds</span>
-                    </div>
-                  </div>
-
-                  {/* PRODUCTOS DIRECTOS DEL PASILLO (SI TIENE) */}
-                  {grupo.productosPasillo.length > 0 && (
-                    <div className="p-2.5 border-b border-gray-200 bg-gray-50/50">
-                      <div className="text-[11px] font-semibold text-gray-700 mb-1 flex justify-between">
-                        <span>Productos en suelo/palet de {grupo.pasillo.nombre}:</span>
-                        <span>{grupo.productosPasillo.length} productos</span>
-                      </div>
-                      <table className="w-full text-left text-xs border border-gray-200 border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200 text-[10px] uppercase">
-                            <th className="py-1 px-2 w-32">Código barras</th>
-                            <th className="py-1 px-2 w-28">SKU</th>
-                            <th className="py-1 px-2">Nombre</th>
-                            <th className="py-1 px-2 text-right w-24">Cantidad</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {grupo.productosPasillo.map((prod) => (
-                            <tr key={prod.id} className="text-[11px]">
-                              <td className="py-1 px-2 font-mono text-gray-600">
-                                {prod.codigo_barras || "-"}
-                              </td>
-                              <td className="py-1 px-2 font-mono font-medium text-gray-800">
-                                {prod.sku || "-"}
-                              </td>
-                              <td className="py-1 px-2 text-gray-900 font-medium">{prod.nombre}</td>
-                              <td className="py-1 px-2 text-right font-bold text-gray-900">
-                                {prod.cantidad} uds
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* SUB-UBICACIONES HIJAS (ARMARIOS, ALTOS, CAJAS, CROSS) (NIVEL 2 & 3) */}
-                  {grupo.hijos.length > 0 && (
-                    <div className="divide-y divide-gray-200">
-                      {grupo.hijos.map(({ ubicacion: hijo, productos }) => {
-                        const totalUdsHijo = productos.reduce((sum, p) => sum + p.cantidad, 0);
-
-                        return (
-                          <div key={hijo.id} className="p-2.5 break-inside-avoid">
-                            {/* SUB-CABECERA DEL ARMARIO */}
-                            <div className="flex justify-between items-center mb-1.5">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border border-gray-300 bg-gray-50 text-gray-700">
-                                  {hijo.tipo}
-                                </span>
-                                <span className="font-bold text-xs text-gray-900">
-                                  {hijo.nombre}
-                                </span>
-                                <span className="text-[11px] text-gray-500">
-                                  · {getDetalles(hijo)}
-                                </span>
-                              </div>
-                              <div className="text-xs">
-                                <span className="font-semibold text-gray-800">
-                                  {productos.length} prod. ({totalUdsHijo} uds)
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* TABLA DE PRODUCTOS (NIVEL 3) */}
-                            <table className="w-full text-left text-xs border border-gray-200 border-collapse">
-                              <thead>
-                                <tr className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200 text-[10px] uppercase">
-                                  <th className="py-1 px-2 w-32">Código barras</th>
-                                  <th className="py-1 px-2 w-28">SKU</th>
-                                  <th className="py-1 px-2">Nombre</th>
-                                  <th className="py-1 px-2 text-right w-24">Cantidad</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-200">
-                                {productos.map((prod) => (
-                                  <tr key={prod.id} className="text-[11px]">
-                                    <td className="py-1 px-2 font-mono text-gray-600">
-                                      {prod.codigo_barras || "-"}
-                                    </td>
-                                    <td className="py-1 px-2 font-mono font-medium text-gray-800">
-                                      {prod.sku || "-"}
-                                    </td>
-                                    <td className="py-1 px-2 text-gray-900 font-medium">
-                                      {prod.nombre}
-                                    </td>
-                                    <td className="py-1 px-2 text-right font-bold text-gray-900">
-                                      {prod.cantidad} uds
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* PIE DE PÁGINA FORMAL DEL INFORME A4 */}
-        <div className="mt-6 pt-3 border-t border-gray-300 flex justify-between items-center text-[10px] text-gray-500">
-          <div>Inventario LM · Software de gestión logística</div>
-          <div>Documento para control y reposición de almacén</div>
-          <div>Pág. 1</div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderizarTabla() {
-    if (cargando) return <div className="text-center py-12 text-gray-500">Cargando...</div>;
-    if (ubicaciones.length === 0) {
-      return (
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <p className="text-gray-500">No hay ubicaciones.</p>
-        </div>
-      );
-    }
-
-    const agrupadas = getUbicacionesAgrupadas();
-    const pasillosDisp = getPasillosDisponibles();
-    const ubicacionesFiltradas = getUbicacionesFiltradas();
-
-    return (
-      <div className="bg-white rounded-lg shadow-xs border overflow-hidden">
-        {/* CABECERA PRINCIPAL */}
-        <div className="bg-gray-50 px-4 py-3 border-b flex flex-wrap justify-between items-center gap-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="text-sm text-gray-700">
-              <strong>{ubicaciones.length}</strong> ubicaciones
-            </div>
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-gray-500 border-l pl-3">
-              {Object.values(CONFIG_TIPOS).map((cfg) => {
-                const count = ubicaciones.filter((u: any) => u.tipo === cfg.tipo).length;
-                if (count === 0 && cfg.tipo !== "pasillo" && cfg.tipo !== "armario") return null;
-                const Icon = cfg.icon;
-                return (
-                  <span
-                    key={cfg.tipo}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 shadow-2xs"
-                  >
-                    <Icon className={`w-3 h-3 ${cfg.textColor}`} />
-                    <span>
-                      {cfg.label}: {count}
-                    </span>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 no-print">
-            {/* Toggle Vista Listado / Vista Árbol */}
-            <button
-              onClick={() => setVistaListado(!vistaListado)}
-              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium border shadow-2xs transition-colors ${
-                vistaListado
-                  ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              }`}
-              title={vistaListado ? "Cambiar a Vista Árbol" : "Cambiar a Vista Listado"}
-            >
-              {vistaListado ? (
-                <>
-                  <FolderTree className="w-3.5 h-3.5" />
-                  <span>Vista Árbol</span>
-                </>
-              ) : (
-                <>
-                  <List className="w-3.5 h-3.5" />
-                  <span>Vista Listado</span>
-                </>
-              )}
-            </button>
-
-            {/* Expandir / Colapsar todos (deshabilitados en vista listado) */}
-            <button
-              onClick={expandirTodos}
-              disabled={vistaListado}
-              className={`text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors ${
-                vistaListado ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50"
-              }`}
-            >
-              ▼ Expandir todos
-            </button>
-            <button
-              onClick={colapsarTodos}
-              disabled={vistaListado}
-              className={`text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md font-medium text-gray-700 shadow-2xs transition-colors ${
-                vistaListado ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-50"
-              }`}
-            >
-              ▶ Colapsar todos
-            </button>
-          </div>
-        </div>
-
-        {/* BARRA DE FILTROS PARA VISTA LISTADO */}
-        {vistaListado && (
-          <div className="bg-blue-50/70 border-b border-blue-100 p-3 flex flex-wrap items-center justify-between gap-3 no-print">
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Filtro Tipo */}
-              <div className="flex items-center gap-1.5">
-                <label className="text-xs font-semibold text-blue-900">Tipo:</label>
-                <select
-                  value={filtroTipo}
-                  onChange={(e) => setFiltroTipo(e.target.value)}
-                  className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="todos">Todos los tipos</option>
-                  <option value="pasillo">Pasillo</option>
-                  <option value="armario">Armario</option>
-                  <option value="alto">Alto</option>
-                  <option value="cross">Cross</option>
-                  <option value="caja">Caja</option>
-                  <option value="reserva">Reserva</option>
-                </select>
-              </div>
-
-              {/* Filtro Sección */}
-              <div className="flex items-center gap-1.5">
-                <label className="text-xs font-semibold text-blue-900">Sección:</label>
-                <select
-                  value={filtroSeccion}
-                  onChange={(e) => {
-                    setFiltroSeccion(e.target.value);
-                    setFiltroPasillo("todos");
-                  }}
-                  className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="todas">Todas las secciones</option>
-                  {secciones.map((s: any) => (
-                    <option key={s.id} value={s.nombre}>
-                      {s.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Filtro Pasillo */}
-              <div className="flex items-center gap-1.5">
-                <label className="text-xs font-semibold text-blue-900">Pasillo:</label>
-                <select
-                  value={filtroPasillo}
-                  onChange={(e) => setFiltroPasillo(e.target.value)}
-                  className="text-xs border border-blue-200 rounded-md px-2 py-1.5 bg-white text-gray-700 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-blue-500 max-w-[200px]"
-                >
-                  <option value="todos">Todos los pasillos</option>
-                  {pasillosDisp.map((p: any) => (
-                    <option key={p.id} value={p.nombre}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Checkbox Solo con stock */}
-              <label className="flex items-center gap-1.5 text-xs text-blue-950 font-medium cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={soloConStock}
-                  onChange={(e) => setSoloConStock(e.target.checked)}
-                  className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
-                />
-                <span>Solo con stock</span>
-              </label>
-
-              {/* Contador */}
-              <span className="text-xs font-semibold text-blue-800 bg-blue-100/90 border border-blue-200/80 px-2.5 py-1 rounded-md">
-                {ubicacionesFiltradas.length} encontradas
-              </span>
-
-              {/* Botón Vista Previa */}
-              <button
-                onClick={abrirVistaPreviaInforme}
-                disabled={cargandoInforme}
-                className="inline-flex items-center gap-1 text-xs bg-white border border-blue-200 hover:bg-blue-50 text-blue-900 px-2.5 py-1.5 rounded-md font-medium shadow-2xs transition-colors disabled:opacity-50"
-                title="Vista previa del informe A4"
-              >
-                <Eye className="w-3.5 h-3.5 text-blue-700" />
-                <span className="hidden sm:inline">Vista previa</span>
-              </button>
-
-              {/* Botón Imprimir Detallado */}
-              <button
-                onClick={generarEImprimirInforme}
-                disabled={cargandoInforme}
-                className="inline-flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium shadow-2xs transition-colors disabled:opacity-50"
-                title="Cargar productos e imprimir informe A4"
-              >
-                {cargandoInforme ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Cargando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Imprimir informe</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ENCABEZADOS DE COLUMNA */}
-        <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-100/80 border-b text-xs font-semibold text-gray-600 uppercase tracking-wider">
-          <div className="col-span-4">Ubicación</div>
-          <div className="col-span-2">Tipo</div>
-          <div className="col-span-2">{vistaListado ? "Sección" : "Detalles"}</div>
-          <div className="col-span-2">{vistaListado ? "Detalles" : "Sección"}</div>
-          <div className="col-span-2 text-right">{vistaListado ? "Stock" : "Acciones"}</div>
-        </div>
-
-        {/* FILAS DE LA TABLA (CONDICIONAL: LISTADO O ÁRBOL) */}
-        {vistaListado ? (
-          <div className="divide-y divide-gray-100">
-            {ubicacionesFiltradas.length === 0 ? (
-              <div className="text-center py-10 text-gray-500 text-sm">
-                No se encontraron ubicaciones con los filtros seleccionados.
-              </div>
-            ) : (
-              ubicacionesFiltradas.map((u: any) => {
-                const numProductos = productosPorUbicacion.get(u.id) || 0;
-                const config = getConfigTipo(u.tipo);
-                const IconoUbicacion = config.icon;
-                const esReserva = u.tipo === "reserva";
-                const estaExpandida = reservasExpandidas.has(u.id);
-
-                return (
-                  <div key={u.id} className="border-b last:border-b-0">
-                    <div
-                      onClick={() => {
-                        if (esReserva) {
-                          toggleReservaExpandida(u.id);
-                        } else {
-                          abrirStockUbicacion(u);
-                        }
-                      }}
-                      className={`grid grid-cols-12 gap-2 px-4 py-2.5 items-center transition-colors cursor-pointer group ${
-                        esReserva && estaExpandida
-                          ? "bg-amber-50/60 hover:bg-amber-100/70"
-                          : esReserva
-                            ? "hover:bg-amber-50/50 bg-white"
-                            : "hover:bg-blue-50/70 bg-white"
-                      }`}
-                    >
-                      {/* Col 4: Icono, Chevron para reserva y Nombre */}
-                      <div className="col-span-4 flex items-center gap-2 min-w-0">
-                        {esReserva ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleReservaExpandida(u.id);
-                            }}
-                            className="p-1 hover:bg-amber-200/80 rounded text-amber-800 transition-colors shrink-0"
-                            title={
-                              estaExpandida
-                                ? "Ocultar palets de la reserva"
-                                : "Ver palets de la reserva"
-                            }
-                          >
-                            {estaExpandida ? (
-                              <ChevronDown className="w-4 h-4 text-amber-900" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-amber-700" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="w-4 shrink-0" />
-                        )}
-
-                        <div
-                          className={`p-1.5 rounded-md border shrink-0 ${config.iconBgClass}`}
-                          title={config.label}
-                        >
-                          <IconoUbicacion className="w-4 h-4" />
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
-                            {u.nombre}
-                          </span>
-                          {u.descripcion && (
-                            <span className="text-xs text-gray-500 truncate">{u.descripcion}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Col 2: Tipo Badge */}
-                      <div className="col-span-2">
-                        <BadgeTipoUbicacion tipo={u.tipo} size="sm" />
-                      </div>
-
-                      {/* Col 2: Sección */}
-                      <div className="col-span-2 text-sm text-gray-600 truncate">
-                        {getSeccionReal(u)}
-                      </div>
-
-                      {/* Col 2: Detalles */}
-                      <div className="col-span-2 text-sm text-gray-600 truncate">
-                        {getDetalles(u)}
-                      </div>
-
-                      {/* Col 2: Stock, Botón Nuevo Palet y Flechita */}
-                      <div className="col-span-2 flex justify-end items-center gap-1.5">
-                        {esReserva && puedeGestionarPalets && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReservaParaNuevoPalet(u);
-                            }}
-                            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md font-semibold border bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs"
-                            title="Dar de alta un nuevo palet en esta reserva"
-                          >
-                            <Plus className="w-3 h-3 text-amber-700" />
-                            <span className="hidden sm:inline">Nuevo palet</span>
-                          </button>
-                        )}
-
-                        {esReserva ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border bg-gray-50 text-gray-500 border-gray-200 cursor-default select-none"
-                            title="Las reservas no contienen productos sueltos. La mercancía se almacena en palets."
-                          >
-                            <Package className="w-3.5 h-3.5 text-gray-400" />
-                            <span>0 prod.</span>
-                          </span>
-                        ) : (
-                          <span
-                            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium border ${
-                              numProductos > 0
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-gray-50 text-gray-500 border-gray-200"
-                            }`}
-                          >
-                            <Package className="w-3.5 h-3.5" />
-                            <span>{numProductos > 0 ? `${numProductos} prod.` : "0 prod."}</span>
-                          </span>
-                        )}
-
-                        {esReserva ? (
-                          <span className="p-0.5 text-amber-700">
-                            {estaExpandida ? (
-                              <ChevronDown className="w-4 h-4 text-amber-800" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-amber-600" />
-                            )}
-                          </span>
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Sección expandible de palets de la reserva */}
-                    {esReserva && estaExpandida && (
-                      <SeccionPaletsReserva
-                        reserva={u}
-                        puedeGestionar={puedeGestionarPalets}
-                        usuarioNombre={usuarioNombre}
-                        onNuevoPalet={() => setReservaParaNuevoPalet(u)}
-                      />
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {agrupadas.map(({ padre, hijos }: any) => {
-              const estaExpandido = expandidos.has(padre.id);
-              const tieneHijos = hijos.length > 0;
-              return (
-                <div key={padre.id}>
-                  <div
-                    className={tieneHijos ? "cursor-pointer" : ""}
-                    onClick={() => tieneHijos && toggleExpandir(padre.id)}
-                  >
-                    <FilaUbicacion ubicacion={padre} esHijo={false} />
-                  </div>
-                  {estaExpandido &&
-                    hijos.map((hijo: any) => (
-                      <FilaUbicacion key={hijo.id} ubicacion={hijo} esHijo={true} />
-                    ))}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ---------- RENDER DEL MODAL ----------
-
-  function renderizarModal() {
-    const textoBusqueda = busqueda.trim().toLowerCase();
-    const productosFiltrados = textoBusqueda
-      ? productosUbicacion.filter(
-          (p) =>
-            p.nombre.toLowerCase().includes(textoBusqueda) ||
-            (p.sku || "").toLowerCase().includes(textoBusqueda) ||
-            (p.codigo_barras || "").toLowerCase().includes(textoBusqueda),
-        )
-      : productosUbicacion;
-
-    return (
-      <>
-        <Dialog
-          open={!!ubicacionStockAbierta}
-          onOpenChange={(open) => {
-            if (!open) cerrarModal();
-          }}
-        >
-          <DialogContent
-            className="max-w-3xl max-h-[85vh] overflow-y-auto"
-            onInteractOutside={(e) => {
-              if (escanerAbierto || ajusteRapido || productoAEliminar || confirmacionStockCero)
-                e.preventDefault();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle className="flex flex-wrap items-center gap-2">
-                {ubicacionStockAbierta && (
-                  <BadgeTipoUbicacion tipo={ubicacionStockAbierta.tipo} size="md" />
-                )}
-                <span>Productos en: {ubicacionStockAbierta?.nombre}</span>
-                {ubicacionStockAbierta?.ubicacion_padre_nombre && (
-                  <span className="text-xs font-normal text-gray-500">
-                    ({ubicacionStockAbierta.ubicacion_padre_nombre})
-                  </span>
-                )}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-              <Input
-                placeholder="Buscar por nombre, SKU o código de barras..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="max-w-xs"
-                disabled={modalMode !== "ver"}
-              />
-              {modalMode === "ver" && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setModalMode("anadir");
-                    setResultadosBusqueda(catalogoProductos);
-                    setSinResultados(false);
-                    setScanError("");
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  + Añadir producto
-                </Button>
-              )}
-              {modalMode !== "ver" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    resetearModalForms();
-                    setUbicacionStockAbierta(ubicacionStockAbierta);
-                  }}
-                >
-                  Cancelar
-                </Button>
-              )}
-            </div>
-
-            {modalMode === "anadir" && (
-              <div className="border border-blue-200 bg-blue-50/50 rounded-lg p-4 space-y-3">
-                <p className="text-sm font-semibold text-gray-800">
-                  Añadir producto a {ubicacionStockAbierta?.nombre}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                  <div className="space-y-1 relative">
-                    <Label htmlFor="scan-codigo">Código de barras (escáner o manual)</Label>
-                    <Input
-                      id="scan-codigo"
-                      autoFocus
-                      placeholder="Busca por nombre, SKU o código (o selecciona de la lista)"
-                      value={nuevoCodigoBarras}
-                      onFocus={() => {
-                        if (!nuevoCodigoBarras.trim() && !productoEscaneado) {
-                          setResultadosBusqueda(catalogoProductos);
-                          setSinResultados(false);
-                        }
-                      }}
-                      onChange={(e) => {
-                        setNuevoCodigoBarras(e.target.value);
-                        setProductoEscaneado(null);
-                        setScanError("");
-                        autocompletarProductos(e.target.value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          escanearCodigo();
-                        }
-                      }}
-                    />
-
-                    {/* LISTA DESPLEGABLE DE AUTOCOMPLETADO */}
-                    {(buscandoProductos || sinResultados || resultadosBusqueda.length > 0) && (
-                      <div className="absolute top-full left-0 z-50 mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg max-h-80 overflow-y-auto divide-y divide-gray-100 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_#f1f5f9]">
-                        {buscandoProductos ? (
-                          <p className="px-3 py-2 text-sm text-gray-500 animate-pulse">
-                            Buscando en todos los productos…
-                          </p>
-                        ) : resultadosBusqueda.length > 0 ? (
-                          <>
-                            <p className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 sticky top-0 z-10">
-                              Mostrando {Math.min(visiblesLista, resultadosBusqueda.length)} de{" "}
-                              {resultadosBusqueda.length} productos
-                              {totalRealesTabla !== null &&
-                                totalRealesTabla > catalogoProductos.length && (
-                                  <span className="text-amber-600">
-                                    {" "}
-                                    · {totalRealesTabla - catalogoProductos.length} inactivos no se
-                                    muestran
-                                  </span>
-                                )}
-                            </p>
-                            {resultadosBusqueda.slice(0, visiblesLista).map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => seleccionarProductoBusqueda(p)}
-                                className="w-full text-left px-3 py-3 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
-                              >
-                                <span className="font-semibold truncate">{p.nombre}</span>
-                                <span className="text-xs text-gray-500 font-mono shrink-0">
-                                  {p.sku} · {p.codigo_barras}
-                                </span>
-                              </button>
-                            ))}
-                            {visiblesLista < resultadosBusqueda.length && (
-                              <div className="sticky bottom-0 bg-white p-2 z-10">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="w-full"
-                                  onClick={() => setVisiblesLista((v) => v + 25)}
-                                >
-                                  Ver más ({resultadosBusqueda.length - visiblesLista} restantes)
-                                </Button>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <p className="px-3 py-2 text-sm text-gray-500">
-                            No se encontraron productos
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEscanerAbierto(true)}
-                      disabled={guardando}
-                    >
-                      {"\u{1F4F7} Escanear"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => escanearCodigo()}
-                      disabled={guardando}
-                    >
-                      🔍 Buscar
-                    </Button>
-                  </div>
-                </div>
-
-                {productoEscaneado && (
-                  <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
-                    <span className="font-semibold">{productoEscaneado.nombre}</span>
-                    <span className="text-green-600"> · SKU: {productoEscaneado.sku}</span>
-                    <span className="text-green-600">
-                      {" "}
-                      · ya existe en el catálogo, solo se ajustará su stock aquí
-                    </span>
-                  </div>
-                )}
-
-                {!productoEscaneado &&
-                  nuevoCodigoBarras.trim() !== "" &&
-                  scanError === "" &&
-                  (nuevoSku !== "" || nuevoNombre !== "") && (
-                    <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                      No se encontró el código en el catálogo. Completa SKU y nombre para crear un
-                      producto nuevo.
-                    </div>
-                  )}
-
-                {!productoEscaneado &&
-                  (nuevoSku !== "" ||
-                    nuevoNombre !== "" ||
-                    (nuevoCodigoBarras.trim() !== "" && scanError !== "")) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="nuevo-sku">SKU *</Label>
-                        <Input
-                          id="nuevo-sku"
-                          value={nuevoSku}
-                          onChange={(e) => setNuevoSku(e.target.value)}
-                          placeholder="Ej: PINT-001"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="nuevo-nombre">Nombre *</Label>
-                        <Input
-                          id="nuevo-nombre"
-                          value={nuevoNombre}
-                          onChange={(e) => setNuevoNombre(e.target.value)}
-                          placeholder="Ej: Esmalte blanco 750ml"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="nueva-cantidad">Cantidad *</Label>
-                    <Input
-                      id="nueva-cantidad"
-                      type="number"
-                      min={1}
-                      value={nuevaCantidad}
-                      onChange={(e) =>
-                        setNuevaCantidad(e.target.value === "" ? "" : parseInt(e.target.value))
-                      }
-                    />
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <Button
-                      size="default"
-                      onClick={anadirProducto}
-                      disabled={guardando}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {guardando ? "Guardando..." : "Guardar en ubicación"}
-                    </Button>
-                  </div>
-                </div>
-
-                {scanError && (
-                  <div className="bg-red-50 text-red-700 p-2 rounded border border-red-200 text-sm">
-                    {scanError}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {modalMode === "editar" && productoEditando && (
-              <div className="border border-amber-200 bg-amber-50/60 rounded-lg p-4 space-y-3">
-                <p className="text-sm font-semibold text-gray-800">
-                  Editar cantidad: {productoEditando.nombre}
-                  <span className="text-xs font-normal text-gray-500">
-                    {" "}
-                    (SKU {productoEditando.sku}) · actual: {productoEditando.cantidad} uds
-                  </span>
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-[150px_auto] gap-2 items-end">
-                  <div className="space-y-1">
-                    <Label htmlFor="cantidad-edicion">Nueva cantidad</Label>
-                    <Input
-                      id="cantidad-edicion"
-                      type="number"
-                      min={0}
-                      autoFocus
-                      value={cantidadEdicion}
-                      onChange={(e) =>
-                        setCantidadEdicion(e.target.value === "" ? "" : parseInt(e.target.value))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          guardarCantidad();
-                        }
-                      }}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Pon 0 para quitar el producto de esta ubicación.
-                    </p>
-                  </div>
-                  <Button
-                    size="default"
-                    onClick={guardarCantidad}
-                    disabled={guardando}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {guardando ? "Guardando..." : "Guardar cambios"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {cargandoStock ? (
-              <div className="py-8 text-center text-gray-500">Cargando...</div>
-            ) : productosUbicacion.length === 0 ? (
-              <div className="py-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
-                No hay productos en esta ubicación todavía. Usa «+ Añadir producto» para empezar.
-              </div>
-            ) : (
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[110px]">SKU</TableHead>
-                      <TableHead>Producto</TableHead>
-                      <TableHead className="hidden sm:table-cell w-[140px]">Cód. barras</TableHead>
-                      <TableHead className="text-right w-[90px]">Cantidad</TableHead>
-                      <TableHead className="text-right w-[110px]">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {productosFiltrados.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-gray-500 py-6">
-                          Ningún resultado para «{busqueda}».
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      productosFiltrados.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="font-mono text-xs">{p.sku || "—"}</TableCell>
-                          <TableCell className="font-medium">{p.nombre}</TableCell>
-                          <TableCell className="hidden sm:table-cell font-mono text-xs text-gray-500">
-                            {p.codigo_barras || "—"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="secondary" className="text-base px-3 py-1">
-                              {p.cantidad}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-blue-600 hover:text-blue-800 h-8 px-2"
-                                onClick={() => iniciarEdicion(p)}
-                                disabled={modalMode !== "ver"}
-                                title="Modificar cantidad"
-                              >
-                                ✏️
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-amber-600 hover:text-amber-800 h-8 px-2"
-                                onClick={() => abrirAjusteRapido(p)}
-                                disabled={modalMode !== "ver" || !!ajusteRapido}
-                                title="Ajuste rápido"
-                              >
-                                ⚡
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-800 h-8 px-2"
-                                onClick={() => setProductoAEliminar(p)}
-                                disabled={modalMode !== "ver" || !!ajusteRapido || guardando}
-                                title="Quitar de esta ubicación"
-                              >
-                                🗑️
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            <div className="text-xs text-gray-500 flex justify-between">
-              <span>{productosUbicacion.length} producto(s) en esta ubicación</span>
-              <span>Total unidades: {productosUbicacion.reduce((n, p) => n + p.cantidad, 0)}</span>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={!!ajusteRapido}
-          onOpenChange={(open) => {
-            if (!open && !guardando) {
-              setAjusteRapido(null);
-              setNuevaCantidadAjuste("");
+    // Actualizamos el mock simulando el trigger de Supabase
+    setUbicaciones((prev) =>
+      prev.map((u) => {
+        if (u.id === ubicacionParaAjuste.id) {
+          const prods = [...u.productos];
+          
+          // ✅ Usamos .find() para que TypeScript sepa con certeza que 'prod' existe
+          const prod = prods.find((p) => p.id === productoAjusteId);
+          
+          if (prod) {
+            let nuevaCant = prod.cantidad;
+            
+            if (tipoMovimiento === "entrada" || tipoMovimiento === "reposicion") {
+              nuevaCant += cantidadAjuste;
+            } else if (tipoMovimiento === "salida") {
+              nuevaCant = Math.max(0, nuevaCant - cantidadAjuste);
+            } else if (tipoMovimiento === "ajuste") {
+              nuevaCant = cantidadAjuste;
             }
-          }}
-        >
-          <DialogContent className="w-[calc(100%-2rem)] max-w-sm">
-            <DialogHeader>
-              <DialogTitle>⚡ Ajuste rápido</DialogTitle>
-              <DialogDescription>
-                {ajusteRapido?.nombre} (SKU {ajusteRapido?.sku}) · actual: {ajusteRapido?.cantidad}{" "}
-                uds
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="cantidad-ajuste-rapido">Nueva cantidad</Label>
-                <Input
-                  id="cantidad-ajuste-rapido"
-                  type="number"
-                  min={0}
-                  autoFocus
-                  value={nuevaCantidadAjuste}
-                  onChange={(e) =>
-                    setNuevaCantidadAjuste(e.target.value === "" ? "" : parseInt(e.target.value))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      guardarAjusteRapido();
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setAjusteRapido(null);
-                    setNuevaCantidadAjuste("");
-                  }}
-                  disabled={guardando}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={guardarAjusteRapido}
-                  disabled={guardando}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
-                >
-                  {guardando ? "Guardando..." : "Guardar ajuste"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* MODAL SECUNDARIO: ESCÁNER DE CÁMARA */}
-        <Dialog open={escanerAbierto} onOpenChange={setEscanerAbierto}>
-          <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-md overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{"\u{1F4F7} Escanear código de barras"}</DialogTitle>
-              <DialogDescription>Apunta al código o escríbelo manualmente.</DialogDescription>
-            </DialogHeader>
-            <Escaner
-              onCodigo={(codigo) => {
-                setNuevoCodigoBarras(codigo);
-                setProductoEscaneado(null);
-                setScanError("");
-                setEscanerAbierto(false);
-                escanearCodigo(codigo);
-              }}
-              onCerrar={() => setEscanerAbierto(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      </>
+            
+            // Actualizamos el producto en el array
+            const idx = prods.indexOf(prod);
+            if (idx !== -1) {
+              prods[idx] = { ...prod, cantidad: nuevaCant };
+            }
+          }
+          
+          const totalUds = prods.reduce((acc, p) => acc + p.cantidad, 0);
+          return {
+            ...u,
+            productos: prods,
+            subtitulo: `${prods.length} productos · ${totalUds} uds (Actualizado vía movimientos)`,
+          };
+        }
+        return u;
+      })
     );
-  }
+
+    toast.success(`Movimiento de ${tipoMovimiento} registrado correctamente en la tabla 'movimientos'`);
+    setDialogAjusteAbierto(false);
+  };
+  const confirmarEliminarUbicacion = () => {
+    if (!ubicacionParaEliminar) return;
+
+    if (ubicacionParaEliminar.productos && ubicacionParaEliminar.productos.length > 0) {
+      toast.error("No se puede eliminar una ubicación con stock activo. Ajusta el stock a 0 primero.");
+      setDialogEliminarAbierto(false);
+      return;
+    }
+
+    setUbicaciones((prev) => prev.filter((u) => u.id !== ubicacionParaEliminar.id));
+    toast.success(`Ubicación "${ubicacionParaEliminar.nombre}" eliminada`);
+    setDialogEliminarAbierto(false);
+    setUbicacionParaEliminar(null);
+  };
 
   return (
-    <>
-      <div className="p-6 max-w-7xl mx-auto screen-only">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Ubicaciones</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Gestiona la estructura jerárquica de tu tienda.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              resetearFormulario();
-              setMostrarFormulario(true);
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium inline-flex items-center gap-1.5 shadow-xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva ubicación</span>
-          </button>
-        </div>
-
-        {mostrarFormulario && renderizarFormulario()}
-        {renderizarTabla()}
-
-        {renderizarModal()}
-
-        {/* MODAL 1: Confirmación de quitar producto de la ubicación */}
-        <AlertDialog
-          open={!!productoAEliminar}
-          onOpenChange={(open) => !open && !guardando && setProductoAEliminar(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Quitar producto de esta ubicación?</AlertDialogTitle>
-              <AlertDialogDescription>
-                ¿Estás seguro de que deseas quitar «<strong>{productoAEliminar?.nombre}</strong>» de
-                la ubicación <strong>{ubicacionStockAbierta?.nombre}</strong>?
-                <br />
-                <br />
-                El producto seguirá existiendo en el catálogo general, pero su stock en esta
-                ubicación pasará a 0.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={guardando} onClick={() => setProductoAEliminar(null)}>
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction
-                disabled={guardando}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={confirmarEliminarProducto}
-              >
-                {guardando ? "Quitando..." : "Quitar producto"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* MODAL 2: Confirmación de ajuste de stock a 0 */}
-        <AlertDialog
-          open={!!confirmacionStockCero}
-          onOpenChange={(open) => !open && !guardando && setConfirmacionStockCero(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>⚠️ ¿Ajustar stock a 0?</AlertDialogTitle>
-              <AlertDialogDescription>
-                ¿Confirmar que el stock de <strong>{confirmacionStockCero?.producto.nombre}</strong>{" "}
-                pasará a 0 en <strong>{ubicacionStockAbierta?.nombre}</strong>?
-                <br />
-                <br />
-                El producto quedará registrado sin existencias en esta ubicación.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                disabled={guardando}
-                onClick={() => setConfirmacionStockCero(null)}
-              >
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction
-                disabled={guardando}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={confirmarAjusteCero}
-              >
-                {guardando ? "Ajustando…" : "Confirmar stock a 0"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* MODAL 3: Confirmación de desactivar ubicación */}
-        <AlertDialog
-          open={!!ubicacionADesactivar}
-          onOpenChange={(open) => !open && setUbicacionADesactivar(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Desactivar esta ubicación?</AlertDialogTitle>
-              <AlertDialogDescription>
-                ¿Deseas desactivar la ubicación «<strong>{ubicacionADesactivar?.nombre}</strong>»?
-                <br />
-                <br />
-                La ubicación dejará de estar activa para nuevas operaciones, pero se conservarán
-                todos sus datos y movimientos históricos.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setUbicacionADesactivar(null)}>
-                Cancelar
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-                onClick={confirmarDesactivarUbicacion}
-              >
-                Desactivar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* MODAL 4: Confirmación de borrar ubicación definitivamente */}
-        <AlertDialog
-          open={!!ubicacionABorrar}
-          onOpenChange={(open) => !open && setUbicacionABorrar(null)}
-        >
-          <AlertDialogContent>
-            {ubicacionABorrar && (productosPorUbicacion.get(ubicacionABorrar.id) || 0) > 0 ? (
-              <>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>No se puede borrar la ubicación</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    No se puede borrar «<strong>{ubicacionABorrar.nombre}</strong>» porque contiene{" "}
-                    <strong>{productosPorUbicacion.get(ubicacionABorrar.id)}</strong> producto(s) en
-                    stock.
-                    <br />
-                    <br />
-                    Para conservar la trazabilidad, desactiva la ubicación en su lugar usando el
-                    botón ⏸️.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => setUbicacionABorrar(null)}>
-                    Entendido
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </>
-            ) : (
-              <>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>⚠️ ¿Borrar ubicación definitivamente?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    ¿Estás seguro de que deseas eliminar permanentemente la ubicación «
-                    <strong>{ubicacionABorrar?.nombre}</strong>»?
-                    <br />
-                    <br />
-                    Esta acción no se puede deshacer y borrará la ubicación del sistema por
-                    completo.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setUbicacionABorrar(null)}>
-                    Cancelar
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={confirmarBorrarUbicacion}
-                  >
-                    Borrar definitivamente
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </>
-            )}
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* MODAL PARA CREACIÓN DE PALET EN RESERVA (FASE 5.3) */}
-        <ModalCrearPalet
-          abierto={Boolean(reservaParaNuevoPalet)}
-          onOpenChange={(open) => {
-            if (!open) setReservaParaNuevoPalet(null);
-          }}
-          reserva={reservaParaNuevoPalet}
-          usuarioNombre={usuarioNombre}
-          onPaletCreado={(nuevo) => {
-            if (reservaParaNuevoPalet) {
-              setReservasExpandidas((prev) => new Set(prev).add(reservaParaNuevoPalet.id));
-            }
-          }}
-        />
-      </div>
-
-      {/* ========================================================= */}
-      {/* INFORME IMPRIMIBLE EN A4 (Renderizado solo en @media print) */}
-      {/* ========================================================= */}
-      <div className="print-only p-4 bg-white text-black">{renderizarInformeImprimible()}</div>
-
-      {/* ========================================================= */}
-      {/* MODAL: Vista Previa del Informe Detallado                  */}
-      {/* ========================================================= */}
-      <Dialog open={mostrarInforme} onOpenChange={setMostrarInforme}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto no-print">
-          <DialogHeader className="border-b pb-3 flex flex-row items-center justify-between">
+    <div className="min-h-screen bg-slate-50/60 pb-16">
+      <div className="border-b bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <Printer className="w-5 h-5 text-blue-600" />
-                <span>Vista Previa del Informe Imprimible (A4)</span>
-              </DialogTitle>
-              <DialogDescription className="text-xs text-gray-500">
-                Documento jerárquico detallado con existencias reales.
-              </DialogDescription>
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                <span>INVENTARIO LM</span>
+                <span>/</span>
+                <span>ALMACÉN</span>
+                <span>/</span>
+                <span className="text-blue-600 font-semibold">JERARQUÍA DE UBICACIONES</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                  Ubicaciones del Almacén
+                </h1>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                  18 Zonas Activas • 94% Ocupación
+                </Badge>
+              </div>
             </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <Button
+                variant={vista === "arbol" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setVista("arbol")}
+                className={`text-xs gap-1.5 h-8 ${vista === "arbol" ? "bg-white text-blue-700 shadow-xs hover:bg-white" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                Vista Árbol
+              </Button>
+              <Button
+                variant={vista === "lista" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setVista("lista")}
+                className={`text-xs gap-1.5 h-8 ${vista === "lista" ? "bg-white text-blue-700 shadow-xs hover:bg-white" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                <List className="w-3.5 h-3.5" />
+                Vista Lista
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <div className="flex flex-1 items-center gap-2 max-w-xl">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar ubicación por nombre o código (ej. A1-01)..."
+                  className="pl-9 bg-slate-50/70 border-slate-200 text-sm h-9 focus-visible:ring-blue-500"
+                />
+                {busqueda && (
+                  <button onClick={() => setBusqueda("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <select
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+                className="h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="todos">Tipo de ubicación (Todos)</option>
+                <option value="seccion">Sección (Nivel 0)</option>
+                <option value="pasillo">Pasillo (Nivel 1)</option>
+                <option value="reserva">Reserva (Nivel 1)</option>
+                <option value="armario">Armario (Nivel 2)</option>
+                <option value="alto">Alto (Nivel 2)</option>
+                <option value="caja">Caja (Nivel 2)</option>
+                <option value="cross">Cross (Nivel 2)</option>
+              </select>
+            </div>
+
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={toggleExpandirColapsarTodo} className="text-xs h-9 text-slate-700 border-slate-200 gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                {todosExpandidos ? "Colapsar todo" : "Expandir todo"}
+              </Button>
+
               <Button
                 size="sm"
                 onClick={() => {
-                  window.print();
+                  setFormNombre("Nueva Posición");
+                  setFormTipo("armario");
+                  toast.info("Configura la nueva ubicación en el panel lateral");
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold h-9 px-3.5 gap-1.5 shadow-xs"
               >
-                <Printer className="w-4 h-4" />
-                <span>Imprimir ahora</span>
+                <Plus className="w-4 h-4" />
+                NUEVA UBICACIÓN
               </Button>
             </div>
-          </DialogHeader>
+          </div>
+        </div>
+      </div>
 
-          <div className="py-4 bg-gray-100 p-3 sm:p-5 rounded-md overflow-x-auto">
-            <div className="bg-white p-6 rounded shadow-sm border border-gray-300 max-w-[210mm] mx-auto">
-              {mostrarInforme && renderizarInformeImprimible()}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOPOLOGÍA DE NAVE</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-bold text-slate-900">46</span>
+                  <span className="text-xs font-medium text-slate-500">ubicaciones</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span>3 Secciones • 8 Pasillos • 35 Posiciones</span>
+                </div>
+              </div>
+              <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600">
+                <Building2 className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div className="bg-blue-600 h-full rounded-full" style={{ width: "78%" }} />
             </div>
           </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">CAPACIDAD OCUPADA</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700">Alerta: Pasillo B</span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-bold text-slate-900">92%</span>
+                  <span className="text-xs font-medium text-rose-600">Capacidad crítica</span>
+                </div>
+                <p className="text-xs text-slate-600 mt-2">1,420 de 1,540 m³ volumen ocupado</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-purple-50 text-purple-600">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div className="bg-purple-600 h-full rounded-full" style={{ width: "92%" }} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ESPACIOS DISPONIBLES</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-bold text-slate-900">8</span>
+                  <span className="text-xs font-medium text-emerald-600">huecos libres</span>
+                </div>
+                <p className="text-xs text-slate-600 mt-2">Disponibles para recepción de pinturas y solventes</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div className="bg-slate-700 h-full rounded-full" style={{ width: "22%" }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-8 space-y-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <FolderTree className="w-4 h-4 text-blue-600" />
+                  <h2 className="text-sm font-bold text-slate-900 tracking-tight">Estructura Física del Almacén</h2>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">Terminal Nave Central • 3 Niveles</span>
+              </div>
+
+              {vista === "arbol" && (
+                <div className="p-4 sm:p-5 space-y-4">
+                  {secciones.map((sec) => {
+                    const secAbierta = expandidos[sec.id] ?? true;
+                    const pasillos = pasillosDeSeccion(sec.id);
+
+                    return (
+                      <div key={sec.id} className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-xs">
+                        <div className="p-3.5 bg-slate-50/60 hover:bg-slate-100/60 transition-colors flex items-center justify-between gap-3 border-b border-slate-100">
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <button onClick={() => toggleExpandir(sec.id)} className="p-1 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors">
+                              {secAbierta ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </button>
+                            <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700">
+                              <Building2 className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-sm text-slate-900">{sec.nombre}</span>
+                                <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">Sección</span>
+                              </div>
+                              <p className="text-xs text-slate-500 truncate mt-0.5">{sec.subtitulo}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button variant="outline" size="sm" onClick={() => { setFormNombre(`Pasillo nuevo`); setFormTipo("pasillo"); toast.info(`Añadiendo Pasillo bajo ${sec.nombre}`); }} className="h-7 text-xs px-2.5 rounded-full border-slate-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 hover:text-blue-800 gap-1">
+                              <Plus className="w-3 h-3" /> Pasillo
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => { setFormNombre(sec.nombre); setFormTipo("seccion"); toast.info(`Editando ${sec.nombre}`); }} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {secAbierta && (
+                          <div className="p-3 sm:p-4 space-y-3 bg-slate-50/20">
+                            {pasillos.map((pas) => {
+                              const pasAbierto = expandidos[pas.id] ?? true;
+                              const posiciones = posicionesDePasillo(pas.id);
+
+                              return (
+                                <div key={pas.id} className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
+                                  <div className="p-3 bg-blue-50/20 hover:bg-blue-50/40 transition-colors flex items-center justify-between gap-3 border-b border-slate-100">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <button onClick={() => toggleExpandir(pas.id)} className="p-1 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-200/50">
+                                        {pasAbierto ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                      </button>
+                                      <div className="p-1.5 rounded-md bg-blue-100 text-blue-700">
+                                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-medium text-sm text-slate-800">{pas.nombre}</span>
+                                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">Pasillo</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={() => { setFormNombre(`${pas.codigo}-0${posiciones.length + 1}`); setFormTipo("armario"); setFormPadre(pas.id); toast.info(`Añadiendo Posición bajo ${pas.nombre}`); }} className="h-6 text-[11px] px-2 rounded-full border-slate-200 text-slate-700 hover:bg-slate-100 gap-1">
+                                      <Plus className="w-3 h-3" /> Posición
+                                    </Button>
+                                  </div>
+
+                                  {pasAbierto && (
+                                    <div className="p-2 sm:p-3 space-y-2 bg-white">
+                                      {posiciones.map((pos) => {
+                                        const config = CONFIG_JERARQUIA[pos.tipo];
+                                        const IconoPos = config.icon;
+
+                                        return (
+                                          <div key={pos.id} onClick={() => setSlotSeleccionado(pos.codigo)} className={`p-2.5 rounded-lg border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer ${slotSeleccionado === pos.codigo ? "border-blue-500 bg-blue-50/40 shadow-xs" : "border-slate-150 bg-slate-50/40 hover:bg-slate-100/60"}`}>
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                              <div className="w-4 h-4 flex items-center justify-center text-slate-400">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                              </div>
+                                              <div className={`p-1.5 rounded-md ${config.badgeClass}`}>
+                                                <IconoPos className="w-3.5 h-3.5" />
+                                              </div>
+                                              <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                  <span className="font-semibold text-xs text-slate-900">{pos.nombre}</span>
+                                                  <span className={`px-1.5 py-0.2 text-[10px] font-medium rounded-full border ${config.badgeClass}`}>{config.label}</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 truncate mt-0.5">{pos.subtitulo}</p>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                              <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setUbicacionSeleccionada(pos); setDialogProductosAbierto(true); }} className="h-7 text-xs px-2.5 rounded-md border-slate-200 text-slate-700 hover:bg-slate-100">
+                                                Ver Productos
+                                              </Button>
+                                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setUbicacionParaAjuste(pos); if (pos.productos?.length > 0) setProductoAjusteId(pos.productos[0]?.id ?? ""); setDialogAjusteAbierto(true); }} className="h-7 text-xs px-2 rounded-md text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium">
+                                                Ajuste
+                                              </Button>
+                                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toast.info(`Código de barras: [ ${pos.codigo} ]`); }} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600" title="Ver código de barras">
+                                                <Barcode className="w-3.5 h-3.5" />
+                                              </Button>
+                                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setUbicacionParaEliminar(pos); setDialogEliminarAbierto(true); }} className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600" title="Eliminar posición">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {reservas.map((res) => (
+                    <div key={res.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
+                          <Warehouse className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-slate-900">{res.nombre}</span>
+                            <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-slate-100 text-slate-700 border border-slate-200">Reserva</span>
+                          </div>
+                          <p className="text-xs text-slate-500 truncate mt-0.5">{res.subtitulo}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Recepción Inmediata
+                        </span>
+                        <Button variant="ghost" size="sm" onClick={() => { setUbicacionParaEliminar(res); setDialogEliminarAbierto(true); }} className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {vista === "lista" && (
+                <div className="divide-y divide-slate-100">
+                  {ubicacionesFiltradas.length === 0 ? (
+                    <div className="py-12 text-center text-slate-500 text-sm">No se encontraron ubicaciones con los filtros actuales</div>
+                  ) : (
+                    ubicacionesFiltradas.map((item) => {
+                      const config = CONFIG_JERARQUIA[item.tipo];
+                      const Icono = config.icon;
+                      return (
+                        <div key={item.id} className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`p-2 rounded-lg ${config.badgeClass}`}>
+                              <Icono className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm text-slate-900">{item.nombre}</span>
+                                <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${config.badgeClass}`}>{config.label}</span>
+                                <span className="text-xs text-slate-400 font-mono">[{item.codigo}]</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">{item.subtitulo || config.descripcion}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {item.productos && item.productos.length > 0 && (
+                              <Button variant="outline" size="sm" onClick={() => { setUbicacionSeleccionada(item); setDialogProductosAbierto(true); }} className="h-7 text-xs border-slate-200">
+                                {item.productos.length} productos
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={() => { setFormNombre(item.nombre); setFormTipo(item.tipo); toast.info(`Cargado en editor: ${item.nombre}`); }} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 space-y-5">
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded-md bg-blue-100 text-blue-700">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Modal: Nueva Ubicación en Almacén</h3>
+                </div>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">EDITOR</span>
+              </div>
+
+              <form onSubmit={handleGuardarUbicacion} className="space-y-3.5">
+                <div>
+                  <Label className="text-xs font-semibold text-slate-700 mb-1 block">Nombre de Ubicación</Label>
+                  <Input value={formNombre} onChange={(e) => setFormNombre(e.target.value)} placeholder="Ej. Armario A1-04" className="h-8 text-xs bg-slate-50/60 border-slate-200" />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-semibold text-slate-700 mb-1 block">Tipo de Ubicación</Label>
+                  <select value={formTipo} onChange={(e) => setFormTipo(e.target.value as TipoUbicacion)} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500">
+                    <option value="armario">Armario (Estantería media - Nivel 2)</option>
+                    <option value="alto">Alto (Altillo superior - Nivel 2)</option>
+                    <option value="caja">Caja (Gavetero / Cubeta - Nivel 2)</option>
+                    <option value="cross">Cross-docking (Tránsito - Nivel 2)</option>
+                    <option value="pasillo">Pasillo (Corredor - Nivel 1)</option>
+                    <option value="reserva">Reserva (Palets - Nivel 1)</option>
+                    <option value="seccion">Sección (Zona General - Nivel 0)</option>
+                  </select>
+                </div>
+
+                {CONFIG_JERARQUIA[formTipo].nivel === 2 && (
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Ubicación Padre</Label>
+                    <select value={formPadre} onChange={(e) => setFormPadre(e.target.value)} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500">
+                      {pasillosDisponibles.map((pas) => (
+                        <option key={pas.id} value={pas.id}>{pas.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Lateral</Label>
+                    <select value={formLateral} onChange={(e) => setFormLateral(e.target.value as "L" | "R" | "C")} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800">
+                      <option value="R">Derecha (R)</option>
+                      <option value="L">Izquierda (L)</option>
+                      <option value="C">Central (C)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Altura / Piso</Label>
+                    <select value={formPiso} onChange={(e) => setFormPiso(Number(e.target.value))} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800">
+                      <option value={1}>Nivel 1 (Suelo)</option>
+                      <option value={2}>Nivel 2 (Medio)</option>
+                      <option value={3}>Nivel 3 (Alto)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Cap. Máx (uds)</Label>
+                    <Input type="number" value={formCapMax} onChange={(e) => setFormCapMax(Number(e.target.value))} className="h-8 text-xs bg-slate-50/60 border-slate-200" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Peso Máx (kg)</Label>
+                    <Input type="number" value={formPesoMax} onChange={(e) => setFormPesoMax(Number(e.target.value))} className="h-8 text-xs bg-slate-50/60 border-slate-200" />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => { setFormNombre(""); toast.info("Formulario limpiado"); }} className="h-8 text-xs text-slate-600">
+                    Cancelar
+                  </Button>
+                  <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 shadow-xs">
+                    Guardar Ubicación
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-900 tracking-wider">MAPA NAVE A-NORTE</span>
+                <span className="text-xs text-blue-600 font-semibold cursor-pointer hover:underline">Plano 2D</span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 py-2">
+                {["A1-01", "A1-02", "A1-03", "A1-04", "A2-01", "B1-01"].map((slot) => {
+                  const isLibre = slot === "A1-04";
+                  const isReserva = slot === "RES-01"; // handled separately
+                  return (
+                    <div key={slot} onClick={() => setSlotSeleccionado(slot)} className={`p-2.5 rounded-lg border text-center transition-all cursor-pointer ${slotSeleccionado === slot ? (isLibre ? "ring-2 ring-indigo-500 bg-indigo-50/70 border-indigo-400" : "ring-2 ring-blue-500 bg-blue-100/70 border-blue-300") : (isLibre ? "border-slate-300 bg-slate-50/40 hover:bg-slate-100/60" : "bg-blue-50/60 border-blue-200 hover:bg-blue-100/50")}`}>
+                      <div className="text-[11px] font-bold text-slate-800">{slot}</div>
+                      <div className={`text-[10px] font-medium ${isLibre ? "text-indigo-600 font-bold" : "text-blue-700"}`}>{isLibre ? "LIBRE" : "92%"}</div>
+                    </div>
+                  );
+                })}
+                <div onClick={() => setSlotSeleccionado("RES-01")} className={`col-span-2 p-2.5 rounded-lg border text-center transition-all cursor-pointer ${slotSeleccionado === "RES-01" ? "ring-2 ring-slate-500 bg-slate-200/70 border-slate-300" : "bg-slate-100/70 border-slate-200 hover:bg-slate-200/50"}`}>
+                  <div className="text-[11px] font-bold text-slate-800">RES-01</div>
+                  <div className="text-[10px] font-medium text-slate-500">VACÍO</div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Último inventario físico:</span>
+                <span className="font-semibold text-slate-700">Ayer, 18:40</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={dialogProductosAbierto} onOpenChange={setDialogProductosAbierto}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Boxes className="w-5 h-5 text-blue-600" />
+              <DialogTitle className="text-lg font-bold text-slate-900">Productos en {ubicacionSeleccionada?.nombre}</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-500">Inventario físico asignado a la posición [{ubicacionSeleccionada?.codigo}]</DialogDescription>
+          </DialogHeader>
+          <div className="mt-3 divide-y divide-slate-150 border rounded-lg overflow-hidden bg-white">
+            {ubicacionSeleccionada?.productos && ubicacionSeleccionada.productos.length > 0 ? (
+              ubicacionSeleccionada.productos.map((prod) => (
+                <div key={prod.id} className="p-3 flex items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="font-semibold text-slate-900">{prod.nombre}</div>
+                    <div className="text-slate-400 font-mono mt-0.5">SKU: {prod.sku} • {prod.categoria}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-sm text-slate-900">{prod.cantidad} uds</span>
+                    <div className="text-[10px] text-slate-400">Mín: {prod.stock_minimo} uds</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-6 text-center text-slate-400 text-xs">No hay productos asignados a esta ubicación.</div>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" size="sm" onClick={() => setDialogProductosAbierto(false)}>Cerrar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+
+      <Dialog open={dialogAjusteAbierto} onOpenChange={setDialogAjusteAbierto}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="w-5 h-5 text-blue-600" />
+              <DialogTitle className="text-base font-bold text-slate-900">Ajuste de Stock en {ubicacionParaAjuste?.nombre}</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-500">Registra un movimiento para auditar y recalcular el stock automáticamente vía PostgreSQL trigger.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3.5 my-2 text-xs">
+            <div>
+              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Producto</Label>
+              <select value={productoAjusteId} onChange={(e) => setProductoAjusteId(e.target.value)} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-white px-2.5 text-slate-800">
+                {ubicacionParaAjuste?.productos.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nombre} (Actual: {p.cantidad} uds)</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Tipo de Movimiento</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant={tipoMovimiento === "reposicion" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("reposicion")} className={`text-xs h-7 ${tipoMovimiento === "reposicion" ? "bg-emerald-600" : ""}`}>Reposición (+)</Button>
+                <Button type="button" variant={tipoMovimiento === "entrada" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("entrada")} className={`text-xs h-7 ${tipoMovimiento === "entrada" ? "bg-blue-600" : ""}`}>Entrada (+)</Button>
+                <Button type="button" variant={tipoMovimiento === "salida" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("salida")} className={`text-xs h-7 ${tipoMovimiento === "salida" ? "bg-rose-600" : ""}`}>Salida (-)</Button>
+                <Button type="button" variant={tipoMovimiento === "ajuste" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("ajuste")} className={`text-xs h-7 ${tipoMovimiento === "ajuste" ? "bg-amber-600" : ""}`}>Ajuste Físico (=)</Button>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Cantidad</Label>
+              <Input type="number" min={1} value={cantidadAjuste} onChange={(e) => setCantidadAjuste(Number(e.target.value))} className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Motivo / Justificación</Label>
+              <Input value={motivoAjuste} onChange={(e) => setMotivoAjuste(e.target.value)} placeholder="Ej. Conteo físico anual" className="h-8 text-xs" />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="ghost" size="sm" onClick={() => setDialogAjusteAbierto(false)}>Cancelar</Button>
+            <Button size="sm" onClick={handleAplicarAjuste} className="bg-blue-600 hover:bg-blue-700 text-white">Registrar Movimiento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={dialogEliminarAbierto} onOpenChange={setDialogEliminarAbierto}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base text-slate-900 font-bold">¿Eliminar ubicación "{ubicacionParaEliminar?.nombre}"?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-slate-500">Esta acción eliminará la ubicación del mapa del almacén. Solo se puede realizar si la ubicación no tiene productos con stock físico activo.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-xs h-8">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarEliminarUbicacion} className="text-xs h-8 bg-rose-600 hover:bg-rose-700 text-white">Eliminar Definitivamente</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
