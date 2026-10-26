@@ -214,8 +214,8 @@ function MovimientosPage() {
     });
 
   const [filtros, setFiltros] = useState<FiltrosMovimiento>({
-    desde: new Date().toISOString().split("T")[0],
-    hasta: new Date().toISOString().split("T")[0],
+     desde: new Date().toISOString().slice(0, 10),
+hasta: new Date().toISOString().slice(0, 10),
     tipo: "",
     producto: "",
     ubicacion: "",
@@ -298,8 +298,8 @@ function MovimientosPage() {
       for (const [key, cantidadReal] of cantidadesReales.entries()) {
         const [idProducto, idUbicacion] = key.split("::");
         const resultado = await ajustarStockLineal({
-          id_producto: idProducto,
-          id_ubicacion: idUbicacion,
+          id_producto: idProducto ?? "",
+id_ubicacion: idUbicacion ?? "",
           cantidad_real: cantidadReal,
         });
         if (resultado.ajustado) {
@@ -362,16 +362,16 @@ function MovimientosPage() {
 
         if (tipo === "ajuste" && ubicacionesConNombres.length > 0) {
           const primeraUbicacion = ubicacionesConNombres[0];
-          setUbicacionId(primeraUbicacion.id_ubicacion);
+          setUbicacionId(primeraUbicacion?.id_ubicacion ?? "");
           const ubicacionCompleta = data.ubicaciones.find(
-            (u: any) => u.id === primeraUbicacion.id_ubicacion,
+            (u: any) => u.id === primeraUbicacion?.id_ubicacion,
           );
           if (ubicacionCompleta?.id_ubicacion_padre) {
             setUbicacionPadreId(ubicacionCompleta.id_ubicacion_padre);
           } else {
-            setUbicacionPadreId(primeraUbicacion.id_ubicacion);
+           setUbicacionPadreId(primeraUbicacion?.id_ubicacion ?? "");
           }
-          obtenerStockActual(productoId, primeraUbicacion.id_ubicacion).then(setStockActual);
+          obtenerStockActual(productoId, primeraUbicacion?.id_ubicacion ?? "").then(setStockActual);
         }
       });
     } else {
