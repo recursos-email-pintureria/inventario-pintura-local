@@ -188,7 +188,7 @@ git fetch --prune        # Limpiar referencias remotas obsoletas
 git push origin main     # Vercel despliega automáticamente
 📋 Próximas Fases Planificadas
 Fase 5: Sistema de Palets (v1.4.0-palets)
-   - `v1.4.0-palets` (26/10/2026): Sistema completo de palets, autodestrucción automática e impresión de etiquetas/listados.
+- `v1.4.0-palets` (26/10/2026): Sistema completo de palets, autodestrucción automática e impresión de etiquetas/listados.
 Tabla independiente palets relacionada con ubicaciones tipo "Reserva"
 Creación manual de palets con código de barras automático (PAL-###-Usuario-Fecha)
 Gestión de productos dentro del palet (igual que armarios)
