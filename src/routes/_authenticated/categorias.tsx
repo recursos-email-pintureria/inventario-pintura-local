@@ -41,7 +41,7 @@ import {
   actualizarCategoria,
   crearCategoria,
   desactivarCategoria,
-  getCategorias,
+  getCategorias
 } from "@/lib/inventario";
 import type { Categoria } from "@/lib/tipos";
 

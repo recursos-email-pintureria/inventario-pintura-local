@@ -80,7 +80,7 @@ import {
   getCategorias,
   crearProducto,
   actualizarProducto,
-  desactivarProducto,
+  desactivarProducto
 } from "@/lib/inventario";
 import type { Producto } from "@/lib/tipos";
 

@@ -1,0 +1,20 @@
+src/components/inventario/EstadoInventario.tsx(4,33): error TS2307: Cannot find module '@/lib/getCategorias' or its corresponding type declarations.
+src/routes/_authenticated/categorias.tsx(45,8): error TS2307: Cannot find module '@/lib/getCategorias' or its corresponding type declarations.
+src/routes/_authenticated/categorias.tsx(200,19): error TS18046: 'categorias' is of type 'unknown'.
+src/routes/_authenticated/categorias.tsx(207,17): error TS18046: 'categorias' is of type 'unknown'.
+src/routes/_authenticated/categorias.tsx(207,33): error TS7006: Parameter 'cat' implicitly has an 'any' type.
+src/routes/_authenticated/configuracion.tsx(62,89): error TS2307: Cannot find module '@/lib/getCategorias' or its corresponding type declarations.
+src/routes/_authenticated/configuracion.tsx(459,25): error TS18046: 'categorias' is of type 'unknown'.
+src/routes/_authenticated/configuracion.tsx(466,23): error TS18046: 'categorias' is of type 'unknown'.
+src/routes/_authenticated/configuracion.tsx(466,39): error TS7006: Parameter 'cat' implicitly has an 'any' type.
+src/routes/_authenticated/productos.tsx(84,8): error TS2307: Cannot find module '@/lib/getCategorias' or its corresponding type declarations.
+src/routes/_authenticated/productos.tsx(154,11): error TS18046: 'productosRaw' is of type 'unknown'.
+src/routes/_authenticated/productos.tsx(339,24): error TS18046: 'categoriasRaw' is of type 'unknown'.
+src/routes/_authenticated/productos.tsx(362,22): error TS18046: 'categoriasRaw' is of type 'unknown'.
+src/routes/_authenticated/productos.tsx(399,26): error TS2345: Argument of type '{ sku: string; nombre: string; categoria: string | null; stock_actual: number; stock_minimo: number; unidad: string; ubicacion: string | null; precio: number; largo: number | null; ancho: number | null; alto: number | null; peso: number | null; }' is not assignable to parameter of type 'void'.
+src/routes/_authenticated/productos.tsx(543,18): error TS18046: 'categoriasRaw' is of type 'unknown'.
+src/routes/_authenticated/productos.tsx(543,37): error TS7006: Parameter 'cat' implicitly has an 'any' type.
+src/routes/_authenticated/productos.tsx(945,22): error TS18046: 'categoriasRaw' is of type 'unknown'.
+src/routes/_authenticated/productos.tsx(945,41): error TS7006: Parameter 'cat' implicitly has an 'any' type.
+src/routes/_authenticated/productos.tsx(1174,22): error TS18046: 'categoriasRaw' is of type 'unknown'.
+src/routes/_authenticated/productos.tsx(1174,41): error TS7006: Parameter 'cat' implicitly has an 'any' type.

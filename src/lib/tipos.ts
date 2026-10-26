@@ -60,3 +60,20 @@ export interface Seccion {
   codigo?: string;
   activo?: boolean;
 }
+// Movimiento ya resuelto con sus relaciones (para UI)
+export interface MovimientoDetallado {
+  id: string;
+  tipo: "entrada" | "salida" | "reposicion" | "ajuste";
+  cantidad: number;
+  fecha: string; // ISO
+  motivo: string | null;
+  producto: { id: string; nombre: string; sku: string | null } | null;
+  ubicacion: { id: string; codigo: string } | null;
+  usuario: { id: string; nombre: string } | null;
+}
+
+export interface UbicacionSimple {
+  id: string;
+  codigo: string;
+  tipo: string | null;
+}
