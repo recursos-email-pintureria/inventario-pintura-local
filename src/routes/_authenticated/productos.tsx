@@ -252,7 +252,7 @@ const productosMockIniciales: ProductoItem[] = [
 // COMPONENTE PRINCIPAL DE LA PÁGINA
 // ============================================================================
 
-export function ProductosPage() {
+function ProductosPage() {
   const [productos, setProductos] = useState<ProductoItem[]>(productosMockIniciales);
   const [busqueda, setBusqueda] = useState("");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("todas");

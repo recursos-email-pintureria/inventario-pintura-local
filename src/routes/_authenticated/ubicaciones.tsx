@@ -334,7 +334,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
   },
 ];
 
-export function UbicacionesPage() {
+function UbicacionesPage() {
   const [ubicaciones, setUbicaciones] = useState<UbicacionItem[]>(UBICACIONES_INICIALES);
   const [vista, setVista] = useState<"arbol" | "lista">("arbol");
   const [busqueda, setBusqueda] = useState("");
