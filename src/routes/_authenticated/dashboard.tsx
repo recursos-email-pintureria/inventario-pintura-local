@@ -1,3 +1,4 @@
+import { KPICard, KpiData } from '@/components/ui/kpi-card';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
@@ -10,7 +11,6 @@ import {
   RefreshCw,
   Edit3,
   Clock,
-  TrendingUp,
   ChevronRight,
   Filter,
   Plus,
@@ -56,21 +56,10 @@ interface Movimiento {
   usuarioInicial: string;
 }
 
-interface KPIData {
-  label: string;
-  value: string | number;
-  sublabel: string;
-  trend?: string;
-  trendUp?: boolean;
-  icon: React.ReactNode;
-  color: 'amber' | 'rose' | 'emerald' | 'blue';
-  alert?: string;
-}
-
 // ============================================================
 // DATOS MOCK
 // ============================================================
-const kpisData: KPIData[] = [
+const kpisData: KpiData[] = [
   { label: 'Total Productos', value: '3,842', sublabel: 'productos activos', trend: '98.2% cat.', trendUp: true, icon: <Package className="h-5 w-5" />, color: 'amber' },
   { label: 'Stock Bajo', value: 14, sublabel: 'Requiere atención', alert: '3 críticos', icon: <AlertTriangle className="h-5 w-5" />, color: 'rose' },
   { label: 'Movimientos Hoy', value: 86, sublabel: 'Prom. 72/d', trend: '12% vs ayer', trendUp: true, icon: <Activity className="h-5 w-5" />, color: 'emerald' },
@@ -103,13 +92,6 @@ const movimientosRecientes: Movimiento[] = [
   { id: '5', fecha: 'Ayer', hora: '16:40', producto: 'Thinner Universal 10L', sku: 'SOL-9902-STD', tipo: 'ajuste', cantidad: 15, unidad: 'unid', ubicacion: 'Bodega 2 - Z01', usuario: 'Roberto S.', usuarioInicial: 'R' },
 ];
 
-const colorConfig = {
-  amber: { text: 'text-amber-700', border: 'border-l-amber-600', iconBg: 'bg-amber-100', iconText: 'text-amber-700' },
-  rose: { text: 'text-rose-700', border: 'border-l-rose-600', iconBg: 'bg-rose-100', iconText: 'text-rose-700' },
-  emerald: { text: 'text-emerald-700', border: 'border-l-emerald-600', iconBg: 'bg-emerald-100', iconText: 'text-emerald-700' },
-  blue: { text: 'text-blue-700', border: 'border-l-blue-600', iconBg: 'bg-blue-100', iconText: 'text-blue-700' },
-};
-
 const tipoMovimientoConfig = {
   entrada: { label: 'Entrada', icon: <ArrowDownRight className="h-3 w-3" />, badge: 'bg-emerald-100 text-emerald-800 border-emerald-200', cantidad: 'text-emerald-700', prefijo: '+' },
   salida: { label: 'Salida', icon: <ArrowUpRight className="h-3 w-3" />, badge: 'bg-rose-100 text-rose-800 border-rose-200', cantidad: 'text-rose-700', prefijo: '-' },
@@ -120,39 +102,6 @@ const tipoMovimientoConfig = {
 // ============================================================
 // COMPONENTES AUXILIARES
 // ============================================================
-function KPICard({ data }: { data: KPIData }) {
-  const colors = colorConfig[data.color];
-  return (
-    <Card className={`border-l-4 ${colors.border} border-slate-200 shadow-sm transition-shadow hover:shadow-md`}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-600">{data.label}</p>
-            <p className={`text-3xl font-bold tracking-tight ${colors.text}`}>{data.value}</p>
-            <div className="flex items-center gap-2">
-              {data.trend && (
-                <span className="flex items-center gap-1 text-xs text-slate-500">
-                  {data.trendUp && <TrendingUp className="h-3 w-3 text-emerald-600" />}
-                  {data.trend}
-                </span>
-              )}
-              <span className="text-xs text-slate-400">{data.sublabel}</span>
-            </div>
-            {data.alert && (
-              <Badge variant="outline" className="mt-1 border-rose-300 bg-rose-50 text-rose-700">
-                {data.alert}
-              </Badge>
-            )}
-          </div>
-          <div className={`rounded-lg p-2.5 ${colors.iconBg}`}>
-            <div className={colors.iconText}>{data.icon}</div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function MovementBadge({ tipo }: { tipo: TipoMovimiento }) {
   const config = tipoMovimientoConfig[tipo];
   return (
@@ -201,7 +150,7 @@ function DashboardComponent() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs - Ahora usa el componente compartido */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpisData.map((kpi) => (
           <KPICard key={kpi.label} data={kpi} />

@@ -1,28 +1,50 @@
-import { useState, useEffect, useCallback, lazy, Suspense, type FormEvent } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
-  Pencil,
-  Plus,
   Search,
-  Power,
-  ScanBarcode,
-  MapPin,
-  Sparkles,
+  Plus,
+  Download,
+  Eye,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Package,
   AlertTriangle,
+  XCircle,
+  SlidersHorizontal,
+  Warehouse,
+  Paintbrush,
+  FlaskConical,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// Componentes UI de shadcn/ui
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -35,857 +57,1165 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SelectGroup,
-  SelectLabel,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/layout/AppLayout";
-import { pageHead } from "@/lib/meta";
-import { useMyProfile } from "@/hooks/usePermissions";
-import {
-  inventarioQueryOptions,
-  usuarioActual,
-  permisoExplicito,
-  guardarProducto,
-  comprobarUnicidad,
-  desactivarRegistro,
-  errorInventario,
-  formatoPrecio,
-  type Producto,
-  cargarUbicacionesProducto,
-  guardarUbicacionesProducto,
-  buscarProductoPorCodigo,
-} from "@/lib/inventario";
-import { CargandoInventario, ErrorInventario } from "@/components/inventario/EstadoInventario";
-const Escaner = lazy(() => import("@/components/inventario/Escaner"));
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export const Route = createFileRoute("/_authenticated/productos")({
-  head: () => pageHead("Productos", "Listado de productos de pintura."),
-  loader: async ({ context }) => {
-    const user = await usuarioActual();
-    await context.queryClient.ensureQueryData(inventarioQueryOptions(user.id));
-    return { userId: user.id };
+// 🌟 COMPONENTE UNIFICADO DE KPIs
+import { KPICard, KpiData } from "@/components/ui/kpi-card";
+
+// ============================================================================
+// DEFINICIÓN DE TIPOS
+// ============================================================================
+
+export interface ProductoItem {
+  id: string;
+  sku: string;
+  nombre: string;
+  categoria: string;
+  stock_actual: number;
+  stock_minimo: number;
+  activo: boolean;
+  unidad?: string;
+  ubicacion?: string;
+  precio?: number;
+  swatchColor?: string;
+  iconoTipo?: "color" | "herramienta" | "solvente";
+}
+
+// ============================================================================
+// DATOS MOCK REALISTAS
+// ============================================================================
+
+const productosMockIniciales: ProductoItem[] = [
+  {
+    id: "prod-1",
+    sku: "LAT-4001-WHT",
+    nombre: "Látex Extracubriente Blanco Mate 15L",
+    categoria: "Pinturas de Interior",
+    stock_actual: 48,
+    stock_minimo: 15,
+    activo: true,
+    unidad: "gal",
+    ubicacion: "Pasillo A - A01",
+    precio: 42500,
+    swatchColor: "#ffffff",
+    iconoTipo: "color",
   },
-  pendingComponent: CargandoInventario,
-  errorComponent: ErrorInventario,
-  component: Productos,
-});
+  {
+    id: "prod-2",
+    sku: "ESM-1020-BLK",
+    nombre: "Esmalte Sintético Negro Satinado 4L",
+    categoria: "Esmaltes & Sintéticos",
+    stock_actual: 7,
+    stock_minimo: 10,
+    activo: true,
+    unidad: "gal",
+    ubicacion: "Pasillo B - B03",
+    precio: 28990,
+    swatchColor: "#171717",
+    iconoTipo: "color",
+  },
+  {
+    id: "prod-3",
+    sku: "HER-8820-ROD",
+    nombre: "Rodillo Antigota Microfibra Pro 25cm",
+    categoria: "Herramientas",
+    stock_actual: 65,
+    stock_minimo: 20,
+    activo: true,
+    unidad: "unid",
+    ubicacion: "Estante D - D04",
+    precio: 8450,
+    iconoTipo: "herramienta",
+  },
+  {
+    id: "prod-4",
+    sku: "MAS-5040-CAO",
+    nombre: "Masilla para Madera Tono Caoba 1Kg",
+    categoria: "Masillas & Selladores",
+    stock_actual: 4,
+    stock_minimo: 8,
+    activo: true,
+    unidad: "unid",
+    ubicacion: "Rack C - C02",
+    precio: 6800,
+    swatchColor: "#6c3b21",
+    iconoTipo: "color",
+  },
+  {
+    id: "prod-5",
+    sku: "SOL-9902-STD",
+    nombre: "Thinner Universal Extra Calidad 10L",
+    categoria: "Solventes & Químicos",
+    stock_actual: 0,
+    stock_minimo: 5,
+    activo: true,
+    unidad: "unid",
+    ubicacion: "Bodega 2 - Z01",
+    precio: 31200,
+    iconoTipo: "solvente",
+  },
+  {
+    id: "prod-6",
+    sku: "SEL-3108-ACR",
+    nombre: "Primer Acrílico Sellador Antihumedad 5L",
+    categoria: "Pinturas & Selladores",
+    stock_actual: 22,
+    stock_minimo: 10,
+    activo: true,
+    unidad: "unid",
+    ubicacion: "Rack C - C01",
+    precio: 24750,
+    swatchColor: "#fcfaf2",
+    iconoTipo: "color",
+  },
+  {
+    id: "prod-7",
+    sku: "IMP-7721-IMP",
+    nombre: "Membrana Poliuretánica Techos 20Kg",
+    categoria: "Impermeabilizantes",
+    stock_actual: 18,
+    stock_minimo: 12,
+    activo: true,
+    unidad: "gal",
+    ubicacion: "Pasillo C - C04",
+    precio: 64900,
+    swatchColor: "#b94e32",
+    iconoTipo: "color",
+  },
+  {
+    id: "prod-8",
+    sku: "BRO-1205-CER",
+    nombre: "Brocha Profesional Cerda Mixta 3 pulg",
+    categoria: "Herramientas",
+    stock_actual: 42,
+    stock_minimo: 15,
+    activo: true,
+    unidad: "unid",
+    ubicacion: "Estante D - D02",
+    precio: 5200,
+    iconoTipo: "herramienta",
+  },
+  {
+    id: "prod-9",
+    sku: "ESM-2030-BLU",
+    nombre: "Esmalte Sintético Azul Náutico Brillante 4L",
+    categoria: "Esmaltes & Sintéticos",
+    stock_actual: 3,
+    stock_minimo: 8,
+    activo: true,
+    unidad: "gal",
+    ubicacion: "Pasillo B - B01",
+    precio: 29900,
+    swatchColor: "#1e3a8a",
+    iconoTipo: "color",
+  },
+  {
+    id: "prod-10",
+    sku: "SOL-1100-AGU",
+    nombre: "Aguarrás Mineral Purificado 5L",
+    categoria: "Solventes & Químicos",
+    stock_actual: 30,
+    stock_minimo: 12,
+    activo: true,
+    unidad: "unid",
+    ubicacion: "Bodega 2 - Z02",
+    precio: 14500,
+    iconoTipo: "solvente",
+  },
+];
 
-function useUnicidad(campo: "sku" | "codigo_barras", valor: string, abierto: boolean, id?: string) {
-  const [estado, setEstado] = useState<"vacio" | "comprobando" | "libre" | "duplicado" | "error">(
-    "vacio",
-  );
-  useEffect(() => {
-    let cancelado = false;
-    if (!abierto || !valor.trim()) {
-      setEstado("vacio");
-      return;
-    }
-    setEstado("comprobando");
-    const timer = setTimeout(() => {
-      comprobarUnicidad(campo, valor, id)
-        .then((libre) => {
-          if (!cancelado) setEstado(libre ? "libre" : "duplicado");
-        })
-        .catch(() => {
-          if (!cancelado) setEstado("error");
-        });
-    }, 350);
-    return () => {
-      cancelado = true;
-      clearTimeout(timer);
-    };
-  }, [campo, valor, abierto, id]);
-  return estado;
-}
+// ============================================================================
+// COMPONENTE PRINCIPAL DE LA PÁGINA
+// ============================================================================
 
-function EstadoUnicidad({ estado }: { estado: ReturnType<typeof useUnicidad> }) {
-  if (estado === "vacio") return null;
-  return (
-    <p
-      role="status"
-      className={
-        estado === "duplicado" || estado === "error"
-          ? "text-xs text-destructive"
-          : "text-xs text-muted-foreground"
-      }
-    >
-      {estado === "comprobando"
-        ? "Comprobando…"
-        : estado === "libre"
-          ? "Disponible"
-          : estado === "duplicado"
-            ? "Ya existe en otro producto"
-            : "No se pudo comprobar la disponibilidad"}
-    </p>
-  );
-}
-
-function Productos() {
-  const { userId } = Route.useLoaderData();
-  const { data } = useSuspenseQuery(inventarioQueryOptions(userId));
-  const { permisos } = useMyProfile();
-  const crear = permisoExplicito(permisos, "puede_crear_productos");
-  const editar = crear && permisoExplicito(permisos, "puede_editar_productos");
-  const client = useQueryClient();
-
+export function ProductosPage() {
+  const [productos, setProductos] = useState<ProductoItem[]>(productosMockIniciales);
   const [busqueda, setBusqueda] = useState("");
-  const [categoriaFiltro, setCategoriaFiltro] = useState("todos");
-  const [pagina, setPagina] = useState(0);
-  const [abierto, setAbierto] = useState(false);
-  const [escaneando, setEscaneando] = useState(false);
-  const [editando, setEditando] = useState<Producto | null>(null);
-  const [desactivando, setDesactivando] = useState<Producto | null>(null);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("todas");
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState("todos");
+  const [paginaActual, setPaginaActual] = useState(1);
+  const elementosPorPagina = 6;
 
-  const [codigo, setCodigo] = useState("");
-  const [sku, setSku] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [categoria, setCategoria] = useState("ninguna");
-  const [precio, setPrecio] = useState("");
-  const [error, setError] = useState("");
+  // Selección de filas
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
 
-  // Estados para autocompletado desde base de datos
-  const [productoExistente, setProductoExistente] = useState<Producto | null>(null);
-  const [buscandoCodigo, setBuscandoCodigo] = useState(false);
+  // Diálogos modales
+  const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
+  const [productoVer, setProductoVer] = useState<ProductoItem | null>(null);
+  const [productoEditar, setProductoEditar] = useState<ProductoItem | null>(null);
+  const [productoADesactivar, setProductoADesactivar] = useState<ProductoItem | null>(null);
 
-  const [ubicacionesProducto, setUbicacionesProducto] = useState<any[]>([]);
-  const [nuevaUbicacionPadreId, setNuevaUbicacionPadreId] = useState("");
-  const [nuevaUbicacionId, setNuevaUbicacionId] = useState("");
-  const [nuevoTipoUbicacion, setNuevoTipoUbicacion] = useState<
-    "principal" | "cross" | "caja" | "temporal"
-  >("principal");
-  const [nuevaSeccionOrigen, setNuevaSeccionOrigen] = useState("");
-  const [cargandoUbicaciones, setCargandoUbicaciones] = useState(false);
+  // Formulario nuevo/editar
+  const [formNombre, setFormNombre] = useState("");
+  const [formSku, setFormSku] = useState("");
+  const [formCategoria, setFormCategoria] = useState("Pinturas de Interior");
+  const [formStock, setFormStock] = useState<number | "">(10);
+  const [formStockMinimo, setFormStockMinimo] = useState<number | "">(5);
+  const [formPrecio, setFormPrecio] = useState<number | "">(25000);
+  const [formUbicacion, setFormUbicacion] = useState("Pasillo A - A01");
+  const [formUnidad, setFormUnidad] = useState("gal");
 
-  const codigoEstado = useUnicidad("codigo_barras", codigo, abierto, editando?.id);
-  const skuEstado = useUnicidad("sku", sku, abierto, editando?.id);
-  const recibirCodigo = useCallback((valor: string) => {
-    setCodigo(valor);
-    setEscaneando(false);
-  }, []);
+  // Lista de categorías únicas extraídas de los datos
+  const categoriasDisponibles = useMemo(() => {
+    const cats = new Set(productos.map((p) => p.categoria));
+    return Array.from(cats);
+  }, [productos]);
 
-  const guardar = useMutation({
-    mutationFn: async () => {
-      if (!(editando ? editar : crear))
-        throw new Error("No tienes permiso para guardar productos.");
-      const [codigoLibre, skuLibre] = await Promise.all([
-        comprobarUnicidad("codigo_barras", codigo, editando?.id),
-        comprobarUnicidad("sku", sku, editando?.id),
-      ]);
-      if (!codigoLibre || !skuLibre)
-        throw new Error("El código de barras o SKU ya pertenece a otro producto.");
+  // Filtrado de productos
+  const productosFiltrados = useMemo(() => {
+    return productos.filter((p) => {
+      const q = busqueda.toLowerCase().trim();
+      const coincideTexto =
+        !q || p.nombre.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
 
-      await guardarProducto(
-        {
-          codigo_barras: codigo,
-          sku,
-          nombre,
-          descripcion,
-          id_categoria: categoria === "ninguna" ? null : categoria,
-          precio_unitario: precio === "" ? null : Number(precio),
-        },
-        editando?.id,
-      );
+      const coincideCategoria =
+        categoriaSeleccionada === "todas" || p.categoria === categoriaSeleccionada;
 
-      if (editando) {
-        await guardarUbicacionesProducto(editando.id, ubicacionesProducto);
+      let coincideEstado = true;
+      if (estadoSeleccionado === "normal") {
+        coincideEstado = p.stock_actual > p.stock_minimo;
+      } else if (estadoSeleccionado === "bajo") {
+        coincideEstado = p.stock_actual > 0 && p.stock_actual <= p.stock_minimo;
+      } else if (estadoSeleccionado === "agotado") {
+        coincideEstado = p.stock_actual === 0;
       }
-    },
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["inventario", userId] });
-      setAbierto(false);
-      toast.success("Producto guardado");
-    },
-    onError: (e) => setError(errorInventario(e)),
-  });
 
-  const desactivar = useMutation({
-    mutationFn: async () => {
-      if (!editar || !desactivando) throw new Error("No tienes permiso para desactivar productos.");
-      await desactivarRegistro("productos", desactivando.id);
-    },
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["inventario", userId] });
-      setDesactivando(null);
-      toast.success("Producto desactivado");
-    },
-    onError: (e) => setError(errorInventario(e)),
-  });
+      return coincideTexto && coincideCategoria && coincideEstado;
+    });
+  }, [productos, busqueda, categoriaSeleccionada, estadoSeleccionado]);
 
-  // ✅ NUEVA FUNCIÓN: Buscar producto existente por código y autocompletar
-  async function buscarYAutocompletar(codigoBuscado: string) {
-    if (!codigoBuscado.trim()) {
-      setProductoExistente(null);
+  // Paginación
+  const totalPaginas = Math.ceil(productosFiltrados.length / elementosPorPagina) || 1;
+  const productosPaginados = useMemo(() => {
+    const inicio = (paginaActual - 1) * elementosPorPagina;
+    return productosFiltrados.slice(inicio, inicio + elementosPorPagina);
+  }, [productosFiltrados, paginaActual, elementosPorPagina]);
+
+  // 🌟 MÉTRICAS UNIFICADAS PARA KPICard
+  const kpisData: KpiData[] = useMemo(() => {
+    const total = productos.length;
+    const activos = productos.filter((p) => p.activo).length;
+    const stockBajo = productos.filter((p) => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo).length;
+    const sinStock = productos.filter((p) => p.stock_actual === 0).length;
+    const porcentajeActivos = total > 0 ? ((activos / total) * 100).toFixed(1) : "100";
+
+    return [
+      {
+        label: 'Total Referencias',
+        value: total,
+        sublabel: 'SKUs activos en catálogo',
+        trend: `${porcentajeActivos}% activos`,
+        trendUp: true,
+        icon: <Package className="h-5 w-5" />,
+        color: 'amber',
+      },
+      {
+        label: 'Stock Bajo',
+        value: stockBajo,
+        sublabel: 'Crítico en línea de látex',
+        alert: 'Requiere reposición',
+        icon: <AlertTriangle className="h-5 w-5" />,
+        color: 'rose',
+      },
+      {
+        label: 'Sin Stock',
+        value: sinStock,
+        sublabel: 'artículos agotados',
+        icon: <XCircle className="h-5 w-5" />,
+        color: 'slate',
+      },
+    ];
+  }, [productos]);
+
+  // Manejadores de selección
+  const toggleSeleccionarTodos = () => {
+    if (seleccionados.size === productosPaginados.length) {
+      setSeleccionados(new Set());
+    } else {
+      setSeleccionados(new Set(productosPaginados.map((p) => p.id)));
+    }
+  };
+
+  const toggleSeleccionarFila = (id: string) => {
+    setSeleccionados((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  };
+
+  // Apertura de modal para creación
+  const abrirModalCrear = () => {
+    setFormNombre("");
+    setFormSku(`LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(10 + Math.random() * 90)}`);
+    setFormCategoria("Pinturas de Interior");
+    setFormStock(15);
+    setFormStockMinimo(5);
+    setFormPrecio(32000);
+    setFormUbicacion("Pasillo A - A02");
+    setFormUnidad("gal");
+    setModalNuevoAbierto(true);
+  };
+
+  // Apertura de modal para edición
+  const abrirModalEditar = (p: ProductoItem) => {
+    setProductoEditar(p);
+    setFormNombre(p.nombre);
+    setFormSku(p.sku);
+    setFormCategoria(p.categoria);
+    setFormStock(p.stock_actual);
+    setFormStockMinimo(p.stock_minimo);
+    setFormPrecio(p.precio || 20000);
+    setFormUbicacion(p.ubicacion || "Pasillo A - A01");
+    setFormUnidad(p.unidad || "gal");
+  };
+
+  // Guardar nuevo producto (Mock)
+  const handleGuardarNuevo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNombre.trim() || !formSku.trim()) {
+      toast.error("Por favor completa el nombre y el SKU.");
       return;
     }
 
-    setBuscandoCodigo(true);
-    try {
-      const productoEncontrado = await buscarProductoPorCodigo(codigoBuscado);
+    const nuevo: ProductoItem = {
+      id: `prod-${Date.now()}`,
+      sku: formSku.trim().toUpperCase(),
+      nombre: formNombre.trim(),
+      categoria: formCategoria,
+      stock_actual: Number(formStock) || 0,
+      stock_minimo: Number(formStockMinimo) || 0,
+      activo: true,
+      unidad: formUnidad,
+      ubicacion: formUbicacion,
+      precio: Number(formPrecio) || 0,
+      iconoTipo: "color",
+      swatchColor: "#ffffff",
+    };
 
-      if (productoEncontrado) {
-        setProductoExistente(productoEncontrado);
-        // Autocompletar campos
-        setNombre(productoEncontrado.nombre);
-        setDescripcion(productoEncontrado.descripcion || "");
-        setCategoria(productoEncontrado.id_categoria || "ninguna");
-        setPrecio(
-          productoEncontrado.precio_unitario != null
-            ? String(productoEncontrado.precio_unitario)
-            : "",
-        );
-
-        toast.success(
-          `✨ Producto encontrado: "${productoEncontrado.nombre}". Datos autocompletados.`,
-        );
-      } else {
-        setProductoExistente(null);
-      }
-    } catch (e) {
-      setProductoExistente(null);
-    } finally {
-      setBuscandoCodigo(false);
-    }
-  }
-
-  // Buscar automáticamente cuando cambia el código (con debounce)
-  useEffect(() => {
-    if (!abierto || !codigo.trim() || editando) return;
-
-    const timer = setTimeout(() => {
-      buscarYAutocompletar(codigo);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [codigo, abierto, editando]);
-
-  const abrir = async (p: Producto | null) => {
-    setEditando(p);
-    setCodigo(p?.codigo_barras ?? "");
-    setSku(p?.sku ?? "");
-    setNombre(p?.nombre ?? "");
-    setDescripcion(p?.descripcion ?? "");
-    setCategoria(p?.id_categoria ?? "ninguna");
-    setPrecio(p?.precio_unitario == null ? "" : String(p.precio_unitario));
-    setError("");
-    setProductoExistente(null);
-
-    if (p) {
-      setCargandoUbicaciones(true);
-      try {
-        const ubis = await cargarUbicacionesProducto(p.id);
-        setUbicacionesProducto(ubis);
-      } catch (e) {
-        console.error(e);
-        setUbicacionesProducto([]);
-      } finally {
-        setCargandoUbicaciones(false);
-      }
-    } else {
-      setUbicacionesProducto([]);
-    }
-    setAbierto(true);
+    setProductos([nuevo, ...productos]);
+    setModalNuevoAbierto(false);
+    toast.success(`Producto "${nuevo.nombre}" creado exitosamente.`);
   };
 
-  const enviar = (e: FormEvent) => {
+  // Guardar edición
+  const handleGuardarEdicion = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    guardar.mutate();
+    if (!productoEditar) return;
+
+    setProductos((prev) =>
+      prev.map((p) =>
+        p.id === productoEditar.id
+          ? {
+              ...p,
+              nombre: formNombre.trim(),
+              sku: formSku.trim().toUpperCase(),
+              categoria: formCategoria,
+              stock_actual: Number(formStock) || 0,
+              stock_minimo: Number(formStockMinimo) || 0,
+              precio: Number(formPrecio) || 0,
+              ubicacion: formUbicacion,
+              unidad: formUnidad,
+            }
+          : p,
+      ),
+    );
+
+    setProductoEditar(null);
+    toast.success("Producto actualizado correctamente.");
   };
 
-  const query = busqueda.trim().toLocaleLowerCase("es");
-  const filtrados = data.productos.filter(
-    (p) =>
-      p.activo &&
-      (categoriaFiltro === "todos" || p.id_categoria === categoriaFiltro) &&
-      [p.codigo_barras, p.sku, p.nombre].some((v) => v.toLocaleLowerCase("es").includes(query)),
-  );
-  const paginaActual = Math.min(pagina, Math.max(0, Math.ceil(filtrados.length / 20) - 1));
-  const rows = filtrados.slice(paginaActual * 20, (paginaActual + 1) * 20);
+  // Confirmar desactivación/reactivación
+  const confirmarDesactivar = () => {
+    if (!productoADesactivar) return;
+    setProductos((prev) =>
+      prev.map((p) => (p.id === productoADesactivar.id ? { ...p, activo: !p.activo } : p)),
+    );
+    toast.success(`Producto "${productoADesactivar.nombre}" actualizado.`);
+    setProductoADesactivar(null);
+  };
 
-  function obtenerNombreUbicacion(id_ubicacion: string) {
-    const ubi = data.ubicaciones.find((u: any) => u.id === id_ubicacion);
-    if (!ubi) return "Desconocida";
-    if (ubi.id_ubicacion_padre) {
-      const padre = data.ubicaciones.find((p: any) => p.id === ubi.id_ubicacion_padre);
-      return padre ? `${padre.nombre} > ${ubi.nombre}` : ubi.nombre;
-    }
-    return ubi.nombre;
-  }
+  // Exportar CSV
+  const exportarCSV = () => {
+    const encabezados = "SKU,Nombre,Categoría,Ubicación,Stock,Mínimo,Precio\n";
+    const filas = productosFiltrados
+      .map(
+        (p) =>
+          `"${p.sku}","${p.nombre}","${p.categoria}","${p.ubicacion || "-"}","${p.stock_actual} ${p.unidad || ""}","${p.stock_minimo}","${p.precio || 0}"`,
+      )
+      .join("\n");
+    const blob = new Blob([encabezados + filas], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `productos_inventario_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Listado de productos exportado a CSV.");
+  };
 
   return (
-    <>
-      <PageHeader
-        title="Productos"
-        action={
-          crear ? (
-            <Button onClick={() => abrir(null)}>
-              <Plus className="h-4 w-4" />
-              Nuevo producto
-            </Button>
-          ) : undefined
-        }
-      />
-      <Card className="p-4">
-        <div className="mb-4 flex flex-wrap gap-3">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* 1. HEADER & BREADCRUMB */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-gray-400 mb-1">
+            <span>INVENTARIO LM</span>
+            <span className="text-gray-300">/</span>
+            <span>CATÁLOGO</span>
+            <span className="text-gray-300">/</span>
+            <span className="text-amber-700 font-bold">EXISTENCIAS</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            Catálogo de Productos
+          </h1>
+        </div>
+
+        <div className="flex items-center">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/90 text-blue-700 border border-blue-200/80 text-xs font-medium shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span>Base Central • Actualizado hace 4m</span>
+          </span>
+        </div>
+      </div>
+
+      {/* 2. BARRA DE HERRAMIENTAS / FILTROS */}
+      <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
-              aria-label="Buscar productos"
-              placeholder="Buscar por código, SKU o nombre…"
-              className="pl-9"
               value={busqueda}
               onChange={(e) => {
                 setBusqueda(e.target.value);
-                setPagina(0);
+                setPaginaActual(1);
               }}
+              placeholder="Buscar por nombre, SKU o código..."
+              className="pl-9 h-10 bg-white border-gray-300 rounded-lg text-sm focus:border-amber-600 focus:ring-amber-600"
             />
           </div>
-          <Select
-            value={categoriaFiltro}
-            onValueChange={(v) => {
-              setCategoriaFiltro(v);
-              setPagina(0);
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-56" aria-label="Filtrar categoría">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas las categorías</SelectItem>
-              {data.categorias.map((c: any) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.nombre}
-                  {!c.activo ? " (inactiva)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código de barras</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((p: any) => (
-              <TableRow key={p.id}>
-                <TableCell className="font-mono text-xs">{p.codigo_barras}</TableCell>
-                <TableCell className="font-mono text-xs">{p.sku}</TableCell>
-                <TableCell className="max-w-64 break-words align-middle min-h-[60px]">
-                  {p.nombre}
-                </TableCell>
-                <TableCell>
-                  {data.categorias.find((c: any) => c.id === p.id_categoria)?.nombre ?? "—"}
-                </TableCell>
-                <TableCell className="text-right">{formatoPrecio(p.precio_unitario)}</TableCell>
-                <TableCell className="text-right">
-                  {editar && (
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Editar ${p.nombre}`}
-                        title="Editar"
-                        onClick={() => abrir(p)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Desactivar ${p.nombre}`}
-                        title="Desactivar"
-                        onClick={() => {
-                          setError("");
-                          setDesactivando(p);
-                        }}
-                      >
-                        <Power className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {!rows.length && (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  No hay productos que coincidan.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+          <div className="w-[190px]">
+            <Select
+              value={categoriaSeleccionada}
+              onValueChange={(val) => {
+                setCategoriaSeleccionada(val);
+                setPaginaActual(1);
+              }}
+            >
+              <SelectTrigger className="h-10 border-gray-300 bg-white text-gray-700 rounded-lg text-sm">
+                <SelectValue placeholder="Todas las categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas las categorías</SelectItem>
+                {categoriasDisponibles.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-          <span>
-            {filtrados.length
-              ? `Mostrando ${paginaActual * 20 + 1}–${Math.min((paginaActual + 1) * 20, filtrados.length)} de ${filtrados.length}`
-              : "0 productos"}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={paginaActual === 0}
-              onClick={() => setPagina(paginaActual - 1)}
+          <div className="w-[170px]">
+            <Select
+              value={estadoSeleccionado}
+              onValueChange={(val) => {
+                setEstadoSeleccionado(val);
+                setPaginaActual(1);
+              }}
             >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={(paginaActual + 1) * 20 >= filtrados.length}
-              onClick={() => setPagina(paginaActual + 1)}
-            >
-              Siguiente
-            </Button>
+              <SelectTrigger className="h-10 border-gray-300 bg-white text-gray-700 rounded-lg text-sm">
+                <SelectValue placeholder="Todos los estados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los estados</SelectItem>
+                <SelectItem value="normal">Normal (Stock OK)</SelectItem>
+                <SelectItem value="bajo">Stock Bajo</SelectItem>
+                <SelectItem value="agotado">Sin Stock</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      </Card>
 
-      <Dialog
-        open={abierto}
-        onOpenChange={(o) => {
-          if (!guardar.isPending) {
-            setAbierto(o);
-            if (!o) setEscaneando(false);
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editando ? "Editar producto" : "Nuevo producto"}</DialogTitle>
-            <DialogDescription>Datos del producto</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={enviar} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="producto-codigo">Código de barras</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="producto-codigo"
-                  value={codigo}
-                  onChange={(e) => setCodigo(e.target.value)}
-                  required
-                  disabled={guardar.isPending || buscandoCodigo}
-                  placeholder="Escanea o escribe el código..."
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEscaneando(true)}
-                  disabled={guardar.isPending}
-                >
-                  <ScanBarcode className="h-4 w-4" />
-                </Button>
-              </div>
-              {buscandoCodigo && (
-                <p className="text-xs text-muted-foreground">🔍 Buscando en base de datos...</p>
-              )}
-              {/* ✅ AVISO DE PRODUCTO EXISTENTE */}
-              {productoExistente && !editando && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
-                  <Sparkles className="h-5 w-5 text-green-700 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-green-800">
-                      ✨ Producto ya registrado en tu base de datos
-                    </p>
-                    <p className="text-xs text-green-700 mt-1">
-                      Hemos autocompletado los datos del producto "
-                      <strong>{productoExistente.nombre}</strong>" que registraste anteriormente.
-                    </p>
-                    <p className="text-xs text-green-600 mt-1">
-                      Puedes modificar cualquier campo si es necesario antes de guardar.
-                    </p>
-                  </div>
-                </div>
-              )}
-              <EstadoUnicidad estado={codigoEstado} />
-            </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={exportarCSV}
+            className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <Download className="w-3.5 h-3.5 text-gray-500" />
+            <span>Exportar CSV</span>
+          </Button>
 
-            <div className="space-y-2">
-              <Label htmlFor="producto-sku">SKU</Label>
-              <Input
-                id="producto-sku"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                required
-                disabled={guardar.isPending}
-              />
-              <EstadoUnicidad estado={skuEstado} />
-            </div>
+          <Button
+            onClick={abrirModalCrear}
+            className="h-10 bg-[#8c4314] hover:bg-[#78370e] text-white rounded-lg text-xs font-semibold px-4 gap-1.5 shadow-xs transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Producto</span>
+          </Button>
+        </div>
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="producto-nombre">Nombre</Label>
-              <Input
-                id="producto-nombre"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-                disabled={guardar.isPending}
-              />
-            </div>
+      {/* 🌟 3. TARJETAS KPI RESUMEN (UNIFICADAS CON DASHBOARD) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {kpisData.map((kpi) => (
+          <KPICard key={kpi.label} data={kpi} />
+        ))}
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="producto-descripcion">Descripción (opcional)</Label>
-              <Textarea
-                id="producto-descripcion"
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                disabled={guardar.isPending}
-              />
-            </div>
+      {/* 4. TABLA PRINCIPAL DE DATOS */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+          <span>{seleccionados.size} seleccionados</span>
+          <div className="flex items-center gap-1.5 font-medium">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <span>Columnas activas: 6/6 • Almacén Norte</span>
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="producto-categoria">Categoría</Label>
-              <Select value={categoria} disabled={guardar.isPending} onValueChange={setCategoria}>
-                <SelectTrigger id="producto-categoria">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ninguna">Sin categoría</SelectItem>
-                  {data.categorias
-                    .filter((c: any) => c.activo || c.id === categoria)
-                    .map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nombre}
-                        {!c.activo ? " (inactiva)" : ""}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+          <Table>
+            <TableHeader className="bg-gray-50/80 border-b border-gray-200">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[48px] px-4">
+                  <Checkbox
+                    checked={
+                      productosPaginados.length > 0 &&
+                      seleccionados.size === productosPaginados.length
+                    }
+                    onCheckedChange={toggleSeleccionarTodos}
+                    aria-label="Seleccionar todos"
+                  />
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                  PRODUCTO & SKU
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                  CATEGORÍA
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                  UBICACIÓN
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                  STOCK & ESTADO
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600 text-right">
+                  PRECIO UNITARIO
+                </TableHead>
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600 text-right w-[100px]">
+                  ACCIONES
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-gray-100">
+              {productosPaginados.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-gray-500">
+                    No se encontraron productos con los filtros seleccionados.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                productosPaginados.map((p) => {
+                  const estaSeleccionado = seleccionados.has(p.id);
+                  const esAgotado = p.stock_actual === 0;
+                  const esBajo = p.stock_actual > 0 && p.stock_actual <= p.stock_minimo;
 
-            <div className="space-y-2">
-              <Label htmlFor="producto-precio">Precio unitario</Label>
-              <Input
-                id="producto-precio"
-                type="number"
-                min="0"
-                step="0.01"
-                value={precio}
-                onChange={(e) => setPrecio(e.target.value)}
-                disabled={guardar.isPending}
-              />
-            </div>
+                  return (
+                    <TableRow
+                      key={p.id}
+                      className={`transition-colors ${
+                        estaSeleccionado ? "bg-amber-50/40" : "hover:bg-gray-50/80"
+                      }`}
+                    >
+                      <TableCell className="px-4">
+                        <Checkbox
+                          checked={estaSeleccionado}
+                          onCheckedChange={() => toggleSeleccionarFila(p.id)}
+                          aria-label={`Seleccionar ${p.nombre}`}
+                        />
+                      </TableCell>
 
-            {/* UBICACIONES DEL PRODUCTO */}
-            {editando && (
-              <div className="space-y-3 pt-4 border-t mt-4">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> Ubicaciones del producto
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Añade ubicaciones cruzadas, cajas o armarios donde se pueda encontrar este
-                  producto.
-                </p>
-
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                  {cargandoUbicaciones ? (
-                    <p className="text-sm text-muted-foreground">Cargando ubicaciones...</p>
-                  ) : ubicacionesProducto.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">
-                      No hay ubicaciones asignadas. Añade una abajo.
-                    </p>
-                  ) : (
-                    ubicacionesProducto.map((u: any, index: number) => {
-                      const nombreMostrar = obtenerNombreUbicacion(u.id_ubicacion);
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center gap-2 p-2 bg-muted/50 rounded-md text-sm border"
-                        >
-                          <Badge
-                            variant={u.tipo === "principal" ? "default" : "secondary"}
-                            className="capitalize text-xs"
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-full border border-gray-200 shrink-0 flex items-center justify-center shadow-2xs"
+                            style={{
+                              backgroundColor: p.swatchColor || "#f1f5f9",
+                            }}
                           >
-                            {u.tipo}
-                          </Badge>
-                          <span className="flex-1 truncate font-medium" title={nombreMostrar}>
-                            {nombreMostrar}
+                            {p.iconoTipo === "herramienta" ? (
+                              <Paintbrush className="w-4 h-4 text-gray-600" />
+                            ) : p.iconoTipo === "solvente" ? (
+                              <FlaskConical className="w-4 h-4 text-blue-600" />
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-sm text-gray-900 truncate">
+                              {p.nombre}
+                            </span>
+                            <span className="text-xs font-mono text-gray-500 tracking-tight">
+                              SKU: {p.sku}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100">
+                          {p.categoria}
+                        </span>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="inline-flex items-center gap-1.5 text-xs text-gray-700 font-medium">
+                          <Warehouse className="w-3.5 h-3.5 text-gray-400" />
+                          <span>{p.ubicacion || "Sin asignar"}</span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-bold text-xs ${
+                              esAgotado
+                                ? "text-rose-600"
+                                : esBajo
+                                  ? "text-amber-800"
+                                  : "text-gray-900"
+                            }`}
+                          >
+                            {p.stock_actual} {p.unidad || "unid"}
                           </span>
-                          {u.tipo === "cross" && u.seccion_origen && (
-                            <span className="text-xs text-muted-foreground italic">
-                              de {u.seccion_origen}
+
+                          {esAgotado ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                              Agotado
+                            </span>
+                          ) : esBajo ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                              Bajo
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                              Normal
                             </span>
                           )}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                            onClick={() =>
-                              setUbicacionesProducto((prev) =>
-                                prev.filter((_: any, i: number) => i !== index),
-                              )
-                            }
-                            title="Quitar"
-                          >
-                            <Power className="h-3 w-3" />
-                          </Button>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      </TableCell>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="select-pasillo" className="text-sm font-medium">
-                      1. Selecciona zona principal
-                    </Label>
-                    <Select
-                      value={nuevaUbicacionPadreId}
-                      onValueChange={(value) => {
-                        setNuevaUbicacionPadreId(value);
-                        setNuevaUbicacionId(value);
-                      }}
-                    >
-                      <SelectTrigger id="select-pasillo">
-                        <SelectValue placeholder="Elige pasillo o reserva..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel className="text-xs font-bold text-blue-700">
-                            🛣️ PASILLOS
-                          </SelectLabel>
-                          {data.ubicaciones
-                            .filter((u: any) => u.tipo === "pasillo")
-                            .map((pasillo: any) => (
-                              <SelectItem key={pasillo.id} value={pasillo.id}>
-                                🛣️ {pasillo.nombre}{" "}
-                                {pasillo.descripcion ? `- ${pasillo.descripcion}` : ""}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                        <SelectGroup>
-                          <SelectLabel className="text-xs font-bold text-gray-700">
-                            🏭 RESERVA
-                          </SelectLabel>
-                          {data.ubicaciones
-                            .filter((u: any) => u.tipo === "reserva")
-                            .map((reserva: any) => (
-                              <SelectItem key={reserva.id} value={reserva.id}>
-                                🏭 {reserva.nombre}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <TableCell className="text-right font-medium text-xs text-gray-800">
+                        ${(p.precio || 0).toLocaleString("es-CL")}
+                      </TableCell>
 
-                  {nuevaUbicacionPadreId && (
-                    <div>
-                      <Label htmlFor="select-hijo" className="text-sm font-medium">
-                        2. Ubicación específica
-                      </Label>
-                      <Select value={nuevaUbicacionId} onValueChange={setNuevaUbicacionId}>
-                        <SelectTrigger id="select-hijo">
-                          <SelectValue placeholder="Elige ubicación específica..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={nuevaUbicacionPadreId}>
-                            {data.ubicaciones.find((u: any) => u.id === nuevaUbicacionPadreId)
-                              ?.tipo === "pasillo"
-                              ? "🛣️"
-                              : "🏭"}{" "}
-                            {
-                              data.ubicaciones.find((u: any) => u.id === nuevaUbicacionPadreId)
-                                ?.nombre
-                            }{" "}
-                            (General)
-                          </SelectItem>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setProductoVer(p)}
+                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                            title="Ver detalles"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
 
-                          {data.ubicaciones.filter(
-                            (h: any) => h.id_ubicacion_padre === nuevaUbicacionPadreId,
-                          ).length > 0 && <div className="h-px bg-gray-200 my-1" />}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuItem
+                                onClick={() => abrirModalEditar(p)}
+                                className="gap-2 text-xs font-medium cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Editar producto</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setProductoADesactivar(p)}
+                                className="gap-2 text-xs font-medium text-rose-600 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                <span>{p.activo ? "Desactivar" : "Activar"}</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
-                          {data.ubicaciones
-                            .filter(
-                              (h: any) =>
-                                h.id_ubicacion_padre === nuevaUbicacionPadreId &&
-                                !ubicacionesProducto.some((up: any) => up.id_ubicacion === h.id),
-                            )
-                            .map((hijo: any) => (
-                              <SelectItem key={hijo.id} value={hijo.id}>
-                                <span className="pl-2">
-                                  {hijo.tipo === "armario"
-                                    ? "🗄️"
-                                    : hijo.tipo === "alto"
-                                      ? "📦"
-                                      : hijo.tipo === "cross"
-                                        ? "🔄"
-                                        : hijo.tipo === "caja"
-                                          ? "💳"
-                                          : "📍"}{" "}
-                                  {hijo.nombre} ({hijo.tipo})
-                                  {hijo.posicion_lateral && ` [${hijo.posicion_lateral}]`}
-                                  {hijo.numero && ` Nº${hijo.numero}`}
-                                </span>
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
+      {/* 5. FOOTER & PAGINACIÓN */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 pt-1">
+        <div>
+          Mostrando{" "}
+          <strong className="text-gray-800">
+            {productosFiltrados.length === 0 ? 0 : (paginaActual - 1) * elementosPorPagina + 1}
+          </strong>{" "}
+          a{" "}
+          <strong className="text-gray-800">
+            {Math.min(paginaActual * elementosPorPagina, productosFiltrados.length)}
+          </strong>{" "}
+          de <strong className="text-gray-800">{productosFiltrados.length}</strong> productos
+        </div>
 
-                {nuevaUbicacionId && (
-                  <div className="flex flex-col sm:flex-row gap-2 p-3 bg-background border rounded-md">
-                    <Select
-                      value={nuevoTipoUbicacion}
-                      onValueChange={(v: any) => setNuevoTipoUbicacion(v)}
-                    >
-                      <SelectTrigger className="w-full sm:w-32">
-                        <SelectValue placeholder="Tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="principal">Principal</SelectItem>
-                        <SelectItem value="cross">Cross</SelectItem>
-                        <SelectItem value="caja">Caja</SelectItem>
-                        <SelectItem value="temporal">Temporal</SelectItem>
-                      </SelectContent>
-                    </Select>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+            disabled={paginaActual === 1}
+            className="h-8 text-xs font-medium border-gray-300"
+          >
+            Anterior
+          </Button>
 
-                    {nuevoTipoUbicacion === "cross" && (
-                      <Input
-                        placeholder="Sección origen"
-                        value={nuevaSeccionOrigen}
-                        onChange={(e) => setNuevaSeccionOrigen(e.target.value)}
-                        className="flex-1"
-                      />
-                    )}
+          {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => (
+            <Button
+              key={num}
+              variant={paginaActual === num ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPaginaActual(num)}
+              className={`h-8 w-8 p-0 text-xs font-semibold ${
+                paginaActual === num
+                  ? "bg-[#8c4314] hover:bg-[#78370e] text-white border-transparent"
+                  : "border-gray-300 text-gray-700"
+              }`}
+            >
+              {num}
+            </Button>
+          ))}
 
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        if (!nuevaUbicacionId) return;
-                        setUbicacionesProducto((prev) => [
-                          ...prev,
-                          {
-                            id_ubicacion: nuevaUbicacionId,
-                            tipo: nuevoTipoUbicacion,
-                            seccion_origen:
-                              nuevoTipoUbicacion === "cross" ? nuevaSeccionOrigen : null,
-                          },
-                        ]);
-                        setNuevaUbicacionPadreId("");
-                        setNuevaUbicacionId("");
-                        setNuevoTipoUbicacion("principal");
-                        setNuevaSeccionOrigen("");
-                      }}
-                    >
-                      Añadir
-                    </Button>
-                  </div>
-                )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+            disabled={paginaActual === totalPaginas}
+            className="h-8 text-xs font-medium border-gray-300 text-amber-900 border-amber-300 hover:bg-amber-50"
+          >
+            Siguiente
+          </Button>
+        </div>
+      </div>
+
+      {/* MODAL: NUEVO PRODUCTO */}
+      <Dialog open={modalNuevoAbierto} onOpenChange={setModalNuevoAbierto}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-gray-900">
+              Registrar Nuevo Producto
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              Introduce la información del nuevo producto para darlo de alta en el catálogo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleGuardarNuevo} className="space-y-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-sku">SKU *</Label>
+                <Input
+                  id="nuevo-sku"
+                  value={formSku}
+                  onChange={(e) => setFormSku(e.target.value)}
+                  placeholder="Ej: LAT-4001-WHT"
+                  className="font-mono text-sm uppercase"
+                  required
+                />
               </div>
-            )}
 
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-cat">Categoría *</Label>
+                <Select value={formCategoria} onValueChange={setFormCategoria}>
+                  <SelectTrigger id="nuevo-cat">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pinturas de Interior">Pinturas de Interior</SelectItem>
+                    <SelectItem value="Esmaltes & Sintéticos">Esmaltes & Sintéticos</SelectItem>
+                    <SelectItem value="Herramientas">Herramientas</SelectItem>
+                    <SelectItem value="Masillas & Selladores">Masillas & Selladores</SelectItem>
+                    <SelectItem value="Solventes & Químicos">Solventes & Químicos</SelectItem>
+                    <SelectItem value="Impermeabilizantes">Impermeabilizantes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="nuevo-nombre">Nombre del Producto *</Label>
+              <Input
+                id="nuevo-nombre"
+                value={formNombre}
+                onChange={(e) => setFormNombre(e.target.value)}
+                placeholder="Ej: Látex Supercubriente Blanco 20L"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-stock">Stock Inicial</Label>
+                <Input
+                  id="nuevo-stock"
+                  type="number"
+                  min={0}
+                  value={formStock}
+                  onChange={(e) =>
+                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-minimo">Stock Mínimo</Label>
+                <Input
+                  id="nuevo-minimo"
+                  type="number"
+                  min={0}
+                  value={formStockMinimo}
+                  onChange={(e) =>
+                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-unidad">Unidad</Label>
+                <Select value={formUnidad} onValueChange={setFormUnidad}>
+                  <SelectTrigger id="nuevo-unidad">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gal">gal (Galones)</SelectItem>
+                    <SelectItem value="unid">unid (Unidades)</SelectItem>
+                    <SelectItem value="Kg">Kg (Kilos)</SelectItem>
+                    <SelectItem value="L">L (Litros)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-ubicacion">Ubicación física</Label>
+                <Input
+                  id="nuevo-ubicacion"
+                  value={formUbicacion}
+                  onChange={(e) => setFormUbicacion(e.target.value)}
+                  placeholder="Ej: Pasillo A - A01"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="nuevo-precio">Precio Unitario ($)</Label>
+                <Input
+                  id="nuevo-precio"
+                  type="number"
+                  min={0}
+                  value={formPrecio}
+                  onChange={(e) =>
+                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
               <Button
                 type="button"
                 variant="outline"
-                disabled={guardar.isPending}
-                onClick={() => setAbierto(false)}
+                onClick={() => setModalNuevoAbierto(false)}
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={
-                  guardar.isPending ||
-                  !(editando ? editar : crear) ||
-                  !nombre.trim() ||
-                  !sku.trim() ||
-                  !codigo.trim() ||
-                  codigoEstado !== "libre" ||
-                  skuEstado !== "libre"
-                }
+                className="bg-[#8c4314] hover:bg-[#78370e] text-white"
               >
-                {guardar.isPending ? "Guardando…" : "Guardar"}
+                Guardar Producto
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={escaneando && abierto} onOpenChange={setEscaneando}>
-        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto">
+      {/* MODAL: EDITAR PRODUCTO */}
+      <Dialog open={Boolean(productoEditar)} onOpenChange={(open) => !open && setProductoEditar(null)}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Escanear código</DialogTitle>
-            <DialogDescription>Código de barras del producto</DialogDescription>
+            <DialogTitle className="text-lg font-bold text-gray-900">
+              Editar Producto
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              Modifica los detalles del producto seleccionado.
+            </DialogDescription>
           </DialogHeader>
-          <Suspense fallback={<CargandoInventario />}>
-            <Escaner onCodigo={recibirCodigo} onCerrar={() => setEscaneando(false)} />
-          </Suspense>
+
+          <form onSubmit={handleGuardarEdicion} className="space-y-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-sku">SKU</Label>
+                <Input
+                  id="edit-sku"
+                  value={formSku}
+                  onChange={(e) => setFormSku(e.target.value)}
+                  className="font-mono text-sm uppercase"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-cat">Categoría</Label>
+                <Select value={formCategoria} onValueChange={setFormCategoria}>
+                  <SelectTrigger id="edit-cat">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pinturas de Interior">Pinturas de Interior</SelectItem>
+                    <SelectItem value="Esmaltes & Sintéticos">Esmaltes & Sintéticos</SelectItem>
+                    <SelectItem value="Herramientas">Herramientas</SelectItem>
+                    <SelectItem value="Masillas & Selladores">Masillas & Selladores</SelectItem>
+                    <SelectItem value="Solventes & Químicos">Solventes & Químicos</SelectItem>
+                    <SelectItem value="Impermeabilizantes">Impermeabilizantes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit-nombre">Nombre</Label>
+              <Input
+                id="edit-nombre"
+                value={formNombre}
+                onChange={(e) => setFormNombre(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-stock">Stock Actual</Label>
+                <Input
+                  id="edit-stock"
+                  type="number"
+                  min={0}
+                  value={formStock}
+                  onChange={(e) =>
+                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-minimo">Stock Mínimo</Label>
+                <Input
+                  id="edit-minimo"
+                  type="number"
+                  min={0}
+                  value={formStockMinimo}
+                  onChange={(e) =>
+                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-unidad">Unidad</Label>
+                <Input
+                  id="edit-unidad"
+                  value={formUnidad}
+                  onChange={(e) => setFormUnidad(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-ubicacion">Ubicación</Label>
+                <Input
+                  id="edit-ubicacion"
+                  value={formUbicacion}
+                  onChange={(e) => setFormUbicacion(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-precio">Precio Unitario ($)</Label>
+                <Input
+                  id="edit-precio"
+                  type="number"
+                  min={0}
+                  value={formPrecio}
+                  onChange={(e) =>
+                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setProductoEditar(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-[#8c4314] hover:bg-[#78370e] text-white"
+              >
+                Guardar Cambios
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
+      {/* MODAL: VER DETALLE DEL PRODUCTO */}
+      <Dialog open={Boolean(productoVer)} onOpenChange={(open) => !open && setProductoVer(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold">
+                {productoVer?.sku}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 font-medium border border-blue-100">
+                {productoVer?.categoria}
+              </span>
+            </div>
+            <DialogTitle className="text-base font-bold text-gray-900">
+              {productoVer?.nombre}
+            </DialogTitle>
+          </DialogHeader>
+
+          {productoVer && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div>
+                  <span className="text-gray-500 block">Stock Actual:</span>
+                  <span className="font-bold text-sm text-gray-900">
+                    {productoVer.stock_actual} {productoVer.unidad}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">Stock Mínimo:</span>
+                  <span className="font-bold text-sm text-gray-900">
+                    {productoVer.stock_minimo} {productoVer.unidad}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">Ubicación Física:</span>
+                  <span className="font-semibold text-gray-800">
+                    {productoVer.ubicacion || "-"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">Precio Unitario:</span>
+                  <span className="font-semibold text-gray-800">
+                    ${(productoVer.precio || 0).toLocaleString("es-CL")}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded border bg-white">
+                <span className="text-gray-600">Estado del producto:</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full font-semibold ${
+                    productoVer.activo
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}
+                >
+                  {productoVer.activo ? "Activo" : "Inactivo"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setProductoVer(null)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ALERT DIALOG: CONFIRMAR DESACTIVACIÓN / ELIMINACIÓN */}
       <AlertDialog
-        open={!!desactivando}
-        onOpenChange={(o) => {
-          if (!o && !desactivar.isPending) setDesactivando(null);
-        }}
+        open={Boolean(productoADesactivar)}
+        onOpenChange={(open) => !open && setProductoADesactivar(null)}
       >
-        <AlertDialogContent className="w-[calc(100%-2rem)] sm:max-w-md">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar producto?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿{productoADesactivar?.activo ? "Desactivar" : "Reactivar"} producto?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que deseas desactivar «{desactivando?.nombre}»? Se conservarán su
-              stock y movimientos históricos.
+              ¿Estás seguro de que deseas{" "}
+              {productoADesactivar?.activo ? "desactivar" : "activar"} el producto «
+              <strong>{productoADesactivar?.nombre}</strong>» (SKU: {productoADesactivar?.sku})?
+              <br />
+              <br />
+              Los movimientos e histórico de existencias se conservarán en la base de datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={desactivar.isPending}
-              onClick={() => setDesactivando(null)}
-            >
+            <AlertDialogCancel onClick={() => setProductoADesactivar(null)}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={desactivar.isPending || !editar}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => desactivar.mutate()}
+              onClick={confirmarDesactivar}
+              className={
+                productoADesactivar?.activo
+                  ? "bg-rose-600 hover:bg-rose-700 text-white"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white"
+              }
             >
-              {desactivar.isPending ? "Desactivando…" : "Desactivar"}
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }
+
+// ============================================================================
+// EXPORTACIÓN DE RUTA TANSTACK ROUTER
+// ============================================================================
+
+export const Route = createFileRoute("/_authenticated/productos")({
+  component: ProductosPage,
+});
