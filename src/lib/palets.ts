@@ -30,11 +30,10 @@ export function generarCodigoBarrasPalet(
   fecha: Date = new Date(),
 ): string {
   const padNumero = String(numeroPalet).padStart(3, "0");
-  const usuarioLimpio =
-    usuario
-      .trim()
-      .split(/\s+/)[0]
-      .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, "") || "Usuario";
+  
+  // CORRECCIÓN AQUÍ: Declaración limpia y única de usuarioLimpio
+  const usuarioLimpio = (usuario ?? "").trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, "") || "Usuario";
+  
   const dia = String(fecha.getDate()).padStart(2, "0");
   const mes = String(fecha.getMonth() + 1).padStart(2, "0");
   const anio = fecha.getFullYear();
