@@ -29,7 +29,7 @@ export function KPICard({ data }: { data: KpiData }) {
   const colors = colorConfig[data.color] || colorConfig.slate;
   
   return (
-    <Card className={`border-l-4 ${colors.border} border-slate-200 shadow-sm transition-shadow hover:shadow-md`}>
+    <Card className={`border-l-4 ${colors.border} border-slate-200 shadow-md transition-shadow hover:shadow-lg`}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">

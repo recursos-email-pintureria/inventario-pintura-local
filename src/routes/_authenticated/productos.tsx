@@ -15,6 +15,9 @@ import {
   Warehouse,
   Paintbrush,
   FlaskConical,
+  Camera,
+  Box,
+  Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,12 +67,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// 🌟 COMPONENTE UNIFICADO DE KPIs
+//  Componente unificado de KPIs
 import { KPICard, KpiData } from "@/components/ui/kpi-card";
+
+// 📷 Escáner de código de barras
+import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 
 // ============================================================================
 // DEFINICIÓN DE TIPOS
 // ============================================================================
+
+export interface Dimensiones {
+  largo: number;
+  ancho: number;
+  alto: number;
+  peso: number;
+}
 
 export interface ProductoItem {
   id: string;
@@ -84,6 +97,7 @@ export interface ProductoItem {
   precio?: number;
   swatchColor?: string;
   iconoTipo?: "color" | "herramienta" | "solvente";
+  dimensiones?: Dimensiones;
 }
 
 // ============================================================================
@@ -104,6 +118,7 @@ const productosMockIniciales: ProductoItem[] = [
     precio: 42500,
     swatchColor: "#ffffff",
     iconoTipo: "color",
+    dimensiones: { largo: 30, ancho: 30, alto: 35, peso: 18.5 },
   },
   {
     id: "prod-2",
@@ -118,6 +133,7 @@ const productosMockIniciales: ProductoItem[] = [
     precio: 28990,
     swatchColor: "#171717",
     iconoTipo: "color",
+    dimensiones: { largo: 20, ancho: 20, alto: 22, peso: 5.2 },
   },
   {
     id: "prod-3",
@@ -131,6 +147,7 @@ const productosMockIniciales: ProductoItem[] = [
     ubicacion: "Estante D - D04",
     precio: 8450,
     iconoTipo: "herramienta",
+    dimensiones: { largo: 30, ancho: 8, alto: 8, peso: 0.4 },
   },
   {
     id: "prod-4",
@@ -158,6 +175,7 @@ const productosMockIniciales: ProductoItem[] = [
     ubicacion: "Bodega 2 - Z01",
     precio: 31200,
     iconoTipo: "solvente",
+    dimensiones: { largo: 25, ancho: 25, alto: 30, peso: 9.8 },
   },
   {
     id: "prod-6",
@@ -186,6 +204,7 @@ const productosMockIniciales: ProductoItem[] = [
     precio: 64900,
     swatchColor: "#b94e32",
     iconoTipo: "color",
+    dimensiones: { largo: 35, ancho: 35, alto: 40, peso: 22.0 },
   },
   {
     id: "prod-8",
@@ -244,6 +263,9 @@ export function ProductosPage() {
   // Selección de filas
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
 
+  // 📷 Escáner de código de barras
+  const [scannerOpen, setScannerOpen] = useState(false);
+
   // Diálogos modales
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false);
   const [productoVer, setProductoVer] = useState<ProductoItem | null>(null);
@@ -259,6 +281,12 @@ export function ProductosPage() {
   const [formPrecio, setFormPrecio] = useState<number | "">(25000);
   const [formUbicacion, setFormUbicacion] = useState("Pasillo A - A01");
   const [formUnidad, setFormUnidad] = useState("gal");
+  
+  // 📦 Formulario Dimensiones
+  const [formLargo, setFormLargo] = useState<number | "">(0);
+  const [formAncho, setFormAncho] = useState<number | "">(0);
+  const [formAlto, setFormAlto] = useState<number | "">(0);
+  const [formPeso, setFormPeso] = useState<number | "">(0);
 
   // Lista de categorías únicas extraídas de los datos
   const categoriasDisponibles = useMemo(() => {
@@ -350,7 +378,35 @@ export function ProductosPage() {
     });
   };
 
-  // Apertura de modal para creación
+  // 📷 Manejador inteligente del escaneo de código de barras
+  const handleScan = (code: string) => {
+    const productoEncontrado = productos.find(
+      (p) => p.sku.toLowerCase() === code.toLowerCase() || p.id === code,
+    );
+
+    if (productoEncontrado) {
+      // Si existe, lo buscamos en la tabla
+      setBusqueda(productoEncontrado.sku);
+      setPaginaActual(1);
+      toast.success(`✅ Producto encontrado: ${productoEncontrado.nombre}`);
+    } else {
+      // Si NO existe, abrimos el modal de creación con el SKU pre-rellenado
+      setFormSku(code.toUpperCase());
+      setFormNombre("");
+      setFormCategoria("Pinturas de Interior");
+      setFormStock(0);
+      setFormStockMinimo(0);
+      setFormPrecio(0);
+      setFormUbicacion("");
+      setFormUnidad("unid");
+      setFormLargo(0); setFormAncho(0); setFormAlto(0); setFormPeso(0);
+      
+      setModalNuevoAbierto(true);
+      toast.info(`🆕 Código ${code} no encontrado. Complete los datos para crearlo.`);
+    }
+  };
+
+  // Apertura de modal para creación (vacío)
   const abrirModalCrear = () => {
     setFormNombre("");
     setFormSku(`LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(10 + Math.random() * 90)}`);
@@ -360,6 +416,7 @@ export function ProductosPage() {
     setFormPrecio(32000);
     setFormUbicacion("Pasillo A - A02");
     setFormUnidad("gal");
+    setFormLargo(0); setFormAncho(0); setFormAlto(0); setFormPeso(0);
     setModalNuevoAbierto(true);
   };
 
@@ -374,6 +431,12 @@ export function ProductosPage() {
     setFormPrecio(p.precio || 20000);
     setFormUbicacion(p.ubicacion || "Pasillo A - A01");
     setFormUnidad(p.unidad || "gal");
+    
+    // Cargar dimensiones si existen
+    setFormLargo(p.dimensiones?.largo || 0);
+    setFormAncho(p.dimensiones?.ancho || 0);
+    setFormAlto(p.dimensiones?.alto || 0);
+    setFormPeso(p.dimensiones?.peso || 0);
   };
 
   // Guardar nuevo producto (Mock)
@@ -397,6 +460,12 @@ export function ProductosPage() {
       precio: Number(formPrecio) || 0,
       iconoTipo: "color",
       swatchColor: "#ffffff",
+      dimensiones: {
+        largo: Number(formLargo) || 0,
+        ancho: Number(formAncho) || 0,
+        alto: Number(formAlto) || 0,
+        peso: Number(formPeso) || 0,
+      }
     };
 
     setProductos([nuevo, ...productos]);
@@ -422,6 +491,12 @@ export function ProductosPage() {
               precio: Number(formPrecio) || 0,
               ubicacion: formUbicacion,
               unidad: formUnidad,
+              dimensiones: {
+                largo: Number(formLargo) || 0,
+                ancho: Number(formAncho) || 0,
+                alto: Number(formAlto) || 0,
+                peso: Number(formPeso) || 0,
+              }
             }
           : p,
       ),
@@ -553,6 +628,16 @@ export function ProductosPage() {
           >
             <Download className="w-3.5 h-3.5 text-gray-500" />
             <span>Exportar CSV</span>
+          </Button>
+
+          {/* 📷 Botón de Escáner */}
+          <Button
+            variant="outline"
+            onClick={() => setScannerOpen(true)}
+            className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <Camera className="w-3.5 h-3.5 text-gray-500" />
+            <span>Escanear</span>
           </Button>
 
           <Button
@@ -824,9 +909,16 @@ export function ProductosPage() {
         </div>
       </div>
 
+      {/* 📷 COMPONENTE ESCÁNER DE CÓDIGO DE BARRAS */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onScan={handleScan}
+      />
+
       {/* MODAL: NUEVO PRODUCTO */}
       <Dialog open={modalNuevoAbierto} onOpenChange={setModalNuevoAbierto}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-gray-900">
               Registrar Nuevo Producto
@@ -840,14 +932,19 @@ export function ProductosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="nuevo-sku">SKU *</Label>
-                <Input
-                  id="nuevo-sku"
-                  value={formSku}
-                  onChange={(e) => setFormSku(e.target.value)}
-                  placeholder="Ej: LAT-4001-WHT"
-                  className="font-mono text-sm uppercase"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="nuevo-sku"
+                    value={formSku}
+                    onChange={(e) => setFormSku(e.target.value)}
+                    placeholder="Ej: LAT-4001-WHT"
+                    className="font-mono text-sm uppercase flex-1"
+                    required
+                  />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="Escanear código">
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -879,7 +976,7 @@ export function ProductosPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="nuevo-stock">Stock Inicial</Label>
                 <Input
@@ -920,18 +1017,6 @@ export function ProductosPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-ubicacion">Ubicación física</Label>
-                <Input
-                  id="nuevo-ubicacion"
-                  value={formUbicacion}
-                  onChange={(e) => setFormUbicacion(e.target.value)}
-                  placeholder="Ej: Pasillo A - A01"
-                />
-              </div>
 
               <div className="space-y-1">
                 <Label htmlFor="nuevo-precio">Precio Unitario ($)</Label>
@@ -944,6 +1029,67 @@ export function ProductosPage() {
                     setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="nuevo-ubicacion">Ubicación física</Label>
+              <Input
+                id="nuevo-ubicacion"
+                value={formUbicacion}
+                onChange={(e) => setFormUbicacion(e.target.value)}
+                placeholder="Ej: Pasillo A - A01"
+              />
+            </div>
+
+            {/*  SECCIÓN DE DIMENSIONES Y PESO */}
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-3">
+                <Box className="h-4 w-4 text-amber-700" />
+                <h3 className="text-sm font-semibold text-gray-800">Dimensiones y Peso (Opcional)</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="nuevo-largo" className="text-xs">Largo (cm)</Label>
+                  <Input
+                    id="nuevo-largo"
+                    type="number"
+                    min={0}
+                    value={formLargo}
+                    onChange={(e) => setFormLargo(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="nuevo-ancho" className="text-xs">Ancho (cm)</Label>
+                  <Input
+                    id="nuevo-ancho"
+                    type="number"
+                    min={0}
+                    value={formAncho}
+                    onChange={(e) => setFormAncho(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="nuevo-alto" className="text-xs">Alto (cm)</Label>
+                  <Input
+                    id="nuevo-alto"
+                    type="number"
+                    min={0}
+                    value={formAlto}
+                    onChange={(e) => setFormAlto(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="nuevo-peso" className="text-xs flex items-center gap-1"><Scale className="h-3 w-3" /> Peso (kg)</Label>
+                  <Input
+                    id="nuevo-peso"
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={formPeso}
+                    onChange={(e) => setFormPeso(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
               </div>
             </div>
 
@@ -968,7 +1114,7 @@ export function ProductosPage() {
 
       {/* MODAL: EDITAR PRODUCTO */}
       <Dialog open={Boolean(productoEditar)} onOpenChange={(open) => !open && setProductoEditar(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-gray-900">
               Editar Producto
@@ -1019,7 +1165,7 @@ export function ProductosPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="edit-stock">Stock Actual</Label>
                 <Input
@@ -1054,17 +1200,6 @@ export function ProductosPage() {
                   onChange={(e) => setFormUnidad(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="edit-ubicacion">Ubicación</Label>
-                <Input
-                  id="edit-ubicacion"
-                  value={formUbicacion}
-                  onChange={(e) => setFormUbicacion(e.target.value)}
-                />
-              </div>
 
               <div className="space-y-1">
                 <Label htmlFor="edit-precio">Precio Unitario ($)</Label>
@@ -1077,6 +1212,66 @@ export function ProductosPage() {
                     setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit-ubicacion">Ubicación</Label>
+              <Input
+                id="edit-ubicacion"
+                value={formUbicacion}
+                onChange={(e) => setFormUbicacion(e.target.value)}
+              />
+            </div>
+
+            {/* 📦 SECCIÓN DE DIMENSIONES Y PESO (EDITAR) */}
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-3">
+                <Box className="h-4 w-4 text-amber-700" />
+                <h3 className="text-sm font-semibold text-gray-800">Dimensiones y Peso (Opcional)</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-largo" className="text-xs">Largo (cm)</Label>
+                  <Input
+                    id="edit-largo"
+                    type="number"
+                    min={0}
+                    value={formLargo}
+                    onChange={(e) => setFormLargo(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-ancho" className="text-xs">Ancho (cm)</Label>
+                  <Input
+                    id="edit-ancho"
+                    type="number"
+                    min={0}
+                    value={formAncho}
+                    onChange={(e) => setFormAncho(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-alto" className="text-xs">Alto (cm)</Label>
+                  <Input
+                    id="edit-alto"
+                    type="number"
+                    min={0}
+                    value={formAlto}
+                    onChange={(e) => setFormAlto(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-peso" className="text-xs flex items-center gap-1"><Scale className="h-3 w-3" /> Peso (kg)</Label>
+                  <Input
+                    id="edit-peso"
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={formPeso}
+                    onChange={(e) => setFormPeso(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1144,6 +1339,34 @@ export function ProductosPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Mostrar dimensiones si existen */}
+              {productoVer.dimensiones && (
+                <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-1.5 mb-2 text-amber-800 font-semibold">
+                    <Box className="h-3.5 w-3.5" />
+                    <span>Dimensiones y Peso</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                      <span className="text-[10px] text-gray-500 block">Largo</span>
+                      <span className="font-bold text-gray-900">{productoVer.dimensiones.largo} cm</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-500 block">Ancho</span>
+                      <span className="font-bold text-gray-900">{productoVer.dimensiones.ancho} cm</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-500 block">Alto</span>
+                      <span className="font-bold text-gray-900">{productoVer.dimensiones.alto} cm</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-500 block">Peso</span>
+                      <span className="font-bold text-gray-900">{productoVer.dimensiones.peso} kg</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between p-2 rounded border bg-white">
                 <span className="text-gray-600">Estado del producto:</span>
