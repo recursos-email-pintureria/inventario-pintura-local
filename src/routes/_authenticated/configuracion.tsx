@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store,
   Package,
@@ -14,12 +15,7 @@ import {
   Download,
   Upload,
   CheckCircle2,
-  Bell,
-  Shield,
-  Clock,
-  Mail,
   Globe,
-  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -62,22 +58,17 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Imports de Supabase y TanStack Query
+import { getCategorias, crearCategoria, actualizarCategoria, desactivarCategoria } from "@/lib/inventario";
+import type { Categoria } from "@/lib/tipos";
+
 export const Route = createFileRoute("/_authenticated/configuracion")({
   component: ConfiguracionPage,
 });
 
 // ============================================================================
-// TIPOS
+// TIPOS LOCALES (solo para Usuarios, ya que Categorías viene de @/lib/tipos)
 // ============================================================================
-
-interface Categoria {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  productos: number;
-  color: string;
-}
-
 interface Usuario {
   id: string;
   nombre: string;
@@ -87,20 +78,8 @@ interface Usuario {
 }
 
 // ============================================================================
-// DATOS MOCK
+// DATOS MOCK (Solo Usuarios y Backup por ahora, Categorías es real)
 // ============================================================================
-
-const CATEGORIAS_INICIALES: Categoria[] = [
-  { id: "cat-1", nombre: "Pinturas de Interior", descripcion: "Látex, plásticas y esmaltes para interiores", productos: 24, color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
-  { id: "cat-2", nombre: "Esmaltes & Sintéticos", descripcion: "Acabados brillantes, mates y satinados", productos: 18, color: "bg-blue-100 text-blue-800 border-blue-200" },
-  { id: "cat-3", nombre: "Herramientas", descripcion: "Brochas, rodillos, espátulas y accesorios", productos: 32, color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  { id: "cat-4", nombre: "Masillas & Selladores", descripcion: "Reparación de maderas y juntas", productos: 12, color: "bg-amber-100 text-amber-800 border-amber-200" },
-  { id: "cat-5", nombre: "Solventes & Químicos", descripcion: "Disolventes, thinners y aguarrás", productos: 15, color: "bg-purple-100 text-purple-800 border-purple-200" },
-  { id: "cat-6", nombre: "Impermeabilizantes", descripcion: "Membranas y productos para techos", productos: 8, color: "bg-rose-100 text-rose-800 border-rose-200" },
-  { id: "cat-7", nombre: "Pinturas de Exterior", descripcion: "Fachadas y revestimientos", productos: 20, color: "bg-sky-100 text-sky-800 border-sky-200" },
-  { id: "cat-8", nombre: "Accesorios", descripcion: "Cintas, lijas, protectores y varios", productos: 45, color: "bg-slate-100 text-slate-800 border-slate-200" },
-];
-
 const USUARIOS_INICIALES: Usuario[] = [
   { id: "u-1", nombre: "Javier Martínez", email: "javier@inventariolm.com", rol: "Administrador", activo: true },
   { id: "u-2", nombre: "Elena Rodríguez", email: "elena@inventariolm.com", rol: "Operadora de Almacén", activo: true },
@@ -113,8 +92,9 @@ const USUARIOS_INICIALES: Usuario[] = [
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
+function ConfiguracionPage() {
+  const queryClient = useQueryClient();
 
-export function ConfiguracionPage() {
   // Estado de configuración general
   const [nombreTienda, setNombreTienda] = useState("Pinturas LM - Sucursal Norte");
   const [direccion, setDireccion] = useState("Polígono Industrial Las Palmeras, Nave 14B");
@@ -138,14 +118,18 @@ export function ConfiguracionPage() {
   const [bloquearVentasStockBajo, setBloquearVentasStockBajo] = useState(false);
   const [iva, setIva] = useState(21);
 
-  // Categorías
-  const [categorias, setCategorias] = useState<Categoria[]>(CATEGORIAS_INICIALES);
+  // Categorías (REAL con TanStack Query)
+  const { data: categorias = [], isLoading: cargandoCategorias } = useQuery({
+    queryKey: ["categorias"],
+    queryFn: getCategorias,
+  });
+
   const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false);
   const [categoriaEditando, setCategoriaEditando] = useState<Categoria | null>(null);
   const [formCatNombre, setFormCatNombre] = useState("");
   const [formCatDescripcion, setFormCatDescripcion] = useState("");
 
-  // Usuarios
+  // Usuarios (Mock por ahora)
   const [usuarios] = useState<Usuario[]>(USUARIOS_INICIALES);
 
   // Backup
@@ -156,11 +140,48 @@ export function ConfiguracionPage() {
   const [dialogEliminarAbierto, setDialogEliminarAbierto] = useState(false);
 
   // ============================================================================
+  // MUTACIONES (Supabase)
+  // ============================================================================
+  const mutationCrear = useMutation({
+    mutationFn: ({ nombre, descripcion }: { nombre: string; descripcion: string }) =>
+      crearCategoria(nombre, descripcion),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categorias"] });
+      toast.success("Categoría creada correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear la categoría");
+    },
+  });
+
+  const mutationActualizar = useMutation({
+    mutationFn: ({ id, nombre, descripcion }: { id: string; nombre: string; descripcion: string }) =>
+      actualizarCategoria(id, { nombre, descripcion }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categorias"] });
+      toast.success("Categoría actualizada correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar la categoría");
+    },
+  });
+
+  const mutationEliminar = useMutation({
+    mutationFn: (id: string) => desactivarCategoria(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categorias"] });
+      toast.success("Categoría eliminada correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar la categoría");
+    },
+  });
+
+  // ============================================================================
   // HANDLERS
   // ============================================================================
-
   const handleGuardarCambios = () => {
-    toast.success("Configuración guardada correctamente");
+    toast.success("Configuración guardada correctamente (simulado)");
   };
 
   const handleRestaurarValores = () => {
@@ -181,28 +202,20 @@ export function ConfiguracionPage() {
       toast.error("El nombre es obligatorio");
       return;
     }
-
+    
     if (categoriaEditando) {
-      setCategorias((prev) =>
-        prev.map((c) =>
-          c.id === categoriaEditando.id
-            ? { ...c, nombre: formCatNombre, descripcion: formCatDescripcion }
-            : c
-        )
-      );
-      toast.success(`Categoría "${formCatNombre}" actualizada`);
-    } else {
-      const nueva: Categoria = {
-        id: `cat-${Date.now()}`,
+      mutationActualizar.mutate({
+        id: categoriaEditando.id,
         nombre: formCatNombre,
         descripcion: formCatDescripcion,
-        productos: 0,
-        color: "bg-slate-100 text-slate-800 border-slate-200",
-      };
-      setCategorias((prev) => [...prev, nueva]);
-      toast.success(`Categoría "${formCatNombre}" creada`);
+      });
+    } else {
+      mutationCrear.mutate({
+        nombre: formCatNombre,
+        descripcion: formCatDescripcion,
+      });
     }
-
+    
     setModalCategoriaAbierto(false);
     setCategoriaEditando(null);
     setFormCatNombre("");
@@ -211,8 +224,7 @@ export function ConfiguracionPage() {
 
   const handleEliminarCategoria = () => {
     if (!categoriaAEliminar) return;
-    setCategorias((prev) => prev.filter((c) => c.id !== categoriaAEliminar.id));
-    toast.success(`Categoría "${categoriaAEliminar.nombre}" eliminada`);
+    mutationEliminar.mutate(categoriaAEliminar.id);
     setDialogEliminarAbierto(false);
     setCategoriaAEliminar(null);
   };
@@ -236,7 +248,7 @@ export function ConfiguracionPage() {
   const abrirModalEditarCategoria = (cat: Categoria) => {
     setCategoriaEditando(cat);
     setFormCatNombre(cat.nombre);
-    setFormCatDescripcion(cat.descripcion);
+    setFormCatDescripcion(cat.descripcion || "");
     setModalCategoriaAbierto(true);
   };
 
@@ -250,7 +262,6 @@ export function ConfiguracionPage() {
   // ============================================================================
   // RENDER
   // ============================================================================
-
   return (
     <div className="min-h-screen bg-slate-50/60 pb-16">
       {/* HEADER */}
@@ -411,7 +422,7 @@ export function ConfiguracionPage() {
             </Card>
           </TabsContent>
 
-          {/* TAB: CATEGORÍAS */}
+          {/* TAB: CATEGORÍAS (CONECTADO A SUPABASE) */}
           <TabsContent value="categorias">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -434,36 +445,65 @@ export function ConfiguracionPage() {
                     <TableRow>
                       <TableHead className="text-xs">NOMBRE</TableHead>
                       <TableHead className="text-xs">DESCRIPCIÓN</TableHead>
-                      <TableHead className="text-xs text-right">PRODUCTOS</TableHead>
+                      <TableHead className="text-xs text-right">ESTADO</TableHead>
                       <TableHead className="text-xs text-right">ACCIONES</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {categorias.map((cat) => (
-                      <TableRow key={cat.id}>
-                        <TableCell>
-                          <Badge variant="outline" className={`${cat.color} text-xs font-medium`}>
-                            {cat.nombre}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-slate-600 max-w-[300px] truncate">
-                          {cat.descripcion}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="text-xs font-semibold text-slate-700">{cat.productos}</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => abrirModalEditarCategoria(cat)} className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600">
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setCategoriaAEliminar(cat); setDialogEliminarAbierto(true); }} className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
+                    {cargandoCategorias ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                          Cargando categorías desde la base de datos...
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : categorias.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                          No hay categorías registradas. Crea una nueva.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      categorias.map((cat) => (
+                        <TableRow key={cat.id}>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium">
+                              {cat.nombre}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600 max-w-[300px] truncate">
+                            {cat.descripcion || "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge 
+                              variant="outline" 
+                              className={cat.activo ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-xs" : "bg-slate-100 text-slate-600 border-slate-200 text-xs"}
+                            >
+                              {cat.activo ? "Activa" : "Inactiva"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => abrirModalEditarCategoria(cat)} 
+                                className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => { setCategoriaAEliminar(cat); setDialogEliminarAbierto(true); }} 
+                                className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

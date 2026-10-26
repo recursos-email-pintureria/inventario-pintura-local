@@ -209,7 +209,7 @@ const MOVIMIENTOS_MOCK: Movimiento[] = [
   },
 ];
 
-export function MovimientosPage() {
+function MovimientosPage() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>(MOVIMIENTOS_MOCK);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");

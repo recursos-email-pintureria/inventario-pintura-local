@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
   Plus,
@@ -67,11 +68,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-//  Componente unificado de KPIs
+// 🌟 Componente unificado de KPIs
 import { KPICard, KpiData } from "@/components/ui/kpi-card";
 
 // 📷 Escáner de código de barras
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
+
+// 🔌 Supabase + TanStack Query
+import {
+  getProductos,
+  getCategorias,
+  crearProducto,
+  actualizarProducto,
+  desactivarProducto,
+} from "@/lib/inventario";
+import type { Producto } from "@/lib/tipos";
 
 // ============================================================================
 // DEFINICIÓN DE TIPOS
@@ -84,176 +95,107 @@ export interface Dimensiones {
   peso: number;
 }
 
-export interface ProductoItem {
-  id: string;
-  sku: string;
-  nombre: string;
-  categoria: string;
-  stock_actual: number;
-  stock_minimo: number;
-  activo: boolean;
-  unidad?: string;
-  ubicacion?: string;
-  precio?: number;
+// Tipo local extendido para UI (incluye propiedades visuales)
+export interface ProductoItem extends Producto {
   swatchColor?: string;
   iconoTipo?: "color" | "herramienta" | "solvente";
   dimensiones?: Dimensiones;
 }
 
-// ============================================================================
-// DATOS MOCK REALISTAS
-// ============================================================================
+// Función para adaptar Producto de BD al ProductoItem de UI
+function adaptarProducto(p: Producto): ProductoItem {
+  // Determinar icono según categoría
+  let iconoTipo: "color" | "herramienta" | "solvente" = "color";
+  const catLower = (p.categoria || "").toLowerCase();
+  if (catLower.includes("brocha") || catLower.includes("rodillo") || catLower.includes("herramienta")) {
+    iconoTipo = "herramienta";
+  } else if (catLower.includes("solvente") || catLower.includes("thinner") || catLower.includes("aguarrás")) {
+    iconoTipo = "solvente";
+  }
 
-const productosMockIniciales: ProductoItem[] = [
-  {
-    id: "prod-1",
-    sku: "LAT-4001-WHT",
-    nombre: "Látex Extracubriente Blanco Mate 15L",
-    categoria: "Pinturas de Interior",
-    stock_actual: 48,
-    stock_minimo: 15,
-    activo: true,
-    unidad: "gal",
-    ubicacion: "Pasillo A - A01",
-    precio: 42500,
+  return {
+    ...p,
+    stock_actual: p.stock_actual ?? 0,
+    stock_minimo: p.stock_minimo ?? 0,
+    precio: p.precio ?? 0,
+    unidad: p.unidad ?? "unid",
+    categoria: p.categoria || "Sin categoría",
     swatchColor: "#ffffff",
-    iconoTipo: "color",
-    dimensiones: { largo: 30, ancho: 30, alto: 35, peso: 18.5 },
-  },
-  {
-    id: "prod-2",
-    sku: "ESM-1020-BLK",
-    nombre: "Esmalte Sintético Negro Satinado 4L",
-    categoria: "Esmaltes & Sintéticos",
-    stock_actual: 7,
-    stock_minimo: 10,
-    activo: true,
-    unidad: "gal",
-    ubicacion: "Pasillo B - B03",
-    precio: 28990,
-    swatchColor: "#171717",
-    iconoTipo: "color",
-    dimensiones: { largo: 20, ancho: 20, alto: 22, peso: 5.2 },
-  },
-  {
-    id: "prod-3",
-    sku: "HER-8820-ROD",
-    nombre: "Rodillo Antigota Microfibra Pro 25cm",
-    categoria: "Herramientas",
-    stock_actual: 65,
-    stock_minimo: 20,
-    activo: true,
-    unidad: "unid",
-    ubicacion: "Estante D - D04",
-    precio: 8450,
-    iconoTipo: "herramienta",
-    dimensiones: { largo: 30, ancho: 8, alto: 8, peso: 0.4 },
-  },
-  {
-    id: "prod-4",
-    sku: "MAS-5040-CAO",
-    nombre: "Masilla para Madera Tono Caoba 1Kg",
-    categoria: "Masillas & Selladores",
-    stock_actual: 4,
-    stock_minimo: 8,
-    activo: true,
-    unidad: "unid",
-    ubicacion: "Rack C - C02",
-    precio: 6800,
-    swatchColor: "#6c3b21",
-    iconoTipo: "color",
-  },
-  {
-    id: "prod-5",
-    sku: "SOL-9902-STD",
-    nombre: "Thinner Universal Extra Calidad 10L",
-    categoria: "Solventes & Químicos",
-    stock_actual: 0,
-    stock_minimo: 5,
-    activo: true,
-    unidad: "unid",
-    ubicacion: "Bodega 2 - Z01",
-    precio: 31200,
-    iconoTipo: "solvente",
-    dimensiones: { largo: 25, ancho: 25, alto: 30, peso: 9.8 },
-  },
-  {
-    id: "prod-6",
-    sku: "SEL-3108-ACR",
-    nombre: "Primer Acrílico Sellador Antihumedad 5L",
-    categoria: "Pinturas & Selladores",
-    stock_actual: 22,
-    stock_minimo: 10,
-    activo: true,
-    unidad: "unid",
-    ubicacion: "Rack C - C01",
-    precio: 24750,
-    swatchColor: "#fcfaf2",
-    iconoTipo: "color",
-  },
-  {
-    id: "prod-7",
-    sku: "IMP-7721-IMP",
-    nombre: "Membrana Poliuretánica Techos 20Kg",
-    categoria: "Impermeabilizantes",
-    stock_actual: 18,
-    stock_minimo: 12,
-    activo: true,
-    unidad: "gal",
-    ubicacion: "Pasillo C - C04",
-    precio: 64900,
-    swatchColor: "#b94e32",
-    iconoTipo: "color",
-    dimensiones: { largo: 35, ancho: 35, alto: 40, peso: 22.0 },
-  },
-  {
-    id: "prod-8",
-    sku: "BRO-1205-CER",
-    nombre: "Brocha Profesional Cerda Mixta 3 pulg",
-    categoria: "Herramientas",
-    stock_actual: 42,
-    stock_minimo: 15,
-    activo: true,
-    unidad: "unid",
-    ubicacion: "Estante D - D02",
-    precio: 5200,
-    iconoTipo: "herramienta",
-  },
-  {
-    id: "prod-9",
-    sku: "ESM-2030-BLU",
-    nombre: "Esmalte Sintético Azul Náutico Brillante 4L",
-    categoria: "Esmaltes & Sintéticos",
-    stock_actual: 3,
-    stock_minimo: 8,
-    activo: true,
-    unidad: "gal",
-    ubicacion: "Pasillo B - B01",
-    precio: 29900,
-    swatchColor: "#1e3a8a",
-    iconoTipo: "color",
-  },
-  {
-    id: "prod-10",
-    sku: "SOL-1100-AGU",
-    nombre: "Aguarrás Mineral Purificado 5L",
-    categoria: "Solventes & Químicos",
-    stock_actual: 30,
-    stock_minimo: 12,
-    activo: true,
-    unidad: "unid",
-    ubicacion: "Bodega 2 - Z02",
-    precio: 14500,
-    iconoTipo: "solvente",
-  },
-];
+    iconoTipo,
+    dimensiones: {
+      largo: p.largo ?? 0,
+      ancho: p.ancho ?? 0,
+      alto: p.alto ?? 0,
+      peso: p.peso ?? 0,
+    },
+  };
+}
 
 // ============================================================================
 // COMPONENTE PRINCIPAL DE LA PÁGINA
 // ============================================================================
 
 function ProductosPage() {
-  const [productos, setProductos] = useState<ProductoItem[]>(productosMockIniciales);
+  const queryClient = useQueryClient();
+
+  // 🔌 CONSULTAS REALES A SUPABASE
+  const { data: productosRaw = [], isLoading: cargandoProductos } = useQuery({
+    queryKey: ["productos"],
+    queryFn: getProductos,
+  });
+
+  const { data: categoriasRaw = [] } = useQuery({
+    queryKey: ["categorias"],
+    queryFn: getCategorias,
+  });
+
+  // Adaptar productos de BD al formato UI
+  const productos: ProductoItem[] = useMemo(
+    () => productosRaw.map(adaptarProducto),
+    [productosRaw]
+  );
+
+  // 🔌 MUTACIONES (crear, actualizar, desactivar)
+  const mutationCrear = useMutation({
+    mutationFn: crearProducto,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["productos"] });
+      toast.success("Producto creado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear el producto");
+    },
+  });
+
+  const mutationActualizar = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Producto> }) =>
+      actualizarProducto(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["productos"] });
+      toast.success("Producto actualizado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar el producto");
+    },
+  });
+
+  const mutationDesactivar = useMutation({
+    mutationFn: ({ id, activo }: { id: string; activo: boolean }) =>
+      desactivarProducto(id, activo),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["productos"] });
+      toast.success(
+        `Producto ${variables.activo ? "reactivado" : "desactivado"} correctamente`
+      );
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al cambiar el estado");
+    },
+  });
+
+  // ============================================================================
+  // ESTADOS LOCALES (UI, filtros, modales)
+  // ============================================================================
   const [busqueda, setBusqueda] = useState("");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("todas");
   const [estadoSeleccionado, setEstadoSeleccionado] = useState("todos");
@@ -275,31 +217,30 @@ function ProductosPage() {
   // Formulario nuevo/editar
   const [formNombre, setFormNombre] = useState("");
   const [formSku, setFormSku] = useState("");
-  const [formCategoria, setFormCategoria] = useState("Pinturas de Interior");
+  const [formCategoria, setFormCategoria] = useState("");
   const [formStock, setFormStock] = useState<number | "">(10);
   const [formStockMinimo, setFormStockMinimo] = useState<number | "">(5);
   const [formPrecio, setFormPrecio] = useState<number | "">(25000);
-  const [formUbicacion, setFormUbicacion] = useState("Pasillo A - A01");
+  const [formUbicacion, setFormUbicacion] = useState("");
   const [formUnidad, setFormUnidad] = useState("gal");
-  
+
   // 📦 Formulario Dimensiones
   const [formLargo, setFormLargo] = useState<number | "">(0);
   const [formAncho, setFormAncho] = useState<number | "">(0);
   const [formAlto, setFormAlto] = useState<number | "">(0);
   const [formPeso, setFormPeso] = useState<number | "">(0);
 
-  // Lista de categorías únicas extraídas de los datos
-  const categoriasDisponibles = useMemo(() => {
-    const cats = new Set(productos.map((p) => p.categoria));
-    return Array.from(cats);
-  }, [productos]);
+  // ============================================================================
+  // FILTRADO Y PAGINACIÓN
+  // ============================================================================
 
-  // Filtrado de productos
   const productosFiltrados = useMemo(() => {
     return productos.filter((p) => {
       const q = busqueda.toLowerCase().trim();
       const coincideTexto =
-        !q || p.nombre.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
+        !q ||
+        p.nombre.toLowerCase().includes(q) ||
+        (p.sku || "").toLowerCase().includes(q);
 
       const coincideCategoria =
         categoriaSeleccionada === "todas" || p.categoria === categoriaSeleccionada;
@@ -317,7 +258,6 @@ function ProductosPage() {
     });
   }, [productos, busqueda, categoriaSeleccionada, estadoSeleccionado]);
 
-  // Paginación
   const totalPaginas = Math.ceil(productosFiltrados.length / elementosPorPagina) || 1;
   const productosPaginados = useMemo(() => {
     const inicio = (paginaActual - 1) * elementosPorPagina;
@@ -328,39 +268,43 @@ function ProductosPage() {
   const kpisData: KpiData[] = useMemo(() => {
     const total = productos.length;
     const activos = productos.filter((p) => p.activo).length;
-    const stockBajo = productos.filter((p) => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo).length;
+    const stockBajo = productos.filter(
+      (p) => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo
+    ).length;
     const sinStock = productos.filter((p) => p.stock_actual === 0).length;
     const porcentajeActivos = total > 0 ? ((activos / total) * 100).toFixed(1) : "100";
 
     return [
       {
-        label: 'Total Referencias',
+        label: "Total Referencias",
         value: total,
-        sublabel: 'SKUs activos en catálogo',
+        sublabel: "SKUs activos en catálogo",
         trend: `${porcentajeActivos}% activos`,
         trendUp: true,
         icon: <Package className="h-5 w-5" />,
-        color: 'amber',
+        color: "amber",
       },
-      {
-        label: 'Stock Bajo',
+            {
+        label: "Stock Bajo",
         value: stockBajo,
-        sublabel: 'Crítico en línea de látex',
-        alert: 'Requiere reposición',
+        sublabel: stockBajo > 0 ? "Requiere reposición" : "Sin alertas activas",
         icon: <AlertTriangle className="h-5 w-5" />,
-        color: 'rose',
+        color: "rose",
       },
       {
-        label: 'Sin Stock',
+        label: "Sin Stock",
         value: sinStock,
-        sublabel: 'artículos agotados',
+        sublabel: "artículos agotados",
         icon: <XCircle className="h-5 w-5" />,
-        color: 'slate',
+        color: "slate",
       },
     ];
   }, [productos]);
 
-  // Manejadores de selección
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
   const toggleSeleccionarTodos = () => {
     if (seleccionados.size === productosPaginados.length) {
       setSeleccionados(new Set());
@@ -378,68 +322,73 @@ function ProductosPage() {
     });
   };
 
-  // 📷 Manejador inteligente del escaneo de código de barras
+  // 📷 Manejador del escaneo
   const handleScan = (code: string) => {
     const productoEncontrado = productos.find(
-      (p) => p.sku.toLowerCase() === code.toLowerCase() || p.id === code,
+      (p) =>
+        (p.sku || "").toLowerCase() === code.toLowerCase() || p.id === code
     );
 
     if (productoEncontrado) {
-      // Si existe, lo buscamos en la tabla
       setBusqueda(productoEncontrado.sku);
       setPaginaActual(1);
       toast.success(`✅ Producto encontrado: ${productoEncontrado.nombre}`);
     } else {
-      // Si NO existe, abrimos el modal de creación con el SKU pre-rellenado
       setFormSku(code.toUpperCase());
       setFormNombre("");
-      setFormCategoria("Pinturas de Interior");
+      setFormCategoria(categoriasRaw[0]?.nombre || "");
       setFormStock(0);
       setFormStockMinimo(0);
       setFormPrecio(0);
       setFormUbicacion("");
       setFormUnidad("unid");
-      setFormLargo(0); setFormAncho(0); setFormAlto(0); setFormPeso(0);
-      
+      setFormLargo(0);
+      setFormAncho(0);
+      setFormAlto(0);
+      setFormPeso(0);
+
       setModalNuevoAbierto(true);
       toast.info(`🆕 Código ${code} no encontrado. Complete los datos para crearlo.`);
     }
   };
 
-  // Apertura de modal para creación (vacío)
   const abrirModalCrear = () => {
     setFormNombre("");
-    setFormSku(`LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(10 + Math.random() * 90)}`);
-    setFormCategoria("Pinturas de Interior");
+    setFormSku(
+      `LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(
+        10 + Math.random() * 90
+      )}`
+    );
+    setFormCategoria(categoriasRaw[0]?.nombre || "");
     setFormStock(15);
     setFormStockMinimo(5);
     setFormPrecio(32000);
     setFormUbicacion("Pasillo A - A02");
     setFormUnidad("gal");
-    setFormLargo(0); setFormAncho(0); setFormAlto(0); setFormPeso(0);
+    setFormLargo(0);
+    setFormAncho(0);
+    setFormAlto(0);
+    setFormPeso(0);
     setModalNuevoAbierto(true);
   };
 
-  // Apertura de modal para edición
   const abrirModalEditar = (p: ProductoItem) => {
     setProductoEditar(p);
     setFormNombre(p.nombre);
-    setFormSku(p.sku);
-    setFormCategoria(p.categoria);
+    setFormSku(p.sku || "");
+    setFormCategoria(p.categoria || "");
     setFormStock(p.stock_actual);
     setFormStockMinimo(p.stock_minimo);
-    setFormPrecio(p.precio || 20000);
-    setFormUbicacion(p.ubicacion || "Pasillo A - A01");
+    setFormPrecio(p.precio || 0);
+    setFormUbicacion(p.ubicacion || "");
     setFormUnidad(p.unidad || "gal");
-    
-    // Cargar dimensiones si existen
     setFormLargo(p.dimensiones?.largo || 0);
     setFormAncho(p.dimensiones?.ancho || 0);
     setFormAlto(p.dimensiones?.alto || 0);
     setFormPeso(p.dimensiones?.peso || 0);
   };
 
-  // Guardar nuevo producto (Mock)
+  // 🔌 Guardar nuevo producto (SUPABASE)
   const handleGuardarNuevo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNombre.trim() || !formSku.trim()) {
@@ -447,72 +396,57 @@ function ProductosPage() {
       return;
     }
 
-    const nuevo: ProductoItem = {
-      id: `prod-${Date.now()}`,
+    mutationCrear.mutate({
       sku: formSku.trim().toUpperCase(),
       nombre: formNombre.trim(),
-      categoria: formCategoria,
+      categoria: formCategoria || null,
       stock_actual: Number(formStock) || 0,
       stock_minimo: Number(formStockMinimo) || 0,
-      activo: true,
       unidad: formUnidad,
-      ubicacion: formUbicacion,
+      ubicacion: formUbicacion || null,
       precio: Number(formPrecio) || 0,
-      iconoTipo: "color",
-      swatchColor: "#ffffff",
-      dimensiones: {
-        largo: Number(formLargo) || 0,
-        ancho: Number(formAncho) || 0,
-        alto: Number(formAlto) || 0,
-        peso: Number(formPeso) || 0,
-      }
-    };
+      largo: Number(formLargo) || null,
+      ancho: Number(formAncho) || null,
+      alto: Number(formAlto) || null,
+      peso: Number(formPeso) || null,
+    });
 
-    setProductos([nuevo, ...productos]);
     setModalNuevoAbierto(false);
-    toast.success(`Producto "${nuevo.nombre}" creado exitosamente.`);
   };
 
-  // Guardar edición
+  // 🔌 Guardar edición (SUPABASE)
   const handleGuardarEdicion = (e: React.FormEvent) => {
     e.preventDefault();
     if (!productoEditar) return;
 
-    setProductos((prev) =>
-      prev.map((p) =>
-        p.id === productoEditar.id
-          ? {
-              ...p,
-              nombre: formNombre.trim(),
-              sku: formSku.trim().toUpperCase(),
-              categoria: formCategoria,
-              stock_actual: Number(formStock) || 0,
-              stock_minimo: Number(formStockMinimo) || 0,
-              precio: Number(formPrecio) || 0,
-              ubicacion: formUbicacion,
-              unidad: formUnidad,
-              dimensiones: {
-                largo: Number(formLargo) || 0,
-                ancho: Number(formAncho) || 0,
-                alto: Number(formAlto) || 0,
-                peso: Number(formPeso) || 0,
-              }
-            }
-          : p,
-      ),
-    );
+    mutationActualizar.mutate({
+      id: productoEditar.id,
+      updates: {
+        nombre: formNombre.trim(),
+        sku: formSku.trim().toUpperCase(),
+        categoria: formCategoria || null,
+        stock_actual: Number(formStock) || 0,
+        stock_minimo: Number(formStockMinimo) || 0,
+        precio: Number(formPrecio) || 0,
+        ubicacion: formUbicacion || null,
+        unidad: formUnidad,
+        largo: Number(formLargo) || null,
+        ancho: Number(formAncho) || null,
+        alto: Number(formAlto) || null,
+        peso: Number(formPeso) || null,
+      },
+    });
 
     setProductoEditar(null);
-    toast.success("Producto actualizado correctamente.");
   };
 
-  // Confirmar desactivación/reactivación
+  // 🔌 Confirmar desactivación/reactivación (SUPABASE)
   const confirmarDesactivar = () => {
     if (!productoADesactivar) return;
-    setProductos((prev) =>
-      prev.map((p) => (p.id === productoADesactivar.id ? { ...p, activo: !p.activo } : p)),
-    );
-    toast.success(`Producto "${productoADesactivar.nombre}" actualizado.`);
+    mutationDesactivar.mutate({
+      id: productoADesactivar.id,
+      activo: !productoADesactivar.activo,
+    });
     setProductoADesactivar(null);
   };
 
@@ -522,20 +456,32 @@ function ProductosPage() {
     const filas = productosFiltrados
       .map(
         (p) =>
-          `"${p.sku}","${p.nombre}","${p.categoria}","${p.ubicacion || "-"}","${p.stock_actual} ${p.unidad || ""}","${p.stock_minimo}","${p.precio || 0}"`,
+          `"${p.sku || ""}","${p.nombre}","${p.categoria || ""}","${
+            p.ubicacion || "-"
+          }","${p.stock_actual} ${p.unidad || ""}","${p.stock_minimo}","${
+            p.precio || 0
+          }"`
       )
       .join("\n");
-    const blob = new Blob([encabezados + filas], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([encabezados + filas], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `productos_inventario_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `productos_inventario_${new Date().toISOString().slice(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     toast.success("Listado de productos exportado a CSV.");
   };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* 1. HEADER & BREADCRUMB */}
@@ -556,7 +502,11 @@ function ProductosPage() {
         <div className="flex items-center">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/90 text-blue-700 border border-blue-200/80 text-xs font-medium shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <span>Base Central • Actualizado hace 4m</span>
+            <span>
+              {cargandoProductos
+                ? "Conectando a Supabase..."
+                : `Supabase • ${productos.length} productos`}
+            </span>
           </span>
         </div>
       </div>
@@ -590,9 +540,9 @@ function ProductosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas las categorías</SelectItem>
-                {categoriasDisponibles.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
+                {categoriasRaw.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.nombre}>
+                    {cat.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -630,7 +580,6 @@ function ProductosPage() {
             <span>Exportar CSV</span>
           </Button>
 
-          {/* 📷 Botón de Escáner */}
           <Button
             variant="outline"
             onClick={() => setScannerOpen(true)}
@@ -650,20 +599,24 @@ function ProductosPage() {
         </div>
       </div>
 
-      {/* 🌟 3. TARJETAS KPI RESUMEN (UNIFICADAS CON DASHBOARD) */}
+      {/* 🌟 3. TARJETAS KPI RESUMEN */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {kpisData.map((kpi) => (
           <KPICard key={kpi.label} data={kpi} />
         ))}
       </div>
 
-      {/* 4. TABLA PRINCIPAL DE DATOS */}
+      {/* 4. TABLA PRINCIPAL */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-gray-500 px-1">
           <span>{seleccionados.size} seleccionados</span>
           <div className="flex items-center gap-1.5 font-medium">
             <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
-            <span>Columnas activas: 6/6 • Almacén Norte</span>
+            <span>
+              {cargandoProductos
+                ? "Cargando..."
+                : `Columnas activas: 6/6 • ${productos.length} productos`}
+            </span>
           </div>
         </div>
 
@@ -702,9 +655,21 @@ function ProductosPage() {
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-gray-100">
-              {productosPaginados.length === 0 ? (
+              {cargandoProductos ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-gray-500">
+                  <TableCell
+                    colSpan={7}
+                    className="h-32 text-center text-gray-500"
+                  >
+                    Cargando productos desde Supabase...
+                  </TableCell>
+                </TableRow>
+              ) : productosPaginados.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="h-32 text-center text-gray-500"
+                  >
                     No se encontraron productos con los filtros seleccionados.
                   </TableCell>
                 </TableRow>
@@ -712,13 +677,16 @@ function ProductosPage() {
                 productosPaginados.map((p) => {
                   const estaSeleccionado = seleccionados.has(p.id);
                   const esAgotado = p.stock_actual === 0;
-                  const esBajo = p.stock_actual > 0 && p.stock_actual <= p.stock_minimo;
+                  const esBajo =
+                    p.stock_actual > 0 && p.stock_actual <= p.stock_minimo;
 
                   return (
                     <TableRow
                       key={p.id}
                       className={`transition-colors ${
-                        estaSeleccionado ? "bg-amber-50/40" : "hover:bg-gray-50/80"
+                        estaSeleccionado
+                          ? "bg-amber-50/40"
+                          : "hover:bg-gray-50/80"
                       }`}
                     >
                       <TableCell className="px-4">
@@ -749,7 +717,7 @@ function ProductosPage() {
                               {p.nombre}
                             </span>
                             <span className="text-xs font-mono text-gray-500 tracking-tight">
-                              SKU: {p.sku}
+                              SKU: {p.sku || "—"}
                             </span>
                           </div>
                         </div>
@@ -757,7 +725,7 @@ function ProductosPage() {
 
                       <TableCell>
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100">
-                          {p.categoria}
+                          {p.categoria || "Sin categoría"}
                         </span>
                       </TableCell>
 
@@ -775,8 +743,8 @@ function ProductosPage() {
                               esAgotado
                                 ? "text-rose-600"
                                 : esBajo
-                                  ? "text-amber-800"
-                                  : "text-gray-900"
+                                ? "text-amber-800"
+                                : "text-gray-900"
                             }`}
                           >
                             {p.stock_actual} {p.unidad || "unid"}
@@ -827,7 +795,10 @@ function ProductosPage() {
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-44"
+                            >
                               <DropdownMenuItem
                                 onClick={() => abrirModalEditar(p)}
                                 className="gap-2 text-xs font-medium cursor-pointer"
@@ -841,7 +812,9 @@ function ProductosPage() {
                                 className="gap-2 text-xs font-medium text-rose-600 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                <span>{p.activo ? "Desactivar" : "Activar"}</span>
+                                <span>
+                                  {p.activo ? "Desactivar" : "Activar"}
+                                </span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -861,13 +834,19 @@ function ProductosPage() {
         <div>
           Mostrando{" "}
           <strong className="text-gray-800">
-            {productosFiltrados.length === 0 ? 0 : (paginaActual - 1) * elementosPorPagina + 1}
+            {productosFiltrados.length === 0
+              ? 0
+              : (paginaActual - 1) * elementosPorPagina + 1}
           </strong>{" "}
           a{" "}
           <strong className="text-gray-800">
-            {Math.min(paginaActual * elementosPorPagina, productosFiltrados.length)}
+            {Math.min(
+              paginaActual * elementosPorPagina,
+              productosFiltrados.length
+            )}
           </strong>{" "}
-          de <strong className="text-gray-800">{productosFiltrados.length}</strong> productos
+          de <strong className="text-gray-800">{productosFiltrados.length}</strong>{" "}
+          productos
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -900,7 +879,9 @@ function ProductosPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+            onClick={() =>
+              setPaginaActual((p) => Math.min(totalPaginas, p + 1))
+            }
             disabled={paginaActual === totalPaginas}
             className="h-8 text-xs font-medium border-gray-300 text-amber-900 border-amber-300 hover:bg-amber-50"
           >
@@ -909,7 +890,7 @@ function ProductosPage() {
         </div>
       </div>
 
-      {/* 📷 COMPONENTE ESCÁNER DE CÓDIGO DE BARRAS */}
+      {/* 📷 COMPONENTE ESCÁNER */}
       <BarcodeScanner
         open={scannerOpen}
         onOpenChange={setScannerOpen}
@@ -924,7 +905,8 @@ function ProductosPage() {
               Registrar Nuevo Producto
             </DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
-              Introduce la información del nuevo producto para darlo de alta en el catálogo.
+              Introduce la información del nuevo producto para darlo de alta en
+              el catálogo.
             </DialogDescription>
           </DialogHeader>
 
@@ -941,7 +923,13 @@ function ProductosPage() {
                     className="font-mono text-sm uppercase flex-1"
                     required
                   />
-                  <Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="Escanear código">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setScannerOpen(true)}
+                    title="Escanear código"
+                  >
                     <Camera className="h-4 w-4" />
                   </Button>
                 </div>
@@ -951,15 +939,14 @@ function ProductosPage() {
                 <Label htmlFor="nuevo-cat">Categoría *</Label>
                 <Select value={formCategoria} onValueChange={setFormCategoria}>
                   <SelectTrigger id="nuevo-cat">
-                    <SelectValue />
+                    <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Pinturas de Interior">Pinturas de Interior</SelectItem>
-                    <SelectItem value="Esmaltes & Sintéticos">Esmaltes & Sintéticos</SelectItem>
-                    <SelectItem value="Herramientas">Herramientas</SelectItem>
-                    <SelectItem value="Masillas & Selladores">Masillas & Selladores</SelectItem>
-                    <SelectItem value="Solventes & Químicos">Solventes & Químicos</SelectItem>
-                    <SelectItem value="Impermeabilizantes">Impermeabilizantes</SelectItem>
+                    {categoriasRaw.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.nombre}>
+                        {cat.nombre}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -985,7 +972,9 @@ function ProductosPage() {
                   min={0}
                   value={formStock}
                   onChange={(e) =>
-                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
+                    setFormStock(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                 />
               </div>
@@ -998,7 +987,9 @@ function ProductosPage() {
                   min={0}
                   value={formStockMinimo}
                   onChange={(e) =>
-                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
+                    setFormStockMinimo(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                 />
               </div>
@@ -1026,7 +1017,9 @@ function ProductosPage() {
                   min={0}
                   value={formPrecio}
                   onChange={(e) =>
-                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
+                    setFormPrecio(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                 />
               </div>
@@ -1042,52 +1035,81 @@ function ProductosPage() {
               />
             </div>
 
-            {/*  SECCIÓN DE DIMENSIONES Y PESO */}
+            {/* 📦 SECCIÓN DE DIMENSIONES Y PESO */}
             <div className="pt-2 border-t border-gray-200">
               <div className="flex items-center gap-2 mb-3">
                 <Box className="h-4 w-4 text-amber-700" />
-                <h3 className="text-sm font-semibold text-gray-800">Dimensiones y Peso (Opcional)</h3>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Dimensiones y Peso (Opcional)
+                </h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-largo" className="text-xs">Largo (cm)</Label>
+                  <Label htmlFor="nuevo-largo" className="text-xs">
+                    Largo (cm)
+                  </Label>
                   <Input
                     id="nuevo-largo"
                     type="number"
                     min={0}
                     value={formLargo}
-                    onChange={(e) => setFormLargo(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormLargo(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-ancho" className="text-xs">Ancho (cm)</Label>
+                  <Label htmlFor="nuevo-ancho" className="text-xs">
+                    Ancho (cm)
+                  </Label>
                   <Input
                     id="nuevo-ancho"
                     type="number"
                     min={0}
                     value={formAncho}
-                    onChange={(e) => setFormAncho(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormAncho(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-alto" className="text-xs">Alto (cm)</Label>
+                  <Label htmlFor="nuevo-alto" className="text-xs">
+                    Alto (cm)
+                  </Label>
                   <Input
                     id="nuevo-alto"
                     type="number"
                     min={0}
                     value={formAlto}
-                    onChange={(e) => setFormAlto(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormAlto(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-peso" className="text-xs flex items-center gap-1"><Scale className="h-3 w-3" /> Peso (kg)</Label>
+                  <Label
+                    htmlFor="nuevo-peso"
+                    className="text-xs flex items-center gap-1"
+                  >
+                    <Scale className="h-3 w-3" /> Peso (kg)
+                  </Label>
                   <Input
                     id="nuevo-peso"
                     type="number"
                     min={0}
                     step="0.1"
                     value={formPeso}
-                    onChange={(e) => setFormPeso(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormPeso(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
               </div>
@@ -1098,14 +1120,16 @@ function ProductosPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setModalNuevoAbierto(false)}
+                disabled={mutationCrear.isPending}
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 className="bg-[#8c4314] hover:bg-[#78370e] text-white"
+                disabled={mutationCrear.isPending}
               >
-                Guardar Producto
+                {mutationCrear.isPending ? "Guardando..." : "Guardar Producto"}
               </Button>
             </DialogFooter>
           </form>
@@ -1113,7 +1137,10 @@ function ProductosPage() {
       </Dialog>
 
       {/* MODAL: EDITAR PRODUCTO */}
-      <Dialog open={Boolean(productoEditar)} onOpenChange={(open) => !open && setProductoEditar(null)}>
+      <Dialog
+        open={Boolean(productoEditar)}
+        onOpenChange={(open) => !open && setProductoEditar(null)}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-gray-900">
@@ -1144,12 +1171,11 @@ function ProductosPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Pinturas de Interior">Pinturas de Interior</SelectItem>
-                    <SelectItem value="Esmaltes & Sintéticos">Esmaltes & Sintéticos</SelectItem>
-                    <SelectItem value="Herramientas">Herramientas</SelectItem>
-                    <SelectItem value="Masillas & Selladores">Masillas & Selladores</SelectItem>
-                    <SelectItem value="Solventes & Químicos">Solventes & Químicos</SelectItem>
-                    <SelectItem value="Impermeabilizantes">Impermeabilizantes</SelectItem>
+                    {categoriasRaw.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.nombre}>
+                        {cat.nombre}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1174,7 +1200,9 @@ function ProductosPage() {
                   min={0}
                   value={formStock}
                   onChange={(e) =>
-                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
+                    setFormStock(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                 />
               </div>
@@ -1187,7 +1215,9 @@ function ProductosPage() {
                   min={0}
                   value={formStockMinimo}
                   onChange={(e) =>
-                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
+                    setFormStockMinimo(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                 />
               </div>
@@ -1209,7 +1239,9 @@ function ProductosPage() {
                   min={0}
                   value={formPrecio}
                   onChange={(e) =>
-                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
+                    setFormPrecio(
+                      e.target.value === "" ? "" : Number(e.target.value)
+                    )
                   }
                 />
               </div>
@@ -1228,48 +1260,77 @@ function ProductosPage() {
             <div className="pt-2 border-t border-gray-200">
               <div className="flex items-center gap-2 mb-3">
                 <Box className="h-4 w-4 text-amber-700" />
-                <h3 className="text-sm font-semibold text-gray-800">Dimensiones y Peso (Opcional)</h3>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Dimensiones y Peso (Opcional)
+                </h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="edit-largo" className="text-xs">Largo (cm)</Label>
+                  <Label htmlFor="edit-largo" className="text-xs">
+                    Largo (cm)
+                  </Label>
                   <Input
                     id="edit-largo"
                     type="number"
                     min={0}
                     value={formLargo}
-                    onChange={(e) => setFormLargo(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormLargo(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="edit-ancho" className="text-xs">Ancho (cm)</Label>
+                  <Label htmlFor="edit-ancho" className="text-xs">
+                    Ancho (cm)
+                  </Label>
                   <Input
                     id="edit-ancho"
                     type="number"
                     min={0}
                     value={formAncho}
-                    onChange={(e) => setFormAncho(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormAncho(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="edit-alto" className="text-xs">Alto (cm)</Label>
+                  <Label htmlFor="edit-alto" className="text-xs">
+                    Alto (cm)
+                  </Label>
                   <Input
                     id="edit-alto"
                     type="number"
                     min={0}
                     value={formAlto}
-                    onChange={(e) => setFormAlto(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormAlto(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="edit-peso" className="text-xs flex items-center gap-1"><Scale className="h-3 w-3" /> Peso (kg)</Label>
+                  <Label
+                    htmlFor="edit-peso"
+                    className="text-xs flex items-center gap-1"
+                  >
+                    <Scale className="h-3 w-3" /> Peso (kg)
+                  </Label>
                   <Input
                     id="edit-peso"
                     type="number"
                     min={0}
                     step="0.1"
                     value={formPeso}
-                    onChange={(e) => setFormPeso(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setFormPeso(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
+                    }
                   />
                 </div>
               </div>
@@ -1280,14 +1341,18 @@ function ProductosPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setProductoEditar(null)}
+                disabled={mutationActualizar.isPending}
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 className="bg-[#8c4314] hover:bg-[#78370e] text-white"
+                disabled={mutationActualizar.isPending}
               >
-                Guardar Cambios
+                {mutationActualizar.isPending
+                  ? "Guardando..."
+                  : "Guardar Cambios"}
               </Button>
             </DialogFooter>
           </form>
@@ -1295,7 +1360,10 @@ function ProductosPage() {
       </Dialog>
 
       {/* MODAL: VER DETALLE DEL PRODUCTO */}
-      <Dialog open={Boolean(productoVer)} onOpenChange={(open) => !open && setProductoVer(null)}>
+      <Dialog
+        open={Boolean(productoVer)}
+        onOpenChange={(open) => !open && setProductoVer(null)}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2 mb-1">
@@ -1340,7 +1408,6 @@ function ProductosPage() {
                 </div>
               </div>
 
-              {/* Mostrar dimensiones si existen */}
               {productoVer.dimensiones && (
                 <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-200">
                   <div className="flex items-center gap-1.5 mb-2 text-amber-800 font-semibold">
@@ -1349,20 +1416,36 @@ function ProductosPage() {
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Largo</span>
-                      <span className="font-bold text-gray-900">{productoVer.dimensiones.largo} cm</span>
+                      <span className="text-[10px] text-gray-500 block">
+                        Largo
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {productoVer.dimensiones.largo} cm
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Ancho</span>
-                      <span className="font-bold text-gray-900">{productoVer.dimensiones.ancho} cm</span>
+                      <span className="text-[10px] text-gray-500 block">
+                        Ancho
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {productoVer.dimensiones.ancho} cm
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Alto</span>
-                      <span className="font-bold text-gray-900">{productoVer.dimensiones.alto} cm</span>
+                      <span className="text-[10px] text-gray-500 block">
+                        Alto
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {productoVer.dimensiones.alto} cm
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block">Peso</span>
-                      <span className="font-bold text-gray-900">{productoVer.dimensiones.peso} kg</span>
+                      <span className="text-[10px] text-gray-500 block">
+                        Peso
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {productoVer.dimensiones.peso} kg
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1403,15 +1486,19 @@ function ProductosPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              ¿{productoADesactivar?.activo ? "Desactivar" : "Reactivar"} producto?
+              ¿{productoADesactivar?.activo ? "Desactivar" : "Reactivar"}{" "}
+              producto?
             </AlertDialogTitle>
             <AlertDialogDescription>
               ¿Estás seguro de que deseas{" "}
-              {productoADesactivar?.activo ? "desactivar" : "activar"} el producto «
-              <strong>{productoADesactivar?.nombre}</strong>» (SKU: {productoADesactivar?.sku})?
+              {productoADesactivar?.activo ? "desactivar" : "activar"} el
+              producto «
+              <strong>{productoADesactivar?.nombre}</strong>» (SKU:{" "}
+              {productoADesactivar?.sku})?
               <br />
               <br />
-              Los movimientos e histórico de existencias se conservarán en la base de datos.
+              Los movimientos e histórico de existencias se conservarán en la
+              base de datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
