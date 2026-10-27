@@ -50,32 +50,34 @@ async function fetchKPIs(): Promise<DashboardKPIs> {
 }
 
 async function fetchMovimientosRecientes(): Promise<MovimientoReciente[]> {
+  // getMovimientos() ya devuelve los datos ordenados por fecha descendente y con los joins hechos
   const movimientos = await getMovimientos();
 
   return movimientos
-    .sort((a, b) => {
-      const fechaA = a.fecha || "";
-      const fechaB = b.fecha || "";
-      return fechaB.localeCompare(fechaA);
-    })
-    .slice(0, 20)
-    .map((m) => {
+    .slice(0, 20) // Tomamos solo los 20 más recientes
+    .map((m: any) => {
       const fechaCompleta = m.fecha || new Date().toISOString();
       const [fecha, horaRaw] = fechaCompleta.split("T");
       const hora = horaRaw ? horaRaw.slice(0, 5) : "00:00";
+
+      // LEER LAS PROPIEDADES CORRECTAS que devuelve getMovimientos()
+      const nombreProducto = m.producto?.nombre || "Producto";
+      const skuProducto = m.producto?.sku || "S/N";
+      const nombreUbicacion = m.ubicacion?.codigo || m.ubicacion?.nombre || "Sin ubicación";
+      const nombreUsuario = m.usuario?.nombre || "Sistema";
 
       return {
         id: m.id,
         fecha: fecha || "Hoy",
         hora: hora,
-        producto: (m as any).producto_nombre || "Producto",
-        sku: (m as any).producto_sku || "S/N",
+        producto: nombreProducto,
+        sku: skuProducto,
         tipo: m.tipo as MovimientoReciente["tipo"],
         cantidad: m.cantidad,
         unidad: "uds",
-        ubicacion: (m as any).ubicacion_nombre || "Sin ubicación",
-        usuario: (m as any).usuario_nombre || "Sistema",
-        usuarioInicial: ((m as any).usuario_nombre || "S").charAt(0).toUpperCase(),
+        ubicacion: nombreUbicacion,
+        usuario: nombreUsuario,
+        usuarioInicial: nombreUsuario.charAt(0).toUpperCase(),
       };
     });
 }
