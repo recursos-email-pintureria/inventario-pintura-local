@@ -118,7 +118,7 @@ export async function crearUbicacionBD(ubi: {
   };
 
   if (userData?.user?.id) {
-    payload.creado_por = userData.user.id;
+    payload["creado_por"] = userData.user.id;
   }
 
   let res = await supabase.from("ubicaciones").insert(payload).select().single();
@@ -132,8 +132,8 @@ export async function crearUbicacionBD(ubi: {
       descripcion: ubi.descripcion ?? null,
       activo: true,
     };
-    if (ubi.id_ubicacion_padre) payloadMinimo.id_ubicacion_padre = ubi.id_ubicacion_padre;
-    if (ubi.seccion) payloadMinimo.seccion = ubi.seccion;
+    if (ubi.id_ubicacion_padre) payloadMinimo["id_ubicacion_padre"] = ubi.id_ubicacion_padre;
+    if (ubi.seccion) payloadMinimo["seccion"] = ubi.seccion;
     res = await supabase.from("ubicaciones").insert(payloadMinimo).select().single();
   }
 

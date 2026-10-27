@@ -1,6 +1,7 @@
 import { KPICard, KpiData } from "@/components/ui/kpi-card";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Package,
   AlertTriangle,
@@ -14,6 +15,7 @@ import {
   ChevronRight,
   Filter,
   Plus,
+  Loader2, // Añadido para el estado de carga
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,65 +31,17 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 
+// Imports de nuestras queries de Supabase
+import { useDashboardKPIs, useMovimientosRecientes, type MovimientoReciente } from "@/lib/queries/dashboard";
+
 // ============================================================
 // TIPOS
 // ============================================================
 type TipoMovimiento = "entrada" | "salida" | "reposicion" | "ajuste";
 
-interface Movimiento {
-  id: string;
-  fecha: string;
-  hora: string;
-  producto: string;
-  sku: string;
-  tipo: TipoMovimiento;
-  cantidad: number;
-  unidad: string;
-  ubicacion: string;
-  usuario: string;
-  usuarioInicial: string;
-}
-
 // ============================================================
-// DATOS MOCK
+// DATOS MOCK (Solo para gráficos hasta la Fase 6)
 // ============================================================
-const kpisData: KpiData[] = [
-  {
-    label: "Total Productos",
-    value: "3,842",
-    sublabel: "productos activos",
-    trend: "98.2% cat.",
-    trendUp: true,
-    icon: <Package className="h-5 w-5" />,
-    color: "amber",
-  },
-  {
-    label: "Stock Bajo",
-    value: 14,
-    sublabel: "Requiere atención",
-    alert: "3 críticos",
-    icon: <AlertTriangle className="h-5 w-5" />,
-    color: "rose",
-  },
-  {
-    label: "Movimientos Hoy",
-    value: 86,
-    sublabel: "Prom. 72/d",
-    trend: "12% vs ayer",
-    trendUp: true,
-    icon: <Activity className="h-5 w-5" />,
-    color: "emerald",
-  },
-  {
-    label: "Ubicaciones Activas",
-    value: 18,
-    sublabel: "85% del total",
-    trend: "3 disp.",
-    icon: <MapPin className="h-5 w-5" />,
-    color: "blue",
-  },
-];
-
 const actividad7Dias = [
   { dia: "Lun", entradas: 40, salidas: 25 },
   { dia: "Mar", entradas: 55, salidas: 35 },
@@ -104,74 +58,6 @@ const topUbicaciones = [
   { nombre: "Rack C - Solventes", valor: 520, unidad: "unid", porcentaje: 65 },
   { nombre: "Bodega 2 - Impermeab.", valor: 430, unidad: "gal", porcentaje: 54 },
   { nombre: "Estante D - Tintes", valor: 310, unidad: "unid", porcentaje: 42 },
-];
-
-const movimientosRecientes: Movimiento[] = [
-  {
-    id: "1",
-    fecha: "Hoy",
-    hora: "10:45",
-    producto: "Látex Extracubriente Blanco 20L",
-    sku: "LAT-4001-WHT",
-    tipo: "entrada",
-    cantidad: 24,
-    unidad: "gal",
-    ubicacion: "Pasillo A - A01",
-    usuario: "Javier M.",
-    usuarioInicial: "J",
-  },
-  {
-    id: "2",
-    fecha: "Hoy",
-    hora: "09:30",
-    producto: "Esmalte Sintético Negro Satinado 4L",
-    sku: "ESM-1020-BLK",
-    tipo: "salida",
-    cantidad: 10,
-    unidad: "gal",
-    ubicacion: "Pasillo B - B03",
-    usuario: "Elena R.",
-    usuarioInicial: "E",
-  },
-  {
-    id: "3",
-    fecha: "Hoy",
-    hora: "08:50",
-    producto: "Primer Acrílico Sellador 5L",
-    sku: "SEL-3108-ACR",
-    tipo: "reposicion",
-    cantidad: 50,
-    unidad: "unid",
-    ubicacion: "Rack C - C02",
-    usuario: "Javier M.",
-    usuarioInicial: "J",
-  },
-  {
-    id: "4",
-    fecha: "Ayer",
-    hora: "18:15",
-    producto: "Antióxido Industrial Gris 1 Gal",
-    sku: "ANT-9011-GRY",
-    tipo: "salida",
-    cantidad: 6,
-    unidad: "gal",
-    ubicacion: "Pasillo B - B02",
-    usuario: "Carlos D.",
-    usuarioInicial: "C",
-  },
-  {
-    id: "5",
-    fecha: "Ayer",
-    hora: "16:40",
-    producto: "Thinner Universal 10L",
-    sku: "SOL-9902-STD",
-    tipo: "ajuste",
-    cantidad: 15,
-    unidad: "unid",
-    ubicacion: "Bodega 2 - Z01",
-    usuario: "Roberto S.",
-    usuarioInicial: "R",
-  },
 ];
 
 const tipoMovimientoConfig = {
@@ -211,10 +97,7 @@ const tipoMovimientoConfig = {
 function MovementBadge({ tipo }: { tipo: TipoMovimiento }) {
   const config = tipoMovimientoConfig[tipo];
   return (
-    <Badge
-      variant="outline"
-      className={`flex items-center gap-1.5 border ${config.badge} font-medium`}
-    >
+    <Badge variant="outline" className={`flex items-center gap-1.5 border ${config.badge} font-medium`}>
       {config.icon}
       {config.label}
     </Badge>
@@ -223,20 +106,7 @@ function MovementBadge({ tipo }: { tipo: TipoMovimiento }) {
 
 function getFechaFormateada(): string {
   const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-  const meses = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre",
-  ];
+  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   const hoy = new Date();
   return `${dias[hoy.getDay()]}, ${hoy.getDate()} de ${meses[hoy.getMonth()]}`;
 }
@@ -246,11 +116,58 @@ function getFechaFormateada(): string {
 // ============================================================
 function DashboardComponent() {
   const [filtroTipo, setFiltroTipo] = useState<TipoMovimiento | "todos">("todos");
+  const queryClient = useQueryClient();
 
-  const movimientosFiltrados =
-    filtroTipo === "todos"
-      ? movimientosRecientes
-      : movimientosRecientes.filter((m) => m.tipo === filtroTipo);
+  // 1. Obtener datos reales de Supabase
+  const { data: kpis, isLoading: isKpisLoading } = useDashboardKPIs();
+  const { data: movimientos, isLoading: isMovLoading } = useMovimientosRecientes();
+
+  // 2. Transformar KPIs al formato que espera tu KPICard visual
+  const kpisData: KpiData[] = [
+    {
+      label: "Total Productos",
+      value: isKpisLoading ? "..." : (kpis?.totalProductos ?? 0).toLocaleString(),
+      sublabel: "productos activos",
+      trend: "100% cat.",
+      trendUp: true,
+      icon: <Package className="h-5 w-5" />,
+      color: "amber",
+    },
+    {
+      label: "Stock Bajo",
+      value: isKpisLoading ? "..." : (kpis?.stockBajo ?? 0),
+      sublabel: "Requiere atención",
+      alert: (kpis && kpis.stockBajo > 0) ? `${kpis.stockBajo} críticos` : "0 críticos",
+      icon: <AlertTriangle className="h-5 w-5" />,
+      color: "rose",
+    },
+    {
+      label: "Movimientos Hoy",
+      value: isKpisLoading ? "..." : (kpis?.movimientosHoy ?? 0),
+      sublabel: "Prom. 72/d",
+      trend: "En tiempo real",
+      trendUp: true,
+      icon: <Activity className="h-5 w-5" />,
+      color: "emerald",
+    },
+    {
+      label: "Ubicaciones Activas",
+      value: isKpisLoading ? "..." : (kpis?.ubicacionesActivas ?? 0),
+      sublabel: "Con stock > 0",
+      trend: "Óptimo",
+      icon: <MapPin className="h-5 w-5" />,
+      color: "blue",
+    },
+  ];
+
+  // 3. Filtrar movimientos (si aún están cargando, usamos array vacío)
+  const movimientosFiltrados = (movimientos || []).filter(
+    (m) => filtroTipo === "todos" || m.tipo === filtroTipo
+  );
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -261,9 +178,9 @@ function DashboardComponent() {
           <p className="mt-1 text-sm text-slate-500">{getFechaFormateada()}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Filter className="mr-2 h-4 w-4" />
-            Ajustar Filtros
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isKpisLoading || isMovLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isKpisLoading || isMovLoading ? "animate-spin" : ""}`} />
+            Actualizar
           </Button>
           <Button size="sm" className="bg-amber-700 hover:bg-amber-800">
             <Plus className="mr-2 h-4 w-4" />
@@ -272,33 +189,25 @@ function DashboardComponent() {
         </div>
       </div>
 
-      {/* KPIs - Ahora usa el componente compartido */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpisData.map((kpi) => (
           <KPICard key={kpi.label} data={kpi} />
         ))}
       </div>
 
-      {/* GRÁFICOS */}
+      {/* GRÁFICOS (Mantienen mock hasta Fase 6, pero no rompen la app) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">
-                  Actividad Últimos 7 Días
-                </CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  Flujo de entradas y salidas de almacén
-                </p>
+                <CardTitle className="text-lg font-semibold text-slate-900">Actividad Últimos 7 Días</CardTitle>
+                <p className="mt-1 text-sm text-slate-500">Flujo de entradas y salidas de almacén</p>
               </div>
               <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded-sm bg-emerald-600" /> Entradas
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded-sm bg-rose-600" /> Salidas
-                </span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-emerald-600" /> Entradas</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-rose-600" /> Salidas</span>
               </div>
             </div>
           </CardHeader>
@@ -306,20 +215,9 @@ function DashboardComponent() {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={actividad7Dias} barGap={4} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis
-                  dataKey="dia"
-                  tick={{ fontSize: 12, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+                <XAxis dataKey="dia" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#fff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                  }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px" }} />
                 <Bar dataKey="entradas" fill="#059669" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="salidas" fill="#e11d48" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -331,14 +229,10 @@ function DashboardComponent() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">
-                  Top 5 Ubicaciones
-                </CardTitle>
+                <CardTitle className="text-lg font-semibold text-slate-900">Top 5 Ubicaciones</CardTitle>
                 <p className="mt-1 text-sm text-slate-500">Zonas con mayor volumen de stock</p>
               </div>
-              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
-                Capacidad
-              </Badge>
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Capacidad</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -346,15 +240,10 @@ function DashboardComponent() {
               <div key={ubicacion.nombre} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-700">{ubicacion.nombre}</span>
-                  <span className="text-xs text-slate-500">
-                    {ubicacion.valor} {ubicacion.unidad} ({ubicacion.porcentaje}%)
-                  </span>
+                  <span className="text-xs text-slate-500">{ubicacion.valor} {ubicacion.unidad} ({ubicacion.porcentaje}%)</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-500 transition-all"
-                    style={{ width: `${ubicacion.porcentaje}%` }}
-                  />
+                  <div className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-500 transition-all" style={{ width: `${ubicacion.porcentaje}%` }} />
                 </div>
               </div>
             ))}
@@ -367,31 +256,25 @@ function DashboardComponent() {
         </Card>
       </div>
 
-      {/* TABLA DE MOVIMIENTOS */}
+      {/* TABLA DE MOVIMIENTOS (CONECTADA A SUPABASE) */}
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-amber-700" />
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">
-                  Movimientos Recientes
-                </CardTitle>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Auditoría continua de despacho y recepción
-                </p>
+                <CardTitle className="text-lg font-semibold text-slate-900">Movimientos Recientes</CardTitle>
+                <p className="mt-0.5 text-sm text-slate-500">Auditoría continua de despacho y recepción</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {(["todos", "entrada", "salida", "reposicion", "ajuste"] as const).map((tipo) => (
                 <Button
                   key={tipo}
                   variant={filtroTipo === tipo ? "default" : "outline"}
                   size="sm"
                   onClick={() => setFiltroTipo(tipo)}
-                  className={
-                    filtroTipo === tipo ? "bg-amber-700 hover:bg-amber-800" : "border-slate-200"
-                  }
+                  className={filtroTipo === tipo ? "bg-amber-700 hover:bg-amber-800" : "border-slate-200"}
                 >
                   {tipo === "todos" ? "Todos" : tipoMovimientoConfig[tipo].label}
                 </Button>
@@ -400,94 +283,79 @@ function DashboardComponent() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-slate-200 bg-slate-50/50">
-                  <TableHead className="text-xs font-semibold uppercase text-slate-500">
-                    Fecha
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase text-slate-500">
-                    Producto & SKU
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase text-slate-500">
-                    Tipo
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase text-slate-500 text-right">
-                    Cantidad
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase text-slate-500">
-                    Ubicación
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase text-slate-500">
-                    Usuario
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movimientosFiltrados.map((mov) => {
-                  const config = tipoMovimientoConfig[mov.tipo];
-                  return (
-                    <TableRow
-                      key={mov.id}
-                      className="border-b border-slate-100 transition-colors hover:bg-amber-50/50"
-                    >
-                      <TableCell className="font-mono text-xs text-slate-500">
-                        {mov.fecha}, {mov.hora}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
-                            {mov.producto.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-medium text-slate-900">{mov.producto}</p>
-                            <p className="font-mono text-xs text-slate-500">SKU: {mov.sku}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <MovementBadge tipo={mov.tipo} />
-                      </TableCell>
-                      <TableCell className={`text-right font-bold ${config.cantidad}`}>
-                        {config.prefijo}
-                        {mov.cantidad} {mov.unidad}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 text-slate-400" />
-                          {mov.ubicacion}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-800">
-                            {mov.usuarioInicial}
-                          </div>
-                          <span className="text-sm text-slate-700">{mov.usuario}</span>
-                        </div>
-                      </TableCell>
+          {isMovLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+              <Loader2 className="h-8 w-8 animate-spin text-amber-700 mb-2" />
+              <p className="text-sm">Cargando movimientos desde Supabase...</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-slate-200 bg-slate-50/50">
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500">Fecha</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500">Producto & SKU</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500">Tipo</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500 text-right">Cantidad</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500">Ubicación</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500">Usuario</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm">
-            <span className="text-slate-600">
-              Mostrando{" "}
-              <span className="font-semibold text-slate-900">{movimientosFiltrados.length}</span> de{" "}
-              <span className="font-semibold text-slate-900">{movimientosRecientes.length}</span>{" "}
-              movimientos registrados hoy
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-amber-700 hover:bg-amber-50 hover:text-amber-800"
-            >
-              Ver todos los movimientos <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {movimientosFiltrados.length > 0 ? (
+                      movimientosFiltrados.map((mov) => {
+                        const config = tipoMovimientoConfig[mov.tipo];
+                        return (
+                          <TableRow key={mov.id} className="border-b border-slate-100 transition-colors hover:bg-amber-50/50">
+                            <TableCell className="font-mono text-xs text-slate-500">{mov.fecha}, {mov.hora.slice(0, 5)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                                  {mov.usuarioInicial}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-slate-900">{mov.producto}</p>
+                                  <p className="font-mono text-xs text-slate-500">SKU: {mov.sku}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell><MovementBadge tipo={mov.tipo} /></TableCell>
+                            <TableCell className={`text-right font-bold ${config.cantidad}`}>
+                              {config.prefijo}{mov.cantidad} {mov.unidad}
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-600">
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-slate-400" />
+                                {mov.ubicacion}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-slate-700">{mov.usuario}</span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                          No se encontraron movimientos {filtroTipo !== "todos" ? `de tipo "${filtroTipo}"` : "registrados"}.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm">
+                <span className="text-slate-600">
+                  Mostrando <span className="font-semibold text-slate-900">{movimientosFiltrados.length}</span> movimientos
+                </span>
+                <Button variant="ghost" size="sm" className="text-amber-700 hover:bg-amber-50 hover:text-amber-800">
+                  Ver todos los movimientos <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -139,3 +139,27 @@ export function errorUbicaciones(error: unknown): string {
     return "No tienes permiso para realizar esta operación o la ubicación ya no está disponible.";
   return e?.message || "No se pudo completar la operación. Inténtalo de nuevo.";
 }
+// ============================================================
+// PUENTES Y EXPORTACIONES FALTANTES PARA ubicaciones.tsx
+// ============================================================
+
+// 1. Tipos que ubicaciones.tsx necesita
+export interface Producto {
+  id: string;
+  nombre: string;
+  sku?: string;
+  categoria?: string;
+  stock_actual?: number;
+  stock_minimo?: number;
+  activo?: boolean;
+}
+
+export interface ProductoConCantidad extends Producto {
+  cantidad: number;
+}
+
+// 2. Funciones de Ubicaciones (Aliases y wrappers)
+export async function getSecciones() {
+  const { data, error } = await supabase.from("secciones").select("*").eq("activo", true);
+  return error ? [] : (data || []);
+}

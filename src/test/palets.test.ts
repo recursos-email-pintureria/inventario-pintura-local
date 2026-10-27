@@ -184,8 +184,8 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
       const items = await cargarProductosPalet("palet-123");
 
       expect(items).toHaveLength(1);
-      expect(items[0].nombre).toBe("Pintura Mate");
-      expect(items[0].cantidad).toBe(15);
+      expect(items[0]!.nombre).toBe("Pintura Mate");
+      expect(items[0]!.cantidad).toBe(15);
       expect(eqPaletMock).toHaveBeenCalledWith("id_palet", "palet-123");
       expect(gtMock).toHaveBeenCalledWith("cantidad", 0);
     });

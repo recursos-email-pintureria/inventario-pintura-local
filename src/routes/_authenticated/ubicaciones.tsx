@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -571,7 +571,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
     piso: 1,
     capacidad_max: 100,
     peso_max_kg: 300,
-    poracidad_ocupacion: 30,
+    porcentaje_ocupacion: 30,
     activo: true,
     subtitulo: "1 producto · 15 uds",
     productos: [
@@ -1409,7 +1409,7 @@ function UbicacionesPage() {
     const idReserva =
       idReservaEspecifica ||
       (ubicacionSeleccionada?.tipo === "reserva" ? ubicacionSeleccionada.id : null) ||
-      reservas[0]?.id ||
+      ubicaciones.find((u: any) => u.tipo === "reserva")?.id ||
       "res-gen";
     const ubiReserva = ubicaciones.find((u) => u.id === idReserva);
     const nombreReserva = ubiReserva?.nombre || "Reserva (Almacén de Tienda)";
@@ -1615,18 +1615,23 @@ function UbicacionesPage() {
         },
       ];
       const ubiList = UBICACIONES_INICIALES.filter((u) => u.tipo !== "seccion").map((u) => {
-        const secPadre = UBICACIONES_INICIALES.find((s) => s.id === u.seccion_id);
-        const ubiPadre = UBICACIONES_INICIALES.find((p) => p.id === u.id_padre);
-        return {
-          nombre: u.nombre,
-          tipo: u.tipo,
-          seccion_nombre: secPadre?.nombre,
-          padre_nombre: ubiPadre?.nombre,
-          lateral: u.lateral,
-          piso: u.piso,
-          descripcion: u.subtitulo,
-        };
-      });
+  const secPadre = UBICACIONES_INICIALES.find((s) => s.id === u.seccion_id);
+  const ubiPadre = UBICACIONES_INICIALES.find((p) => p.id === u.id_padre);
+  
+  // Construimos el objeto añadiendo solo las propiedades que tienen valor
+  const ubiData: any = {
+    nombre: u.nombre,
+    tipo: u.tipo,
+  };
+  
+  if (secPadre?.nombre) ubiData.seccion_nombre = secPadre.nombre;
+  if (ubiPadre?.nombre) ubiData.padre_nombre = ubiPadre.nombre;
+  if (u.lateral) ubiData.lateral = u.lateral;
+  if (u.piso) ubiData.piso = u.piso;
+  if (u.subtitulo) ubiData.descripcion = u.subtitulo;
+  
+  return ubiData;
+});
 
       const res = await sincronizarEstructuraInicialSupabase(secList, ubiList);
       await Promise.all([
