@@ -41,7 +41,7 @@ import {
   actualizarCategoria,
   crearCategoria,
   desactivarCategoria,
-  getCategorias
+  getCategorias,
 } from "@/lib/inventario";
 import type { Categoria } from "@/lib/tipos";
 
@@ -53,7 +53,11 @@ function CategoriasPage() {
   const queryClient = useQueryClient();
 
   // 🔌 Categorías reales desde Supabase
-  const { data: categorias = [], isLoading, isError } = useQuery({
+  const {
+    data: categorias = [],
+    isLoading,
+    isError,
+  } = useQuery<Categoria[]>({
     queryKey: ["categorias"],
     queryFn: getCategorias,
   });
@@ -77,8 +81,15 @@ function CategoriasPage() {
   });
 
   const mutationActualizar = useMutation({
-    mutationFn: ({ id, nombre, descripcion }: { id: string; nombre: string; descripcion: string | null }) =>
-      actualizarCategoria(id, { nombre, descripcion }),
+    mutationFn: ({
+      id,
+      nombre,
+      descripcion,
+    }: {
+      id: string;
+      nombre: string;
+      descripcion: string | null;
+    }) => actualizarCategoria(id, { nombre, descripcion }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categorias"] });
       toast.success("Categoría actualizada correctamente");
@@ -207,7 +218,10 @@ function CategoriasPage() {
                 categorias.map((cat) => (
                   <TableRow key={cat.id}>
                     <TableCell>
-                      <Badge variant="outline" className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium">
+                      <Badge
+                        variant="outline"
+                        className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium"
+                      >
                         {cat.nombre}
                       </Badge>
                     </TableCell>
@@ -215,7 +229,10 @@ function CategoriasPage() {
                       {cat.descripcion || "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                      <Badge
+                        variant="outline"
+                        className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs"
+                      >
                         Activa
                       </Badge>
                     </TableCell>
@@ -248,7 +265,15 @@ function CategoriasPage() {
       </Card>
 
       {/* MODAL NUEVA / EDITAR */}
-      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!open) { setModalAbierto(false); setCategoriaEditando(null); } }}>
+      <Dialog
+        open={modalAbierto}
+        onOpenChange={(open) => {
+          if (!open) {
+            setModalAbierto(false);
+            setCategoriaEditando(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
@@ -282,7 +307,12 @@ function CategoriasPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalAbierto(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setModalAbierto(false)}
+              >
                 Cancelar
               </Button>
               <Button
@@ -299,13 +329,16 @@ function CategoriasPage() {
       </Dialog>
 
       {/* ALERT DIALOG DESACTIVAR */}
-      <AlertDialog open={Boolean(categoriaADesactivar)} onOpenChange={(open) => !open && setCategoriaADesactivar(null)}>
+      <AlertDialog
+        open={Boolean(categoriaADesactivar)}
+        onOpenChange={(open) => !open && setCategoriaADesactivar(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base">¿Desactivar categoría?</AlertDialogTitle>
             <AlertDialogDescription className="text-xs">
-              La categoría «<strong>{categoriaADesactivar?.nombre}</strong>» dejará de
-              aparecer en el catálogo. Los productos asociados conservarán su historial.
+              La categoría «<strong>{categoriaADesactivar?.nombre}</strong>» dejará de aparecer en
+              el catálogo. Los productos asociados conservarán su historial.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

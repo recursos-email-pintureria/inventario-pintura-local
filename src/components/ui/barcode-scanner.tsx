@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import { Camera, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 
 interface BarcodeScannerProps {
   open: boolean;
@@ -36,11 +36,11 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       setLastScanned(null);
 
       try {
-        const scanner = new Html5Qrcode('barcode-reader');
+        const scanner = new Html5Qrcode("barcode-reader");
         scannerRef.current = scanner;
 
         await scanner.start(
-          { facingMode: 'environment' },
+          { facingMode: "environment" },
           {
             fps: 10,
             qrbox: { width: 250, height: 150 },
@@ -53,8 +53,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
           },
           (errorMessage) => {
             // Errores de escaneo (ignoramos los de "no code found")
-            if (!errorMessage.includes('No MultiFormat Readers')) {
-              console.warn('Scanner error:', errorMessage);
+            if (!errorMessage.includes("No MultiFormat Readers")) {
+              console.warn("Scanner error:", errorMessage);
             }
           },
         );
@@ -62,9 +62,9 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
         setIsScanning(true);
       } catch (err: any) {
         setError(
-          err?.message?.includes('Permission')
-            ? 'Permiso de cámara denegado. Actívalo en la configuración del navegador.'
-            : 'No se pudo acceder a la cámara. Verifica que tengas una cámara disponible.',
+          err?.message?.includes("Permission")
+            ? "Permiso de cámara denegado. Actívalo en la configuración del navegador."
+            : "No se pudo acceder a la cámara. Verifica que tengas una cámara disponible.",
         );
         setIsScanning(false);
       }
@@ -84,7 +84,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
         await scannerRef.current.stop();
         scannerRef.current.clear();
       } catch (err) {
-        console.warn('Error al detener scanner:', err);
+        console.warn("Error al detener scanner:", err);
       }
       scannerRef.current = null;
       setIsScanning(false);
@@ -105,7 +105,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             Escanear Código de Barras
           </DialogTitle>
           <DialogDescription>
-            Apunta la cámara al código de barras del producto. El código se detectará automáticamente.
+            Apunta la cámara al código de barras del producto. El código se detectará
+            automáticamente.
           </DialogDescription>
         </DialogHeader>
 
@@ -118,7 +119,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             <div
               id="barcode-reader"
               className="w-full"
-              style={{ minHeight: isScanning ? '300px' : '200px' }}
+              style={{ minHeight: isScanning ? "300px" : "200px" }}
             />
 
             {!isScanning && !error && (

@@ -80,9 +80,9 @@ import {
   getCategorias,
   crearProducto,
   actualizarProducto,
-  desactivarProducto
+  desactivarProducto,
 } from "@/lib/inventario";
-import type { Producto } from "@/lib/tipos";
+import type { Producto, Categoria } from "@/lib/tipos";
 
 // ============================================================================
 // DEFINICIÓN DE TIPOS
@@ -107,9 +107,17 @@ function adaptarProducto(p: Producto): ProductoItem {
   // Determinar icono según categoría
   let iconoTipo: "color" | "herramienta" | "solvente" = "color";
   const catLower = (p.categoria || "").toLowerCase();
-  if (catLower.includes("brocha") || catLower.includes("rodillo") || catLower.includes("herramienta")) {
+  if (
+    catLower.includes("brocha") ||
+    catLower.includes("rodillo") ||
+    catLower.includes("herramienta")
+  ) {
     iconoTipo = "herramienta";
-  } else if (catLower.includes("solvente") || catLower.includes("thinner") || catLower.includes("aguarrás")) {
+  } else if (
+    catLower.includes("solvente") ||
+    catLower.includes("thinner") ||
+    catLower.includes("aguarrás")
+  ) {
     iconoTipo = "solvente";
   }
 
@@ -139,12 +147,12 @@ function ProductosPage() {
   const queryClient = useQueryClient();
 
   // 🔌 CONSULTAS REALES A SUPABASE
-  const { data: productosRaw = [], isLoading: cargandoProductos } = useQuery({
+  const { data: productosRaw = [], isLoading: cargandoProductos } = useQuery<Producto[]>({
     queryKey: ["productos"],
     queryFn: getProductos,
   });
 
-  const { data: categoriasRaw = [] } = useQuery({
+  const { data: categoriasRaw = [] } = useQuery<Categoria[]>({
     queryKey: ["categorias"],
     queryFn: getCategorias,
   });
@@ -152,12 +160,12 @@ function ProductosPage() {
   // Adaptar productos de BD al formato UI
   const productos: ProductoItem[] = useMemo(
     () => productosRaw.map(adaptarProducto),
-    [productosRaw]
+    [productosRaw],
   );
 
   // 🔌 MUTACIONES (crear, actualizar, desactivar)
   const mutationCrear = useMutation({
-    mutationFn: crearProducto,
+    mutationFn: (nuevo: Partial<Producto>) => crearProducto(nuevo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
       toast.success("Producto creado correctamente");
@@ -180,13 +188,10 @@ function ProductosPage() {
   });
 
   const mutationDesactivar = useMutation({
-    mutationFn: ({ id, activo }: { id: string; activo: boolean }) =>
-      desactivarProducto(id, activo),
+    mutationFn: ({ id, activo }: { id: string; activo: boolean }) => desactivarProducto(id, activo),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
-      toast.success(
-        `Producto ${variables.activo ? "reactivado" : "desactivado"} correctamente`
-      );
+      toast.success(`Producto ${variables.activo ? "reactivado" : "desactivado"} correctamente`);
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al cambiar el estado");
@@ -238,9 +243,7 @@ function ProductosPage() {
     return productos.filter((p) => {
       const q = busqueda.toLowerCase().trim();
       const coincideTexto =
-        !q ||
-        p.nombre.toLowerCase().includes(q) ||
-        (p.sku || "").toLowerCase().includes(q);
+        !q || p.nombre.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
 
       const coincideCategoria =
         categoriaSeleccionada === "todas" || p.categoria === categoriaSeleccionada;
@@ -269,7 +272,7 @@ function ProductosPage() {
     const total = productos.length;
     const activos = productos.filter((p) => p.activo).length;
     const stockBajo = productos.filter(
-      (p) => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo
+      (p) => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo,
     ).length;
     const sinStock = productos.filter((p) => p.stock_actual === 0).length;
     const porcentajeActivos = total > 0 ? ((activos / total) * 100).toFixed(1) : "100";
@@ -284,7 +287,7 @@ function ProductosPage() {
         icon: <Package className="h-5 w-5" />,
         color: "amber",
       },
-            {
+      {
         label: "Stock Bajo",
         value: stockBajo,
         sublabel: stockBajo > 0 ? "Requiere reposición" : "Sin alertas activas",
@@ -325,8 +328,7 @@ function ProductosPage() {
   // 📷 Manejador del escaneo
   const handleScan = (code: string) => {
     const productoEncontrado = productos.find(
-      (p) =>
-        (p.sku || "").toLowerCase() === code.toLowerCase() || p.id === code
+      (p) => (p.sku || "").toLowerCase() === code.toLowerCase() || p.id === code,
     );
 
     if (productoEncontrado) {
@@ -355,9 +357,7 @@ function ProductosPage() {
   const abrirModalCrear = () => {
     setFormNombre("");
     setFormSku(
-      `LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(
-        10 + Math.random() * 90
-      )}`
+      `LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(10 + Math.random() * 90)}`,
     );
     setFormCategoria(categoriasRaw[0]?.nombre || "");
     setFormStock(15);
@@ -458,9 +458,7 @@ function ProductosPage() {
         (p) =>
           `"${p.sku || ""}","${p.nombre}","${p.categoria || ""}","${
             p.ubicacion || "-"
-          }","${p.stock_actual} ${p.unidad || ""}","${p.stock_minimo}","${
-            p.precio || 0
-          }"`
+          }","${p.stock_actual} ${p.unidad || ""}","${p.stock_minimo}","${p.precio || 0}"`,
       )
       .join("\n");
     const blob = new Blob([encabezados + filas], {
@@ -471,7 +469,7 @@ function ProductosPage() {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `productos_inventario_${new Date().toISOString().slice(0, 10)}.csv`
+      `productos_inventario_${new Date().toISOString().slice(0, 10)}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -657,19 +655,13 @@ function ProductosPage() {
             <TableBody className="divide-y divide-gray-100">
               {cargandoProductos ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="h-32 text-center text-gray-500"
-                  >
+                  <TableCell colSpan={7} className="h-32 text-center text-gray-500">
                     Cargando productos desde Supabase...
                   </TableCell>
                 </TableRow>
               ) : productosPaginados.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="h-32 text-center text-gray-500"
-                  >
+                  <TableCell colSpan={7} className="h-32 text-center text-gray-500">
                     No se encontraron productos con los filtros seleccionados.
                   </TableCell>
                 </TableRow>
@@ -677,16 +669,13 @@ function ProductosPage() {
                 productosPaginados.map((p) => {
                   const estaSeleccionado = seleccionados.has(p.id);
                   const esAgotado = p.stock_actual === 0;
-                  const esBajo =
-                    p.stock_actual > 0 && p.stock_actual <= p.stock_minimo;
+                  const esBajo = p.stock_actual > 0 && p.stock_actual <= p.stock_minimo;
 
                   return (
                     <TableRow
                       key={p.id}
                       className={`transition-colors ${
-                        estaSeleccionado
-                          ? "bg-amber-50/40"
-                          : "hover:bg-gray-50/80"
+                        estaSeleccionado ? "bg-amber-50/40" : "hover:bg-gray-50/80"
                       }`}
                     >
                       <TableCell className="px-4">
@@ -743,8 +732,8 @@ function ProductosPage() {
                               esAgotado
                                 ? "text-rose-600"
                                 : esBajo
-                                ? "text-amber-800"
-                                : "text-gray-900"
+                                  ? "text-amber-800"
+                                  : "text-gray-900"
                             }`}
                           >
                             {p.stock_actual} {p.unidad || "unid"}
@@ -795,10 +784,7 @@ function ProductosPage() {
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-44"
-                            >
+                            <DropdownMenuContent align="end" className="w-44">
                               <DropdownMenuItem
                                 onClick={() => abrirModalEditar(p)}
                                 className="gap-2 text-xs font-medium cursor-pointer"
@@ -812,9 +798,7 @@ function ProductosPage() {
                                 className="gap-2 text-xs font-medium text-rose-600 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                <span>
-                                  {p.activo ? "Desactivar" : "Activar"}
-                                </span>
+                                <span>{p.activo ? "Desactivar" : "Activar"}</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -834,19 +818,13 @@ function ProductosPage() {
         <div>
           Mostrando{" "}
           <strong className="text-gray-800">
-            {productosFiltrados.length === 0
-              ? 0
-              : (paginaActual - 1) * elementosPorPagina + 1}
+            {productosFiltrados.length === 0 ? 0 : (paginaActual - 1) * elementosPorPagina + 1}
           </strong>{" "}
           a{" "}
           <strong className="text-gray-800">
-            {Math.min(
-              paginaActual * elementosPorPagina,
-              productosFiltrados.length
-            )}
+            {Math.min(paginaActual * elementosPorPagina, productosFiltrados.length)}
           </strong>{" "}
-          de <strong className="text-gray-800">{productosFiltrados.length}</strong>{" "}
-          productos
+          de <strong className="text-gray-800">{productosFiltrados.length}</strong> productos
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -879,9 +857,7 @@ function ProductosPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              setPaginaActual((p) => Math.min(totalPaginas, p + 1))
-            }
+            onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
             disabled={paginaActual === totalPaginas}
             className="h-8 text-xs font-medium border-gray-300 text-amber-900 border-amber-300 hover:bg-amber-50"
           >
@@ -891,11 +867,7 @@ function ProductosPage() {
       </div>
 
       {/* 📷 COMPONENTE ESCÁNER */}
-      <BarcodeScanner
-        open={scannerOpen}
-        onOpenChange={setScannerOpen}
-        onScan={handleScan}
-      />
+      <BarcodeScanner open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScan} />
 
       {/* MODAL: NUEVO PRODUCTO */}
       <Dialog open={modalNuevoAbierto} onOpenChange={setModalNuevoAbierto}>
@@ -905,8 +877,7 @@ function ProductosPage() {
               Registrar Nuevo Producto
             </DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
-              Introduce la información del nuevo producto para darlo de alta en
-              el catálogo.
+              Introduce la información del nuevo producto para darlo de alta en el catálogo.
             </DialogDescription>
           </DialogHeader>
 
@@ -972,9 +943,7 @@ function ProductosPage() {
                   min={0}
                   value={formStock}
                   onChange={(e) =>
-                    setFormStock(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
+                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
               </div>
@@ -987,9 +956,7 @@ function ProductosPage() {
                   min={0}
                   value={formStockMinimo}
                   onChange={(e) =>
-                    setFormStockMinimo(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
+                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
               </div>
@@ -1017,9 +984,7 @@ function ProductosPage() {
                   min={0}
                   value={formPrecio}
                   onChange={(e) =>
-                    setFormPrecio(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
+                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
               </div>
@@ -1054,9 +1019,7 @@ function ProductosPage() {
                     min={0}
                     value={formLargo}
                     onChange={(e) =>
-                      setFormLargo(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormLargo(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
@@ -1070,9 +1033,7 @@ function ProductosPage() {
                     min={0}
                     value={formAncho}
                     onChange={(e) =>
-                      setFormAncho(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormAncho(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
@@ -1086,17 +1047,12 @@ function ProductosPage() {
                     min={0}
                     value={formAlto}
                     onChange={(e) =>
-                      setFormAlto(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormAlto(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label
-                    htmlFor="nuevo-peso"
-                    className="text-xs flex items-center gap-1"
-                  >
+                  <Label htmlFor="nuevo-peso" className="text-xs flex items-center gap-1">
                     <Scale className="h-3 w-3" /> Peso (kg)
                   </Label>
                   <Input
@@ -1106,9 +1062,7 @@ function ProductosPage() {
                     step="0.1"
                     value={formPeso}
                     onChange={(e) =>
-                      setFormPeso(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormPeso(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
@@ -1143,9 +1097,7 @@ function ProductosPage() {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">
-              Editar Producto
-            </DialogTitle>
+            <DialogTitle className="text-lg font-bold text-gray-900">Editar Producto</DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
               Modifica los detalles del producto seleccionado.
             </DialogDescription>
@@ -1200,9 +1152,7 @@ function ProductosPage() {
                   min={0}
                   value={formStock}
                   onChange={(e) =>
-                    setFormStock(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
+                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
               </div>
@@ -1215,9 +1165,7 @@ function ProductosPage() {
                   min={0}
                   value={formStockMinimo}
                   onChange={(e) =>
-                    setFormStockMinimo(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
+                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
               </div>
@@ -1239,9 +1187,7 @@ function ProductosPage() {
                   min={0}
                   value={formPrecio}
                   onChange={(e) =>
-                    setFormPrecio(
-                      e.target.value === "" ? "" : Number(e.target.value)
-                    )
+                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
                   }
                 />
               </div>
@@ -1275,9 +1221,7 @@ function ProductosPage() {
                     min={0}
                     value={formLargo}
                     onChange={(e) =>
-                      setFormLargo(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormLargo(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
@@ -1291,9 +1235,7 @@ function ProductosPage() {
                     min={0}
                     value={formAncho}
                     onChange={(e) =>
-                      setFormAncho(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormAncho(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
@@ -1307,17 +1249,12 @@ function ProductosPage() {
                     min={0}
                     value={formAlto}
                     onChange={(e) =>
-                      setFormAlto(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormAlto(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label
-                    htmlFor="edit-peso"
-                    className="text-xs flex items-center gap-1"
-                  >
+                  <Label htmlFor="edit-peso" className="text-xs flex items-center gap-1">
                     <Scale className="h-3 w-3" /> Peso (kg)
                   </Label>
                   <Input
@@ -1327,9 +1264,7 @@ function ProductosPage() {
                     step="0.1"
                     value={formPeso}
                     onChange={(e) =>
-                      setFormPeso(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
+                      setFormPeso(e.target.value === "" ? "" : Number(e.target.value))
                     }
                   />
                 </div>
@@ -1350,9 +1285,7 @@ function ProductosPage() {
                 className="bg-[#8c4314] hover:bg-[#78370e] text-white"
                 disabled={mutationActualizar.isPending}
               >
-                {mutationActualizar.isPending
-                  ? "Guardando..."
-                  : "Guardar Cambios"}
+                {mutationActualizar.isPending ? "Guardando..." : "Guardar Cambios"}
               </Button>
             </DialogFooter>
           </form>
@@ -1360,10 +1293,7 @@ function ProductosPage() {
       </Dialog>
 
       {/* MODAL: VER DETALLE DEL PRODUCTO */}
-      <Dialog
-        open={Boolean(productoVer)}
-        onOpenChange={(open) => !open && setProductoVer(null)}
-      >
+      <Dialog open={Boolean(productoVer)} onOpenChange={(open) => !open && setProductoVer(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2 mb-1">
@@ -1416,33 +1346,25 @@ function ProductosPage() {
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <div>
-                      <span className="text-[10px] text-gray-500 block">
-                        Largo
-                      </span>
+                      <span className="text-[10px] text-gray-500 block">Largo</span>
                       <span className="font-bold text-gray-900">
                         {productoVer.dimensiones.largo} cm
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block">
-                        Ancho
-                      </span>
+                      <span className="text-[10px] text-gray-500 block">Ancho</span>
                       <span className="font-bold text-gray-900">
                         {productoVer.dimensiones.ancho} cm
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block">
-                        Alto
-                      </span>
+                      <span className="text-[10px] text-gray-500 block">Alto</span>
                       <span className="font-bold text-gray-900">
                         {productoVer.dimensiones.alto} cm
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block">
-                        Peso
-                      </span>
+                      <span className="text-[10px] text-gray-500 block">Peso</span>
                       <span className="font-bold text-gray-900">
                         {productoVer.dimensiones.peso} kg
                       </span>
@@ -1467,11 +1389,7 @@ function ProductosPage() {
           )}
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setProductoVer(null)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setProductoVer(null)}>
               Cerrar
             </Button>
           </DialogFooter>
@@ -1486,19 +1404,15 @@ function ProductosPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              ¿{productoADesactivar?.activo ? "Desactivar" : "Reactivar"}{" "}
-              producto?
+              ¿{productoADesactivar?.activo ? "Desactivar" : "Reactivar"} producto?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que deseas{" "}
-              {productoADesactivar?.activo ? "desactivar" : "activar"} el
-              producto «
-              <strong>{productoADesactivar?.nombre}</strong>» (SKU:{" "}
+              ¿Estás seguro de que deseas {productoADesactivar?.activo ? "desactivar" : "activar"}{" "}
+              el producto «<strong>{productoADesactivar?.nombre}</strong>» (SKU:{" "}
               {productoADesactivar?.sku})?
               <br />
               <br />
-              Los movimientos e histórico de existencias se conservarán en la
-              base de datos.
+              Los movimientos e histórico de existencias se conservarán en la base de datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

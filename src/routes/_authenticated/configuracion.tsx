@@ -24,12 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +54,12 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Imports de Supabase y TanStack Query
-import { getCategorias, crearCategoria, actualizarCategoria, desactivarCategoria } from "@/lib/inventario";
+import {
+  getCategorias,
+  crearCategoria,
+  actualizarCategoria,
+  desactivarCategoria,
+} from "@/lib/inventario";
 import type { Categoria } from "@/lib/tipos";
 
 export const Route = createFileRoute("/_authenticated/configuracion")({
@@ -81,12 +81,42 @@ interface Usuario {
 // DATOS MOCK (Solo Usuarios y Backup por ahora, Categorías es real)
 // ============================================================================
 const USUARIOS_INICIALES: Usuario[] = [
-  { id: "u-1", nombre: "Javier Martínez", email: "javier@inventariolm.com", rol: "Administrador", activo: true },
-  { id: "u-2", nombre: "Elena Rodríguez", email: "elena@inventariolm.com", rol: "Operadora de Almacén", activo: true },
-  { id: "u-3", nombre: "Carlos Domínguez", email: "carlos@inventariolm.com", rol: "Vendedor", activo: true },
-  { id: "u-4", nombre: "Roberto Sánchez", email: "roberto@inventariolm.com", rol: "Mozo de Almacén", activo: true },
+  {
+    id: "u-1",
+    nombre: "Javier Martínez",
+    email: "javier@inventariolm.com",
+    rol: "Administrador",
+    activo: true,
+  },
+  {
+    id: "u-2",
+    nombre: "Elena Rodríguez",
+    email: "elena@inventariolm.com",
+    rol: "Operadora de Almacén",
+    activo: true,
+  },
+  {
+    id: "u-3",
+    nombre: "Carlos Domínguez",
+    email: "carlos@inventariolm.com",
+    rol: "Vendedor",
+    activo: true,
+  },
+  {
+    id: "u-4",
+    nombre: "Roberto Sánchez",
+    email: "roberto@inventariolm.com",
+    rol: "Mozo de Almacén",
+    activo: true,
+  },
   { id: "u-5", nombre: "Ana López", email: "ana@inventariolm.com", rol: "Vendedor", activo: true },
-  { id: "u-6", nombre: "Miguel Torres", email: "miguel@inventariolm.com", rol: "Operador de Almacén", activo: false },
+  {
+    id: "u-6",
+    nombre: "Miguel Torres",
+    email: "miguel@inventariolm.com",
+    rol: "Operador de Almacén",
+    activo: false,
+  },
 ];
 
 // ============================================================================
@@ -119,7 +149,7 @@ function ConfiguracionPage() {
   const [iva, setIva] = useState(21);
 
   // Categorías (REAL con TanStack Query)
-  const { data: categorias = [], isLoading: cargandoCategorias } = useQuery({
+  const { data: categorias = [], isLoading: cargandoCategorias } = useQuery<Categoria[]>({
     queryKey: ["categorias"],
     queryFn: getCategorias,
   });
@@ -155,8 +185,15 @@ function ConfiguracionPage() {
   });
 
   const mutationActualizar = useMutation({
-    mutationFn: ({ id, nombre, descripcion }: { id: string; nombre: string; descripcion: string }) =>
-      actualizarCategoria(id, { nombre, descripcion }),
+    mutationFn: ({
+      id,
+      nombre,
+      descripcion,
+    }: {
+      id: string;
+      nombre: string;
+      descripcion: string;
+    }) => actualizarCategoria(id, { nombre, descripcion }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categorias"] });
       toast.success("Categoría actualizada correctamente");
@@ -202,7 +239,7 @@ function ConfiguracionPage() {
       toast.error("El nombre es obligatorio");
       return;
     }
-    
+
     if (categoriaEditando) {
       mutationActualizar.mutate({
         id: categoriaEditando.id,
@@ -215,7 +252,7 @@ function ConfiguracionPage() {
         descripcion: formCatDescripcion,
       });
     }
-    
+
     setModalCategoriaAbierto(false);
     setCategoriaEditando(null);
     setFormCatNombre("");
@@ -353,27 +390,48 @@ function ConfiguracionPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Nombre Comercial</Label>
-                    <Input value={nombreTienda} onChange={(e) => setNombreTienda(e.target.value)} className="h-9 text-xs" />
+                    <Input
+                      value={nombreTienda}
+                      onChange={(e) => setNombreTienda(e.target.value)}
+                      className="h-9 text-xs"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Teléfono</Label>
-                    <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} className="h-9 text-xs" />
+                    <Input
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      className="h-9 text-xs"
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-700">Dirección Física</Label>
-                  <Input value={direccion} onChange={(e) => setDireccion(e.target.value)} className="h-9 text-xs" />
+                  <Input
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    className="h-9 text-xs"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Email</Label>
-                    <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className="h-9 text-xs" />
+                    <Input
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      type="email"
+                      className="h-9 text-xs"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Zona Horaria</Label>
-                    <select value={zonaHoraria} onChange={(e) => setZonaHoraria(e.target.value)} className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5">
+                    <select
+                      value={zonaHoraria}
+                      onChange={(e) => setZonaHoraria(e.target.value)}
+                      className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5"
+                    >
                       <option value="Europe/Madrid">Europe/Madrid (UTC+1)</option>
                       <option value="Europe/London">Europe/London (UTC+0)</option>
                       <option value="America/Mexico_City">America/Mexico City (UTC-6)</option>
@@ -381,7 +439,11 @@ function ConfiguracionPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Moneda</Label>
-                    <select value={moneda} onChange={(e) => setMoneda(e.target.value)} className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5">
+                    <select
+                      value={moneda}
+                      onChange={(e) => setMoneda(e.target.value)}
+                      className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5"
+                    >
                       <option value="EUR">EUR (€) - Euro</option>
                       <option value="USD">USD ($) - Dólar</option>
                       <option value="MXN">MXN ($) - Peso Mexicano</option>
@@ -405,7 +467,11 @@ function ConfiguracionPage() {
                       <p className="text-xs font-semibold text-slate-800">Idioma</p>
                       <p className="text-[10px] text-slate-500">Idioma de la interfaz</p>
                     </div>
-                    <select value={idioma} onChange={(e) => setIdioma(e.target.value)} className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2">
+                    <select
+                      value={idioma}
+                      onChange={(e) => setIdioma(e.target.value)}
+                      className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2"
+                    >
                       <option value="es">Español</option>
                       <option value="en">English</option>
                     </select>
@@ -415,7 +481,12 @@ function ConfiguracionPage() {
                       <p className="text-xs font-semibold text-slate-800">Formato de fecha</p>
                       <p className="text-[10px] text-slate-500">Cómo se muestran las fechas</p>
                     </div>
-                    <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200">DD/MM/YYYY</Badge>
+                    <Badge
+                      variant="outline"
+                      className="bg-slate-100 text-slate-700 border-slate-200"
+                    >
+                      DD/MM/YYYY
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -435,7 +506,11 @@ function ConfiguracionPage() {
                     Gestiona las categorías que aparecen en el catálogo.
                   </CardDescription>
                 </div>
-                <Button size="sm" onClick={abrirModalNuevaCategoria} className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={abrirModalNuevaCategoria}
+                  className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs gap-1.5"
+                >
                   <Plus className="w-3.5 h-3.5" /> Nueva Categoría
                 </Button>
               </CardHeader>
@@ -466,7 +541,10 @@ function ConfiguracionPage() {
                       categorias.map((cat) => (
                         <TableRow key={cat.id}>
                           <TableCell>
-                            <Badge variant="outline" className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium">
+                            <Badge
+                              variant="outline"
+                              className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium"
+                            >
                               {cat.nombre}
                             </Badge>
                           </TableCell>
@@ -474,27 +552,34 @@ function ConfiguracionPage() {
                             {cat.descripcion || "—"}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Badge 
-                              variant="outline" 
-                              className={cat.activo ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-xs" : "bg-slate-100 text-slate-600 border-slate-200 text-xs"}
+                            <Badge
+                              variant="outline"
+                              className={
+                                cat.activo
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-xs"
+                                  : "bg-slate-100 text-slate-600 border-slate-200 text-xs"
+                              }
                             >
                               {cat.activo ? "Activa" : "Inactiva"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => abrirModalEditarCategoria(cat)} 
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => abrirModalEditarCategoria(cat)}
                                 className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => { setCategoriaAEliminar(cat); setDialogEliminarAbierto(true); }} 
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setCategoriaAEliminar(cat);
+                                  setDialogEliminarAbierto(true);
+                                }}
                                 className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -526,19 +611,35 @@ function ConfiguracionPage() {
                 <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
                   <div>
                     <p className="text-xs font-semibold text-slate-800">Alerta de Stock Bajo</p>
-                    <p className="text-[10px] text-slate-500">Notificar cuando un producto esté por debajo del mínimo</p>
+                    <p className="text-[10px] text-slate-500">
+                      Notificar cuando un producto esté por debajo del mínimo
+                    </p>
                   </div>
                   <Switch checked={alertaStockBajo} onCheckedChange={setAlertaStockBajo} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Umbral Stock Bajo (%)</Label>
-                    <Input type="number" value={umbralStockBajo} onChange={(e) => setUmbralStockBajo(Number(e.target.value))} className="h-9 text-xs" />
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Umbral Stock Bajo (%)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={umbralStockBajo}
+                      onChange={(e) => setUmbralStockBajo(Number(e.target.value))}
+                      className="h-9 text-xs"
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Umbral Stock Crítico (%)</Label>
-                    <Input type="number" value={umbralStockCritico} onChange={(e) => setUmbralStockCritico(Number(e.target.value))} className="h-9 text-xs" />
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Umbral Stock Crítico (%)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={umbralStockCritico}
+                      onChange={(e) => setUmbralStockCritico(Number(e.target.value))}
+                      className="h-9 text-xs"
+                    />
                   </div>
                 </div>
 
@@ -570,12 +671,23 @@ function ConfiguracionPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Stock Mínimo por Defecto</Label>
-                    <Input type="number" value={stockMinimoDefecto} onChange={(e) => setStockMinimoDefecto(Number(e.target.value))} className="h-9 text-xs" />
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Stock Mínimo por Defecto
+                    </Label>
+                    <Input
+                      type="number"
+                      value={stockMinimoDefecto}
+                      onChange={(e) => setStockMinimoDefecto(Number(e.target.value))}
+                      className="h-9 text-xs"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Unidad de Medida</Label>
-                    <select value={unidadMedida} onChange={(e) => setUnidadMedida(e.target.value)} className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5">
+                    <select
+                      value={unidadMedida}
+                      onChange={(e) => setUnidadMedida(e.target.value)}
+                      className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5"
+                    >
                       <option value="gal">Galones (gal)</option>
                       <option value="L">Litros (L)</option>
                       <option value="unid">Unidades (unid)</option>
@@ -583,25 +695,44 @@ function ConfiguracionPage() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">IVA por Defecto (%)</Label>
-                    <Input type="number" value={iva} onChange={(e) => setIva(Number(e.target.value))} className="h-9 text-xs" />
+                    <Label className="text-xs font-semibold text-slate-700">
+                      IVA por Defecto (%)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={iva}
+                      onChange={(e) => setIva(Number(e.target.value))}
+                      className="h-9 text-xs"
+                    />
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
                   <div>
                     <p className="text-xs font-semibold text-slate-800">Permitir Stock Negativo</p>
-                    <p className="text-[10px] text-slate-500">Permitir ventas cuando el stock sea 0</p>
+                    <p className="text-[10px] text-slate-500">
+                      Permitir ventas cuando el stock sea 0
+                    </p>
                   </div>
-                  <Switch checked={permitirStockNegativo} onCheckedChange={setPermitirStockNegativo} />
+                  <Switch
+                    checked={permitirStockNegativo}
+                    onCheckedChange={setPermitirStockNegativo}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
                   <div>
-                    <p className="text-xs font-semibold text-slate-800">Bloquear Ventas con Stock Bajo</p>
-                    <p className="text-[10px] text-slate-500">Impedir ventas si está por debajo del mínimo</p>
+                    <p className="text-xs font-semibold text-slate-800">
+                      Bloquear Ventas con Stock Bajo
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Impedir ventas si está por debajo del mínimo
+                    </p>
                   </div>
-                  <Switch checked={bloquearVentasStockBajo} onCheckedChange={setBloquearVentasStockBajo} />
+                  <Switch
+                    checked={bloquearVentasStockBajo}
+                    onCheckedChange={setBloquearVentasStockBajo}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -635,24 +766,37 @@ function ConfiguracionPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="w-7 h-7 rounded-full bg-[#D24D09]/10 text-[#D24D09] flex items-center justify-center text-xs font-bold">
-                              {u.nombre.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                              {u.nombre
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .slice(0, 2)}
                             </div>
                             <span className="text-xs font-semibold text-slate-800">{u.nombre}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs text-slate-600">{u.email}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs">
+                          <Badge
+                            variant="outline"
+                            className="bg-blue-50 text-blue-800 border-blue-200 text-xs"
+                          >
                             {u.rol}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           {u.activo ? (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                            <Badge
+                              variant="outline"
+                              className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs"
+                            >
                               Activo
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 text-xs">
+                            <Badge
+                              variant="outline"
+                              className="bg-slate-100 text-slate-600 border-slate-200 text-xs"
+                            >
                               Inactivo
                             </Badge>
                           )}
@@ -681,7 +825,9 @@ function ConfiguracionPage() {
                 <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50/50 flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-semibold text-emerald-900">Último backup local completo</p>
+                    <p className="text-xs font-semibold text-emerald-900">
+                      Último backup local completo
+                    </p>
                     <p className="text-[11px] text-emerald-700 mt-0.5">
                       {ultimoBackup} • Exportado correctamente
                     </p>
@@ -689,7 +835,11 @@ function ConfiguracionPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Button variant="outline" onClick={handleExportarBackup} className="h-10 text-xs gap-1.5 border-slate-200">
+                  <Button
+                    variant="outline"
+                    onClick={handleExportarBackup}
+                    className="h-10 text-xs gap-1.5 border-slate-200"
+                  >
                     <Download className="w-4 h-4" />
                     Exportar Backup (JSON)
                   </Button>
@@ -706,7 +856,11 @@ function ConfiguracionPage() {
                     <p className="text-[11px] text-amber-700 mt-0.5">
                       Las acciones irreversibles requieren confirmación adicional.
                     </p>
-                    <Button variant="outline" size="sm" className="mt-2 h-7 text-xs border-rose-200 text-rose-700 hover:bg-rose-50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 h-7 text-xs border-rose-200 text-rose-700 hover:bg-rose-50"
+                    >
                       <Trash2 className="w-3 h-3 mr-1" />
                       Purgar datos de prueba
                     </Button>
@@ -719,28 +873,61 @@ function ConfiguracionPage() {
       </div>
 
       {/* MODAL: NUEVA / EDITAR CATEGORÍA */}
-      <Dialog open={modalCategoriaAbierto} onOpenChange={(open) => { if (!open) { setModalCategoriaAbierto(false); setCategoriaEditando(null); } }}>
+      <Dialog
+        open={modalCategoriaAbierto}
+        onOpenChange={(open) => {
+          if (!open) {
+            setModalCategoriaAbierto(false);
+            setCategoriaEditando(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
               {categoriaEditando ? "Editar Categoría" : "Nueva Categoría"}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              {categoriaEditando ? "Modifica los datos de la categoría." : "Crea una nueva categoría para el catálogo."}
+              {categoriaEditando
+                ? "Modifica los datos de la categoría."
+                : "Crea una nueva categoría para el catálogo."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCrearCategoria} className="space-y-3.5">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">Nombre *</Label>
-              <Input value={formCatNombre} onChange={(e) => setFormCatNombre(e.target.value)} placeholder="Ej: Pinturas de Exterior" className="h-9 text-xs" required />
+              <Input
+                value={formCatNombre}
+                onChange={(e) => setFormCatNombre(e.target.value)}
+                placeholder="Ej: Pinturas de Exterior"
+                className="h-9 text-xs"
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">Descripción</Label>
-              <Textarea value={formCatDescripcion} onChange={(e) => setFormCatDescripcion(e.target.value)} placeholder="Descripción breve de la categoría" className="text-xs" rows={3} />
+              <Textarea
+                value={formCatDescripcion}
+                onChange={(e) => setFormCatDescripcion(e.target.value)}
+                placeholder="Descripción breve de la categoría"
+                className="text-xs"
+                rows={3}
+              />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalCategoriaAbierto(false)}>Cancelar</Button>
-              <Button type="submit" size="sm" className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setModalCategoriaAbierto(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs"
+              >
                 {categoriaEditando ? "Guardar Cambios" : "Crear Categoría"}
               </Button>
             </DialogFooter>
@@ -754,13 +941,16 @@ function ConfiguracionPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base">¿Eliminar categoría?</AlertDialogTitle>
             <AlertDialogDescription className="text-xs">
-              ¿Estás seguro de eliminar la categoría «<strong>{categoriaAEliminar?.nombre}</strong>»?
-              Los productos asociados quedarán sin categoría asignada.
+              ¿Estás seguro de eliminar la categoría «<strong>{categoriaAEliminar?.nombre}</strong>
+              »? Los productos asociados quedarán sin categoría asignada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="text-xs">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleEliminarCategoria} className="bg-rose-600 hover:bg-rose-700 text-white text-xs">
+            <AlertDialogAction
+              onClick={handleEliminarCategoria}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs"
+            >
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

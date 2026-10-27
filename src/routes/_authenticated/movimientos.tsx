@@ -46,12 +46,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import {
-  crearMovimiento,
-  getMovimientos,
-  getProductos,
-  getUbicaciones,
-} from "@/lib/inventario";
+import { crearMovimiento, getMovimientos, getProductos, getUbicaciones } from "@/lib/inventario";
 import type { MovimientoDetallado } from "@/lib/tipos";
 
 export const Route = createFileRoute("/_authenticated/movimientos")({
@@ -164,7 +159,13 @@ function MovimientosPage() {
     const q = busqueda.toLowerCase().trim();
     const ahora = Date.now();
     const dias =
-      filtroPeriodo === "hoy" ? 0 : filtroPeriodo === "7d" ? 7 : filtroPeriodo === "30d" ? 30 : null;
+      filtroPeriodo === "hoy"
+        ? 0
+        : filtroPeriodo === "7d"
+          ? 7
+          : filtroPeriodo === "30d"
+            ? 30
+            : null;
 
     return movimientos.filter((m) => {
       const coincideTexto =
@@ -205,10 +206,10 @@ function MovimientosPage() {
     const entradas = movimientos.filter((m) => m.tipo === "entrada").length;
     const salidas = movimientos.filter((m) => m.tipo === "salida").length;
     const ajustesRepos = movimientos.filter(
-      (m) => m.tipo === "ajuste" || m.tipo === "reposicion"
+      (m) => m.tipo === "ajuste" || m.tipo === "reposicion",
     ).length;
     const ultimos7 = movimientos.filter(
-      (m) => Date.now() - new Date(m.fecha).getTime() <= 7 * 24 * 60 * 60 * 1000
+      (m) => Date.now() - new Date(m.fecha).getTime() <= 7 * 24 * 60 * 60 * 1000,
     ).length;
 
     return [
@@ -304,7 +305,7 @@ function MovimientosPage() {
           m.motivo ?? "-",
         ]
           .map((c) => `"${String(c).replace(/"/g, '""')}"`)
-          .join(",")
+          .join(","),
       )
       .join("\n");
     const blob = new Blob([head + rows], { type: "text/csv;charset=utf-8;" });
@@ -665,8 +666,8 @@ function MovimientosPage() {
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
               El stock se actualizará automáticamente mediante el trigger{" "}
-              <code className="bg-slate-100 px-1 rounded">actualizar_stock</code>. Nunca se
-              escribe directamente en la tabla stock.
+              <code className="bg-slate-100 px-1 rounded">actualizar_stock</code>. Nunca se escribe
+              directamente en la tabla stock.
             </DialogDescription>
           </DialogHeader>
 
@@ -750,7 +751,12 @@ function MovimientosPage() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalNuevo(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setModalNuevo(false)}
+              >
                 Cancelar
               </Button>
               <Button

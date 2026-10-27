@@ -28,11 +28,33 @@ export interface Producto {
 
 export interface Ubicacion {
   id: string;
-  codigo: string;
-  nombre?: string;
-  tipo?: string;
-  seccion_id?: string;
+  codigo?: string;
+  nombre: string;
+  tipo: string;
+  descripcion?: string | null;
   activo?: boolean;
+  creado_por?: string | null;
+  creado_en?: string;
+  id_ubicacion_padre?: string | null;
+  seccion?: string | null;
+  seccion_id?: string | null;
+  seccion_origen?: string | null;
+  posicion_lateral?: string | null;
+  posicion_longitudinal?: string | null;
+  numero?: number | null;
+}
+
+export interface Palet {
+  id: string;
+  id_reserva: string;
+  numero_palet: number;
+  codigo_barras: string;
+  generado_por?: string | null;
+  generado_en?: string;
+  activo: boolean;
+  creado_en?: string;
+  actualizado_en?: string;
+  fecha_baja?: string | null;
 }
 
 export interface Movimiento {
@@ -48,17 +70,23 @@ export interface Movimiento {
 }
 
 export interface Stock {
-  id: string;
-  producto_id: string;
-  ubicacion_id: string;
+  id?: string;
+  id_producto: string;
+  id_ubicacion: string;
   cantidad: number;
+  actualizado_en?: string;
+  id_palet?: string | null;
+  producto_id?: string;
+  ubicacion_id?: string;
 }
 
 export interface Seccion {
   id: string;
   nombre: string;
+  descripcion?: string | null;
   codigo?: string;
   activo?: boolean;
+  creado_en?: string;
 }
 // Movimiento ya resuelto con sus relaciones (para UI)
 export interface MovimientoDetallado {

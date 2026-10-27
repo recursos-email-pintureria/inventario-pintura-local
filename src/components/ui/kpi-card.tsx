@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp } from "lucide-react";
 import { ReactNode } from "react";
 
-export type KpiColor = 'amber' | 'rose' | 'emerald' | 'blue' | 'indigo' | 'slate';
+export type KpiColor = "amber" | "rose" | "emerald" | "blue" | "indigo" | "slate";
 
 export interface KpiData {
   label: string;
@@ -17,19 +17,51 @@ export interface KpiData {
 }
 
 const colorConfig = {
-  amber: { text: 'text-amber-700', border: 'border-l-amber-600', iconBg: 'bg-amber-100', iconText: 'text-amber-700' },
-  rose: { text: 'text-rose-700', border: 'border-l-rose-600', iconBg: 'bg-rose-100', iconText: 'text-rose-700' },
-  emerald: { text: 'text-emerald-700', border: 'border-l-emerald-600', iconBg: 'bg-emerald-100', iconText: 'text-emerald-700' },
-  blue: { text: 'text-blue-700', border: 'border-l-blue-600', iconBg: 'bg-blue-100', iconText: 'text-blue-700' },
-  indigo: { text: 'text-indigo-700', border: 'border-l-indigo-600', iconBg: 'bg-indigo-100', iconText: 'text-indigo-700' },
-  slate: { text: 'text-slate-700', border: 'border-l-slate-600', iconBg: 'bg-slate-100', iconText: 'text-slate-700' },
+  amber: {
+    text: "text-amber-700",
+    border: "border-l-amber-600",
+    iconBg: "bg-amber-100",
+    iconText: "text-amber-700",
+  },
+  rose: {
+    text: "text-rose-700",
+    border: "border-l-rose-600",
+    iconBg: "bg-rose-100",
+    iconText: "text-rose-700",
+  },
+  emerald: {
+    text: "text-emerald-700",
+    border: "border-l-emerald-600",
+    iconBg: "bg-emerald-100",
+    iconText: "text-emerald-700",
+  },
+  blue: {
+    text: "text-blue-700",
+    border: "border-l-blue-600",
+    iconBg: "bg-blue-100",
+    iconText: "text-blue-700",
+  },
+  indigo: {
+    text: "text-indigo-700",
+    border: "border-l-indigo-600",
+    iconBg: "bg-indigo-100",
+    iconText: "text-indigo-700",
+  },
+  slate: {
+    text: "text-slate-700",
+    border: "border-l-slate-600",
+    iconBg: "bg-slate-100",
+    iconText: "text-slate-700",
+  },
 };
 
 export function KPICard({ data }: { data: KpiData }) {
   const colors = colorConfig[data.color] || colorConfig.slate;
-  
+
   return (
-    <Card className={`border-l-4 ${colors.border} border-slate-200 shadow-md transition-shadow hover:shadow-lg`}>
+    <Card
+      className={`border-l-4 ${colors.border} border-slate-200 shadow-md transition-shadow hover:shadow-lg`}
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">

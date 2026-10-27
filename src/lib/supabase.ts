@@ -14,7 +14,7 @@ const SUPABASE_ANON_KEY = import.meta.env["VITE_SUPABASE_ANON_KEY"];
 // Validación temprana
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(
-    "Faltan las variables de entorno de Supabase. Por favor, verifica tu archivo .env"
+    "Faltan las variables de entorno de Supabase. Por favor, verifica tu archivo .env",
   );
 }
 
@@ -59,7 +59,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 export function authErrorMessage(err: unknown): string {
   const msg = (err as { message?: string; code?: string })?.message ?? "";
   const code = (err as { code?: string })?.code ?? "";
-  
+
   if (code === "email_not_confirmed" || /not confirmed/i.test(msg))
     return "Por favor verifica tu email antes de continuar.";
   if (code === "invalid_credentials" || /invalid login credentials/i.test(msg))
@@ -72,6 +72,6 @@ export function authErrorMessage(err: unknown): string {
   if (/rate limit|429/i.test(msg) || code === "over_email_send_rate_limit")
     return "Demasiados intentos. Espera unos minutos y vuelve a intentarlo.";
   if (/fetch/i.test(msg)) return "No se pudo conectar con el servidor. Revisa tu conexión.";
-  
+
   return msg || "Ha ocurrido un error inesperado.";
 }

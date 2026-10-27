@@ -30,10 +30,15 @@ export function generarCodigoBarrasPalet(
   fecha: Date = new Date(),
 ): string {
   const padNumero = String(numeroPalet).padStart(3, "0");
-  
+
   // CORRECCIÓN AQUÍ: Declaración limpia y única de usuarioLimpio
-  const usuarioLimpio = (String(usuario ?? "").trim().split(/\s+/)[0] ?? "").replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, "") || "Usuario";;
-  
+  const usuarioLimpio =
+    (
+      String(usuario ?? "")
+        .trim()
+        .split(/\s+/)[0] ?? ""
+    ).replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/g, "") || "Usuario";
+
   const dia = String(fecha.getDate()).padStart(2, "0");
   const mes = String(fecha.getMonth() + 1).padStart(2, "0");
   const anio = fecha.getFullYear();
@@ -173,6 +178,96 @@ export async function desactivarPalet(id: string): Promise<void> {
     .from("palets")
     .update({ activo: false, actualizado_en: new Date().toISOString() })
     .eq("id", id);
+
+  if (error) throw error;
+}
+
+/**
+ * Estructura de producto dentro de un palet.
+ */
+export interface ProductoEnPalet {
+  id_producto: string;
+  cantidad: number;
+  nombre?: string;
+  codigo_barras?: string;
+  sku?: string;
+  producto?: {
+    id: string;
+    codigo_barras?: string;
+    sku?: string;
+    nombre: string;
+  };
+}
+
+export interface GuardarProductoEnPaletParams {
+  id_palet: string;
+  id_reserva: string;
+  id_producto: string;
+  cantidad: number;
+}
+
+/**
+ * Consulta el stock de productos asignados a un palet determinado (cantidad > 0).
+ */
+export async function cargarProductosPalet(idPalet: string): Promise<ProductoEnPalet[]> {
+  const { data, error } = await supabase
+    .from("stock")
+    .select("id_producto, cantidad, producto:productos(id, codigo_barras, sku, nombre)")
+    .eq("id_palet", idPalet)
+    .gt("cantidad", 0);
+
+  if (error) throw error;
+  return (data ?? []).map((item: any) => ({
+    id_producto: item.id_producto,
+    cantidad: item.cantidad,
+    nombre: item.producto?.nombre,
+    codigo_barras: item.producto?.codigo_barras,
+    sku: item.producto?.sku,
+    producto: item.producto,
+  }));
+}
+
+/**
+ * Guarda o incrementa un producto dentro de un palet.
+ */
+export async function guardarProductoEnPalet(params: GuardarProductoEnPaletParams): Promise<void> {
+  const { id_palet, id_reserva, id_producto, cantidad } = params;
+
+  const { data: existente } = await supabase
+    .from("stock")
+    .select("id_producto, cantidad")
+    .eq("id_palet", id_palet)
+    .eq("id_producto", id_producto)
+    .maybeSingle();
+
+  if (existente) {
+    const nuevaCantidad = (existente.cantidad || 0) + cantidad;
+    const { error } = await supabase
+      .from("stock")
+      .update({ cantidad: nuevaCantidad })
+      .eq("id_palet", id_palet)
+      .eq("id_producto", id_producto);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("stock").insert({
+      id_palet,
+      id_ubicacion: id_reserva,
+      id_producto,
+      cantidad,
+    });
+    if (error) throw error;
+  }
+}
+
+/**
+ * Elimina la asociación de un producto con un palet específico en stock.
+ */
+export async function eliminarProductoDePalet(idPalet: string, idProducto: string): Promise<void> {
+  const { error } = await supabase
+    .from("stock")
+    .delete()
+    .eq("id_palet", idPalet)
+    .eq("id_producto", idProducto);
 
   if (error) throw error;
 }

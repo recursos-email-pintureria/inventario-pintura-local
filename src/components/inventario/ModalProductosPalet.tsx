@@ -2,11 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Palet, desactivarPalet } from "@/lib/palets";
 import { supabase } from "@/lib/supabase";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -279,7 +275,8 @@ export function ModalProductosPalet({
       toast.error("Selecciona un producto del catálogo");
       return;
     }
-    const cant = typeof cantidadNueva === "number" ? cantidadNueva : parseInt(String(cantidadNueva));
+    const cant =
+      typeof cantidadNueva === "number" ? cantidadNueva : parseInt(String(cantidadNueva));
     if (isNaN(cant) || cant <= 0) {
       toast.error("La cantidad debe ser mayor a 0");
       return;
@@ -329,7 +326,8 @@ export function ModalProductosPalet({
 
   async function handleGuardarEdicionCantidad() {
     if (!palet || !editandoItem) return;
-    const nuevaCant = typeof cantidadEdicion === "number" ? cantidadEdicion : parseInt(String(cantidadEdicion));
+    const nuevaCant =
+      typeof cantidadEdicion === "number" ? cantidadEdicion : parseInt(String(cantidadEdicion));
 
     if (isNaN(nuevaCant) || nuevaCant < 0) {
       toast.error("Introduce una cantidad válida (0 o superior)");
@@ -416,7 +414,6 @@ export function ModalProductosPalet({
     <>
       <Dialog open={abierto} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-          
           {/* CABECERA PRINCIPAL DEL PALET (Se oculta al imprimir) */}
           <div className="bg-amber-600 text-white p-5 rounded-t-lg no-print">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -470,7 +467,11 @@ export function ModalProductosPalet({
                   onClick={() => setConfirmarBajaManual(true)}
                   disabled={totalUnidades > 0}
                   className="h-8 text-xs font-semibold gap-1 bg-rose-700 hover:bg-rose-800 disabled:opacity-50 disabled:bg-rose-900/60"
-                  title={totalUnidades > 0 ? "Solo se puede dar de baja cuando el stock total sea 0" : "Dar de baja palet vacío"}
+                  title={
+                    totalUnidades > 0
+                      ? "Solo se puede dar de baja cuando el stock total sea 0"
+                      : "Dar de baja palet vacío"
+                  }
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Dar de baja</span>
@@ -481,26 +482,33 @@ export function ModalProductosPalet({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-amber-500/60 text-xs text-amber-100">
               <div className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                <span className="truncate">Creado por: <strong>{palet.generado_por}</strong></span>
+                <span className="truncate">
+                  Creado por: <strong>{palet.generado_por}</strong>
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                <span>Fecha: <strong>{fechaFormateada}</strong></span>
+                <span>
+                  Fecha: <strong>{fechaFormateada}</strong>
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                <span className="truncate">Ubicación: <strong>{palet.reserva_nombre || "Reserva"}</strong></span>
+                <span className="truncate">
+                  Ubicación: <strong>{palet.reserva_nombre || "Reserva"}</strong>
+                </span>
               </div>
               <div className="flex items-center justify-end gap-1.5 font-semibold text-white">
                 <Package className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                <span>{totalLineas} prod. ({totalUnidades} uds)</span>
+                <span>
+                  {totalLineas} prod. ({totalUnidades} uds)
+                </span>
               </div>
             </div>
           </div>
 
           {/* CUERPO DEL MODAL */}
           <div className="p-5 space-y-4">
-            
             {/* VISTA 1: LISTADO DE PRODUCTOS */}
             {modo === "lista" && (
               <>
@@ -549,7 +557,9 @@ export function ModalProductosPalet({
                         min={0}
                         autoFocus
                         value={cantidadEdicion}
-                        onChange={(e) => setCantidadEdicion(e.target.value === "" ? "" : parseInt(e.target.value))}
+                        onChange={(e) =>
+                          setCantidadEdicion(e.target.value === "" ? "" : parseInt(e.target.value))
+                        }
                         className="w-32 bg-white text-xs h-8"
                       />
                       <Button
@@ -608,11 +618,20 @@ export function ModalProductosPalet({
                       </thead>
                       <tbody className="divide-y divide-gray-100 bg-white">
                         {productosFiltrados.map((item) => (
-                          <tr key={item.id_producto} className="hover:bg-amber-50/40 transition-colors">
-                            <td className="py-2.5 px-3 font-mono text-gray-600">{item.codigo_barras || "-"}</td>
-                            <td className="py-2.5 px-3 font-mono font-semibold text-gray-800">{item.sku || "-"}</td>
+                          <tr
+                            key={item.id_producto}
+                            className="hover:bg-amber-50/40 transition-colors"
+                          >
+                            <td className="py-2.5 px-3 font-mono text-gray-600">
+                              {item.codigo_barras || "-"}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-semibold text-gray-800">
+                              {item.sku || "-"}
+                            </td>
                             <td className="py-2.5 px-3 font-medium text-gray-900">{item.nombre}</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-amber-900">{item.cantidad} uds</td>
+                            <td className="py-2.5 px-3 text-right font-bold text-amber-900">
+                              {item.cantidad} uds
+                            </td>
                             <td className="py-2.5 px-3 text-right no-print">
                               <div className="flex items-center justify-end gap-1">
                                 <Button
@@ -665,7 +684,10 @@ export function ModalProductosPalet({
 
                 <div className="space-y-3">
                   <div className="relative">
-                    <Label htmlFor="buscar-catalogo" className="text-xs font-semibold text-gray-700">
+                    <Label
+                      htmlFor="buscar-catalogo"
+                      className="text-xs font-semibold text-gray-700"
+                    >
                       Buscar en catálogo:
                     </Label>
                     <div className="relative mt-1">
@@ -695,12 +717,18 @@ export function ModalProductosPalet({
                             className="p-2.5 hover:bg-amber-50 cursor-pointer flex items-center justify-between text-xs"
                           >
                             <div className="truncate">
-                              <div className="font-semibold text-gray-900 truncate">{prod.nombre}</div>
+                              <div className="font-semibold text-gray-900 truncate">
+                                {prod.nombre}
+                              </div>
                               <div className="text-[10px] text-gray-500 font-mono">
                                 SKU: {prod.sku} · {prod.codigo_barras || "-"}
                               </div>
                             </div>
-                            <Button size="sm" variant="outline" className="h-6 text-[10px] shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[10px] shrink-0"
+                            >
                               Seleccionar
                             </Button>
                           </div>
@@ -728,9 +756,12 @@ export function ModalProductosPalet({
                           Cambiar
                         </Button>
                       </div>
-                      <div className="text-sm font-semibold text-gray-900">{productoSeleccionado.nombre}</div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        {productoSeleccionado.nombre}
+                      </div>
                       <div className="text-xs text-gray-600 font-mono">
-                        SKU: {productoSeleccionado.sku} · Código: {productoSeleccionado.codigo_barras || "-"}
+                        SKU: {productoSeleccionado.sku} · Código:{" "}
+                        {productoSeleccionado.codigo_barras || "-"}
                       </div>
                     </div>
                   )}
@@ -745,7 +776,9 @@ export function ModalProductosPalet({
                         type="number"
                         min={1}
                         value={cantidadNueva}
-                        onChange={(e) => setCantidadNueva(e.target.value === "" ? "" : parseInt(e.target.value))}
+                        onChange={(e) =>
+                          setCantidadNueva(e.target.value === "" ? "" : parseInt(e.target.value))
+                        }
                         className="mt-1 bg-white text-xs"
                       />
                     </div>
@@ -802,7 +835,10 @@ export function ModalProductosPalet({
                         SISTEMA DE INVENTARIO
                       </div>
                     </div>
-                    <Badge variant="outline" className="font-mono text-xs font-bold border-gray-400">
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-xs font-bold border-gray-400"
+                    >
                       #{String(palet.numero_palet).padStart(3, "0")}
                     </Badge>
                   </div>
@@ -818,20 +854,32 @@ export function ModalProductosPalet({
 
                   <div className="grid grid-cols-2 gap-2 text-left bg-gray-50 p-3 rounded border border-gray-200 text-xs">
                     <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">Reserva:</span>
-                      <span className="font-bold text-gray-900">{palet.reserva_nombre || "Zona Reserva"}</span>
+                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
+                        Reserva:
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {palet.reserva_nombre || "Zona Reserva"}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">Generado por:</span>
+                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
+                        Generado por:
+                      </span>
                       <span className="font-bold text-gray-900">{palet.generado_por}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">Fecha:</span>
+                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
+                        Fecha:
+                      </span>
                       <span className="font-medium text-gray-700">{fechaFormateada}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">Contenido:</span>
-                      <span className="font-bold text-gray-900">{totalLineas} ref. / {totalUnidades} uds</span>
+                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
+                        Contenido:
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {totalLineas} ref. / {totalUnidades} uds
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -866,8 +914,12 @@ export function ModalProductosPalet({
                   <div className="border-b-2 border-gray-800 pb-3 flex justify-between items-start">
                     <div>
                       <div className="text-xs uppercase font-bold text-gray-500">INVENTARIO</div>
-                      <h3 className="text-lg font-bold text-gray-900">Desglose de Mercancía en Palet</h3>
-                      <div className="font-mono text-sm font-semibold text-amber-900">{palet.codigo_barras}</div>
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Desglose de Mercancía en Palet
+                      </h3>
+                      <div className="font-mono text-sm font-semibold text-amber-900">
+                        {palet.codigo_barras}
+                      </div>
                     </div>
                     <div className="text-right text-xs text-gray-600">
                       <div>Fecha: {fechaFormateada}</div>
@@ -895,17 +947,25 @@ export function ModalProductosPalet({
                       ) : (
                         productos.map((prod) => (
                           <tr key={prod.id_producto}>
-                            <td className="py-1.5 px-2 font-mono text-gray-600">{prod.codigo_barras || "-"}</td>
-                            <td className="py-1.5 px-2 font-mono font-medium text-gray-800">{prod.sku || "-"}</td>
+                            <td className="py-1.5 px-2 font-mono text-gray-600">
+                              {prod.codigo_barras || "-"}
+                            </td>
+                            <td className="py-1.5 px-2 font-mono font-medium text-gray-800">
+                              {prod.sku || "-"}
+                            </td>
                             <td className="py-1.5 px-2 text-gray-900">{prod.nombre}</td>
-                            <td className="py-1.5 px-2 text-right font-bold text-gray-900">{prod.cantidad} uds</td>
+                            <td className="py-1.5 px-2 text-right font-bold text-gray-900">
+                              {prod.cantidad} uds
+                            </td>
                           </tr>
                         ))
                       )}
                     </tbody>
                     <tfoot className="bg-gray-50 font-bold border-t border-gray-300">
                       <tr>
-                        <td colSpan={3} className="py-2 px-2 text-right">Total Unidades Físicas:</td>
+                        <td colSpan={3} className="py-2 px-2 text-right">
+                          Total Unidades Físicas:
+                        </td>
                         <td className="py-2 px-2 text-right text-amber-900">{totalUnidades} uds</td>
                       </tr>
                     </tfoot>
@@ -937,21 +997,34 @@ export function ModalProductosPalet({
               <span>¿Dar de baja el palet {palet.codigo_barras}?</span>
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs space-y-2 text-gray-600">
-              <p>Esta acción desactivará el palet de la reserva. Esta operación es segura y conserva el historial (baja lógica).</p>
-              <p className="font-semibold text-gray-800">Confirmación requerida: El palet actualmente no tiene stock pendiente.</p>
+              <p>
+                Esta acción desactivará el palet de la reserva. Esta operación es segura y conserva
+                el historial (baja lógica).
+              </p>
+              <p className="font-semibold text-gray-800">
+                Confirmación requerida: El palet actualmente no tiene stock pendiente.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={ejecutandoBaja} className="text-xs">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={ejecutandoBaja} className="text-xs">
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={ejecutarDesactivacionPalet}
               disabled={ejecutandoBaja}
               className="bg-rose-600 hover:bg-rose-700 text-white text-xs gap-1.5"
             >
               {ejecutandoBaja ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Dando de baja...</span></>
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Dando de baja...</span>
+                </>
               ) : (
-                <><Trash2 className="w-3.5 h-3.5" /><span>Confirmar baja</span></>
+                <>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Confirmar baja</span>
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -967,9 +1040,13 @@ export function ModalProductosPalet({
               <span>Palet sin existencias (Stock = 0)</span>
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs space-y-2 text-gray-600">
-              <p>Se han retirado todos los productos de <strong>{palet.codigo_barras}</strong>.</p>
+              <p>
+                Se han retirado todos los productos de <strong>{palet.codigo_barras}</strong>.
+              </p>
               <p>Según la regla de negocio, un palet vacío puede darse de baja automáticamente.</p>
-              <p className="font-semibold text-gray-800">¿Deseas dar de baja este palet ahora o conservarlo vacío?</p>
+              <p className="font-semibold text-gray-800">
+                ¿Deseas dar de baja este palet ahora o conservarlo vacío?
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
@@ -986,9 +1063,15 @@ export function ModalProductosPalet({
               className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5"
             >
               {ejecutandoBaja ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Dando de baja...</span></>
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Dando de baja...</span>
+                </>
               ) : (
-                <><Trash2 className="w-3.5 h-3.5" /><span>Dar de baja palet vacío</span></>
+                <>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Dar de baja palet vacío</span>
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

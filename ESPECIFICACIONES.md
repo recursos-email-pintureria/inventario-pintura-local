@@ -1,16 +1,19 @@
-#  Inventario Pintura - LM - Especificaciones del Proyecto
+# Inventario Pintura - LM - Especificaciones del Proyecto
 
 ## 🎯 Descripción
+
 Aplicación web para gestión de inventario de una sección de pintura en almacén. Permite registrar productos con código de barras, ubicarlos en pasillos/altos/armarios, registrar movimientos de entrada/salida y exportar reportes.
 
 ## 👥 Usuarios y Roles
 
 ### Roles disponibles:
+
 - **Admin**: Control total del sistema
 - **Vendedor**: Permisos granulares asignados por el admin
 - **Visualizador**: Solo puede consultar datos
 
 ### Permisos granulares (8 permisos):
+
 1. `puede_crear_productos` - Crear nuevos productos
 2. `puede_editar_productos` - Editar productos existentes
 3. `puede_eliminar_productos` - Eliminar/desactivar productos
@@ -21,6 +24,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 8. `puede_gestionar_usuarios` - Gestionar usuarios y permisos
 
 ### Seguridad:
+
 - Row Level Security (RLS) en todas las tablas
 - Los códigos de barras son ÚNICOS e irrepetibles
 - Los SKUs son ÚNICOS e irrepetibles
@@ -32,12 +36,14 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 ## ️ Base de Datos (Supabase + PostgreSQL)
 
 ### Tablas existentes (Fase 2A ✅):
+
 - `perfiles_usuario`: id, nombre_completo, correo, rol, activo, creado_en, actualizado_en
 - `permisos_usuario`: id_usuario + 8 permisos booleanos
 
 ### Tablas a crear (Fase 2B-2E):
 
 #### `ubicaciones`:
+
 - id (UUID, PK)
 - nombre (TEXT, UNIQUE, NOT NULL) - ej: "Pasillo A", "Alto 3", "Armario Principal"
 - tipo (TEXT, CHECK IN: 'pasillo', 'alto', 'armario')
@@ -47,6 +53,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - creado_en, actualizado_en (TIMESTAMPTZ)
 
 #### `categorias`:
+
 - id (UUID, PK)
 - nombre (TEXT, UNIQUE, NOT NULL)
 - descripcion (TEXT, nullable)
@@ -54,6 +61,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - creado_en (TIMESTAMPTZ)
 
 #### `productos`:
+
 - id (UUID, PK)
 - codigo_barras (TEXT, UNIQUE, NOT NULL) - escaneado o manual
 - sku (TEXT, UNIQUE, NOT NULL) - código interno del vendedor
@@ -66,6 +74,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - creado_en, actualizado_en (TIMESTAMPTZ)
 
 #### `movimientos`:
+
 - id (UUID, PK)
 - id_producto (UUID, FK productos)
 - id_ubicacion (UUID, FK ubicaciones)
@@ -78,6 +87,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - fecha_movimiento (TIMESTAMPTZ, default now())
 
 #### `stock`:
+
 - id_producto (UUID, FK productos)
 - id_ubicacion (UUID, FK ubicaciones)
 - cantidad (INTEGER, default 0, CHECK >= 0)
@@ -85,6 +95,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - PRIMARY KEY compuesto: (id_producto, id_ubicacion)
 
 ### Funciones y Triggers:
+
 - `actualizar_stock()`: Trigger AFTER INSERT en movimientos que actualiza stock automáticamente
 - `manejar_nuevo_usuario()`: Trigger AFTER INSERT en auth.users que crea perfil y permisos
 - `es_admin()`: Función para verificar si un usuario es admin (evita recursión en RLS)
@@ -95,6 +106,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 ## 🖥️ Frontend (React + Vite + TypeScript)
 
 ### Páginas existentes:
+
 - `/login` - Inicio de sesión
 - `/registro` - Registro de nuevos usuarios
 - `/dashboard` - Panel principal (Fase 2E: mostrar datos reales)
@@ -108,6 +120,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 ### Funcionalidades por fase:
 
 #### ✅ Fase 2A: Usuarios y Permisos (COMPLETADA)
+
 - Tabla `perfiles_usuario` y `permisos_usuario` creadas
 - RLS configurado con policies
 - Página `/usuarios` funcional con datos reales
@@ -116,6 +129,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - Hook `useMyProfile()` para verificar permisos en toda la app
 
 #### ⏳ Fase 2B: Ubicaciones (PENDIENTE)
+
 - Crear tabla `ubicaciones` con RLS
 - Página `/ubicaciones` con dos pestañas: "Pasillos" y "Altos/Armarios"
 - Botón "Nueva ubicación" (protegido por permiso `puede_crear_ubicaciones`)
@@ -124,7 +138,8 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - Botones Editar/Desactivar (protegidos por `puede_editar_ubicaciones`)
 - Buscador por nombre
 
-####  Fase 2C: Productos con Código de Barras (PENDIENTE)
+#### Fase 2C: Productos con Código de Barras (PENDIENTE)
+
 - Crear tablas `categorias` y `productos` con RLS
 - Página `/productos` con tabla real
 - Botón "Nuevo producto" (protegido por `puede_crear_productos`)
@@ -136,6 +151,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - Botones Editar/Desactivar (protegidos por `puede_editar_productos`)
 
 #### ⏳ Fase 2D: Movimientos con Exportación (PENDIENTE)
+
 - Crear tablas `movimientos` y `stock` con RLS
 - Trigger `actualizar_stock()` automático
 - Página `/movimientos` con filtros: rango de fechas, tipo, producto, ubicación
@@ -146,6 +162,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 - Botones de exportación protegidos por `puede_exportar_movimientos`
 
 #### ⏳ Fase 2E: Dashboard con Datos Reales (PENDIENTE)
+
 - Tarjeta "Total de productos": COUNT de productos activos
 - Tarjeta "Stock bajo": COUNT de productos con stock < 10
 - Tarjeta "Movimientos hoy": COUNT de movimientos de hoy
@@ -157,23 +174,27 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 ## 🔐 Seguridad
 
 ### Autenticación:
+
 - Supabase Auth con email/contraseña
 - Sesión persistente en localStorage (opción "Recordar sesión")
 - Validación de email antes de activar cuenta
 
 ### Autorización:
+
 - Row Level Security (RLS) en TODAS las tablas
 - Policies basadas en rol y permisos granulares
 - Función `es_admin()` para verificar admin sin recursión
 - Trigger `proteger_campos_perfil()` para evitar auto-promoción
 
 ### Validaciones:
+
 - Código de barras: UNIQUE, no nulo, validación en frontend y backend
 - SKU: UNIQUE, no nulo, validación en frontend y backend
 - Stock: CHECK >= 0, no permitir salidas sin stock suficiente
 - Campos obligatorios validados con Zod + React Hook Form
 
 ### Auditoría:
+
 - Registro de quién cambió permisos/rol/estado de usuarios
 - Timestamps en todas las tablas (creado_en, actualizado_en)
 - Campo `creado_por` / `realizado_por` para trazabilidad
@@ -183,20 +204,24 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 ## 📦 Librerías necesarias
 
 ### Ya instaladas:
+
 - `@supabase/supabase-js` - Cliente de Supabase
 - `react-router-dom` - Navegación
 - `@tanstack/react-query` - Gestión de estado del servidor
 
 ### A instalar para Fase 2C:
+
 - `html5-qrcode` - Escáner de código de barras con cámara
 
 ### A instalar para Fase 2D:
+
 - `xlsx` - Exportar a Excel
 - `jspdf` - Exportar a PDF
 - `jspdf-autotable` - Tablas en PDF
 - `date-fns` - Manejo de fechas
 
 ### Recomendadas:
+
 - `react-hook-form` - Formularios
 - `zod` - Validación de schemas
 - `sonner` o `react-hot-toast` - Notificaciones toast
@@ -206,6 +231,7 @@ Aplicación web para gestión de inventario de una sección de pintura en almac�
 ## 🚀 Flujo de trabajo
 
 ### Desarrollo local:
+
 1. Clonar repo: `git clone https://github.com/recursos-email-pintureria/signup-complete-app`
 2. Instalar dependencias: `npm install`
 3. Crear archivo `.env` con:
