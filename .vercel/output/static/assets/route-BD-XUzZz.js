@@ -1,1 +1,0 @@
-import{c as e}from"./createLucideIcon-Dnkpt2Z7.js";import{n as t}from"./Match-DmQdWtCu.js";import{t as n}from"./AppLayout-F0RqN4PX.js";var r=e(),i=()=>(0,r.jsx)(n,{children:(0,r.jsx)(t,{})});export{i as component};
