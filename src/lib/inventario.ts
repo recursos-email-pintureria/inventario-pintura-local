@@ -636,3 +636,36 @@ export async function crearMovimiento(input: {
   }
   if (res.error) throw res.error;
 }
+
+export async function getTopUbicaciones(limit: number = 5): Promise<{ nombre: string; stock_total: number; unidad: string; porcentaje: number }[]> {
+  const { data, error } = await supabase
+    .from("stock")
+    .select("cantidad, ubicaciones!inner(id, nombre, tipo)");
+
+  if (error) throw error;
+
+  const ubicacionesMap = new Map<string, { nombre: string; tipo: string; total: number }>();
+  
+  (data ?? []).forEach((item: any) => {
+    const ubi = item.ubicaciones;
+    const key = ubi.id;
+    if (!ubicacionesMap.has(key)) {
+      ubicacionesMap.set(key, { nombre: ubi.nombre, tipo: ubi.tipo, total: 0 });
+    }
+    ubicacionesMap.get(key)!.total += Number(item.cantidad) || 0;
+  });
+
+  const ubicacionesArray = Array.from(ubicacionesMap.entries())
+    .map(([id, data]) => ({ id, ...data }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit);
+
+  const maxStock = ubicacionesArray[0]?.total || 1;
+  
+  return ubicacionesArray.map((u) => ({
+    nombre: u.nombre,
+    stock_total: u.total,
+    unidad: u.tipo === "armario" || u.tipo === "alto" ? "unid" : "gal",
+    porcentaje: Math.round((u.total / maxStock) * 100),
+  }));
+}

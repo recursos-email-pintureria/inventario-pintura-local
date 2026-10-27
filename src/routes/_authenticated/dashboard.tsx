@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { useDashboardKPIs, useMovimientosRecientes } from "@/lib/queries/dashboard";
+import { useDashboardKPIs, useMovimientosRecientes, useTopUbicaciones } from "@/lib/queries/dashboard";
 
 type TipoMovimiento = "entrada" | "salida" | "reposicion" | "ajuste";
 
@@ -21,14 +21,6 @@ const actividad7Dias = [
   { dia: "Mié", entradas: 42, salidas: 40 }, { dia: "Jue", entradas: 65, salidas: 48 },
   { dia: "Vie", entradas: 58, salidas: 50 }, { dia: "Sáb", entradas: 28, salidas: 20 },
   { dia: "Dom", entradas: 15, salidas: 12 },
-];
-
-const topUbicaciones = [
-  { nombre: "Pasillo A - Esmaltes", valor: 840, unidad: "gal", porcentaje: 92 },
-  { nombre: "Pasillo B - Látex", valor: 715, unidad: "gal", porcentaje: 78 },
-  { nombre: "Rack C - Solventes", valor: 520, unidad: "unid", porcentaje: 65 },
-  { nombre: "Bodega 2 - Impermeab.", valor: 430, unidad: "gal", porcentaje: 54 },
-  { nombre: "Estante D - Tintes", valor: 310, unidad: "unid", porcentaje: 42 },
 ];
 
 const tipoMovimientoConfig = {
@@ -55,6 +47,7 @@ function DashboardComponent() {
   const queryClient = useQueryClient();
   const { data: kpis, isLoading: isKpisLoading } = useDashboardKPIs();
   const { data: movimientos, isLoading: isMovLoading } = useMovimientosRecientes();
+  const { data: topUbicaciones, isLoading: isTopLoading } = useTopUbicaciones();
 
   const kpisData: KpiData[] = [
     { label: "Total Productos", value: isKpisLoading ? "..." : (kpis?.totalProductos ?? 0).toLocaleString(), sublabel: "productos activos", trend: "100% cat.", trendUp: true, icon: <Package className="h-5 w-5" />, color: "amber" },
@@ -65,6 +58,15 @@ function DashboardComponent() {
 
   const movimientosFiltrados = (movimientos || []).filter((m) => filtroTipo === "todos" || m.tipo === filtroTipo);
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+
+  // Datos de ubicaciones reales o placeholder mientras carga
+  const ubicacionesDisplay = isTopLoading 
+    ? [{ nombre: "Cargando...", stock_total: 0, unidad: "", porcentaje: 0 }]
+    : (topUbicaciones ?? []);
+
+  const promedioOcupacion = ubicacionesDisplay.length > 0
+    ? Math.round(ubicacionesDisplay.reduce((acc, u) => acc + u.porcentaje, 0) / ubicacionesDisplay.length)
+    : 0;
 
   return (
     <div className="space-y-6 p-6">
@@ -117,11 +119,11 @@ function DashboardComponent() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {topUbicaciones.map((ubicacion) => (
+            {ubicacionesDisplay.map((ubicacion) => (
               <div key={ubicacion.nombre} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-700">{ubicacion.nombre}</span>
-                  <span className="text-xs text-slate-500">{ubicacion.valor} {ubicacion.unidad} ({ubicacion.porcentaje}%)</span>
+                  <span className="text-xs text-slate-500">{ubicacion.stock_total} {ubicacion.unidad} ({ubicacion.porcentaje}%)</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-500 transition-all" style={{ width: `${ubicacion.porcentaje}%` }} />
@@ -131,7 +133,7 @@ function DashboardComponent() {
             <Separator className="my-2" />
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-600">Promedio Ocupación General</span>
-              <span className="font-semibold text-amber-700">66.2% Óptimo</span>
+              <span className="font-semibold text-amber-700">{promedioOcupacion}% Óptimo</span>
             </div>
           </CardContent>
         </Card>
@@ -162,7 +164,7 @@ function DashboardComponent() {
                 <Table>
                   <TableHeader><TableRow className="border-b border-slate-200 bg-slate-50/50">
                     <TableHead className="text-xs font-semibold uppercase text-slate-500">Fecha</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase text-slate-500">Producto & SKU</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase text-slate-500">Producto & Cód.</TableHead>
                     <TableHead className="text-xs font-semibold uppercase text-slate-500">Tipo</TableHead>
                     <TableHead className="text-xs font-semibold uppercase text-slate-500 text-right">Cantidad</TableHead>
                     <TableHead className="text-xs font-semibold uppercase text-slate-500">Ubicación</TableHead>
@@ -177,7 +179,7 @@ function DashboardComponent() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">{mov.usuarioInicial}</div>
-                              <div><p className="font-medium text-slate-900">{mov.producto}</p><p className="font-mono text-xs text-slate-500">SKU: {mov.sku}</p></div>
+                              <div><p className="font-medium text-slate-900">{mov.producto}</p><p className="font-mono text-xs text-slate-500">Cód.: {mov.sku}</p></div>
                             </div>
                           </TableCell>
                           <TableCell><MovementBadge tipo={mov.tipo} /></TableCell>

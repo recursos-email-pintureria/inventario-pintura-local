@@ -61,8 +61,8 @@ async function fetchMovimientosRecientes(): Promise<MovimientoReciente[]> {
       const hora = horaRaw ? horaRaw.slice(0, 5) : "00:00";
 
       // LEER LAS PROPIEDADES CORRECTAS que devuelve getMovimientos()
-      const nombreProducto = m.producto?.nombre || "Producto";
-      const skuProducto = m.producto?.sku || "S/N";
+      const nombreProducto = m.producto?.nombre || "Producto sin nombre";
+      const skuProducto = m.producto?.sku || "Sin código";
       const nombreUbicacion = m.ubicacion?.codigo || m.ubicacion?.nombre || "Sin ubicación";
       const nombreUsuario = m.usuario?.nombre || "Sistema";
 
@@ -97,5 +97,26 @@ export function useMovimientosRecientes() {
     queryFn: fetchMovimientosRecientes,
     refetchInterval: 30_000,
     staleTime: 15_000,
+  });
+}
+
+export interface UbicacionTop {
+  nombre: string;
+  stock_total: number;
+  unidad: string;
+  porcentaje: number;
+}
+
+async function fetchTopUbicaciones(): Promise<UbicacionTop[]> {
+  const { getTopUbicaciones } = await import("@/lib/inventario");
+  return await getTopUbicaciones(5);
+}
+
+export function useTopUbicaciones() {
+  return useQuery({
+    queryKey: ["dashboard", "top-ubicaciones"],
+    queryFn: fetchTopUbicaciones,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 }
