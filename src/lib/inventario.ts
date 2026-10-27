@@ -512,21 +512,22 @@ export async function getUbicaciones(): Promise<UbicacionSimple[]> {
  * con consultas paralelas (evita depender de nombres de relaciones embed).
  */
 export async function getMovimientos(): Promise<MovimientoDetallado[]> {
+  // 1. Obtener movimientos usando los nombres REALES de las columnas
   let movRes = await supabase
     .from("movimientos")
     .select("*")
-    .order("created_at", { ascending: false })
+    .order("fecha_movimiento", { ascending: false })
     .limit(500);
 
-  // Resiliencia: si la columna de fecha se llama distinto, reintentar sin order
-  if (movRes.error && /created_at/.test(movRes.error.message)) {
+  if (movRes.error && /fecha_movimiento/.test(movRes.error.message)) {
     movRes = await supabase.from("movimientos").select("*").limit(500);
   }
   if (movRes.error) throw movRes.error;
 
+  // 2. Obtener productos, ubicaciones y perfiles en paralelo
   const [prodRes, ubiRes, perRes] = await Promise.all([
-    supabase.from("productos").select("id, nombre, sku"),
-    supabase.from("ubicaciones").select("*"),
+    supabase.from("productos").select("id, nombre, sku, codigo_barras"),
+    supabase.from("ubicaciones").select("id, nombre, tipo, descripcion"),
     supabase.from("perfiles_usuario").select("*"),
   ]);
 
@@ -534,18 +535,27 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
   const ubiMap = new Map((ubiRes.data ?? []).map((u: any) => [u.id, u]));
   const perMap = new Map((perRes.data ?? []).map((u: any) => [u.id, u]));
 
+  // 3. Mapear usando los nombres REALES: id_producto, id_ubicacion, realizado_por, fecha_movimiento
   const filas: MovimientoDetallado[] = (movRes.data ?? []).map((m: any) => {
-    const p = prodMap.get(m.producto_id);
-    const u = ubiMap.get(m.ubicacion_id);
-    const per = m.usuario_id ? perMap.get(m.usuario_id) : undefined;
+    const p = prodMap.get(m.id_producto); // ✅ id_producto (no producto_id)
+    const u = ubiMap.get(m.id_ubicacion); // ✅ id_ubicacion (no ubicacion_id)
+    const per = m.realizado_por ? perMap.get(m.realizado_por) : undefined; // ✅ realizado_por (no usuario_id)
+    
     return {
       id: m.id,
       tipo: m.tipo,
       cantidad: Number(m.cantidad),
-      fecha: m.created_at ?? m.fecha ?? new Date().toISOString(),
-      motivo: m.motivo ?? null,
-      producto: p ? { id: p.id, nombre: p.nombre, sku: p.sku ?? null } : null,
-      ubicacion: u ? { id: u.id, codigo: u.codigo ?? u.nombre ?? String(u.id).slice(0, 8) } : null,
+      fecha: m.fecha_movimiento ?? new Date().toISOString(), // ✅ fecha_movimiento (no created_at)
+      motivo: m.notas ?? null, // ✅ notas (no motivo)
+      producto: p ? { 
+        id: p.id, 
+        nombre: p.nombre, 
+        sku: p.codigo_barras ?? p.sku ?? "S/N" // ✅ codigo_barras primero
+      } : null,
+      ubicacion: u ? { 
+        id: u.id, 
+        codigo: u.nombre ?? String(u.id).slice(0, 8) // ✅ nombre real de la ubicación
+      } : null,
       usuario: per
         ? {
             id: per.id,
@@ -555,7 +565,6 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
     };
   });
 
-  // Orden estable por fecha descendente en cliente
   return filas.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 }
 
