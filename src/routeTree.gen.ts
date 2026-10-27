@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
@@ -19,6 +18,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AuthenticatedCategoriasRouteImport } from './routes/_authenticated/categorias'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedMovimientosRouteImport } from './routes/_authenticated/movimientos'
 import { Route as AuthenticatedProductosRouteImport } from './routes/_authenticated/productos'
 import { Route as AuthenticatedUbicacionesRouteImport } from './routes/_authenticated/ubicaciones'
@@ -31,11 +31,6 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -74,6 +69,11 @@ const AuthenticatedConfiguracionRoute =
     path: '/configuracion',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMovimientosRoute =
   AuthenticatedMovimientosRouteImport.update({
     id: '/movimientos',
@@ -99,7 +99,6 @@ const AuthenticatedUsuariosRoute = AuthenticatedUsuariosRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -107,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof VerifyEmailRoute
   '/categorias': typeof AuthenticatedCategoriasRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/movimientos': typeof AuthenticatedMovimientosRoute
   '/productos': typeof AuthenticatedProductosRoute
   '/ubicaciones': typeof AuthenticatedUbicacionesRoute
@@ -114,7 +114,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -122,6 +121,7 @@ export interface FileRoutesByTo {
   '/verify-email': typeof VerifyEmailRoute
   '/categorias': typeof AuthenticatedCategoriasRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/movimientos': typeof AuthenticatedMovimientosRoute
   '/productos': typeof AuthenticatedProductosRoute
   '/ubicaciones': typeof AuthenticatedUbicacionesRoute
@@ -131,7 +131,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -139,6 +138,7 @@ export interface FileRoutesById {
   '/verify-email': typeof VerifyEmailRoute
   '/_authenticated/categorias': typeof AuthenticatedCategoriasRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/movimientos': typeof AuthenticatedMovimientosRoute
   '/_authenticated/productos': typeof AuthenticatedProductosRoute
   '/_authenticated/ubicaciones': typeof AuthenticatedUbicacionesRoute
@@ -148,7 +148,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/dashboard'
     | '/forgot-password'
     | '/login'
     | '/register'
@@ -156,6 +155,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/categorias'
     | '/configuracion'
+    | '/dashboard'
     | '/movimientos'
     | '/productos'
     | '/ubicaciones'
@@ -163,7 +163,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/dashboard'
     | '/forgot-password'
     | '/login'
     | '/register'
@@ -171,6 +170,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/categorias'
     | '/configuracion'
+    | '/dashboard'
     | '/movimientos'
     | '/productos'
     | '/ubicaciones'
@@ -179,7 +179,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
-    | '/dashboard'
     | '/forgot-password'
     | '/login'
     | '/register'
@@ -187,6 +186,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/_authenticated/categorias'
     | '/_authenticated/configuracion'
+    | '/_authenticated/dashboard'
     | '/_authenticated/movimientos'
     | '/_authenticated/productos'
     | '/_authenticated/ubicaciones'
@@ -196,7 +196,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -218,13 +217,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -276,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConfiguracionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/movimientos': {
       id: '/_authenticated/movimientos'
       path: '/movimientos'
@@ -310,6 +309,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCategoriasRoute: typeof AuthenticatedCategoriasRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMovimientosRoute: typeof AuthenticatedMovimientosRoute
   AuthenticatedProductosRoute: typeof AuthenticatedProductosRoute
   AuthenticatedUbicacionesRoute: typeof AuthenticatedUbicacionesRoute
@@ -319,6 +319,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCategoriasRoute: AuthenticatedCategoriasRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMovimientosRoute: AuthenticatedMovimientosRoute,
   AuthenticatedProductosRoute: AuthenticatedProductosRoute,
   AuthenticatedUbicacionesRoute: AuthenticatedUbicacionesRoute,
@@ -331,7 +332,6 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
