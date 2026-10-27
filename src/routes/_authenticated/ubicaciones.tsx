@@ -1,33 +1,51 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   ArrowLeftRight,
+  Warehouse,
   Archive,
   Layers,
   Package,
   Shuffle,
-  Warehouse,
   Plus,
-  Search,
-  Filter,
+  Pencil,
+  Trash2,
   ChevronRight,
   ChevronDown,
-  Edit2,
-  Barcode,
-  Eye,
-  SlidersHorizontal,
-  CheckCircle2,
-  AlertTriangle,
-  Boxes,
-  MapPin,
+  Search,
+  Camera,
+  RotateCcw,
+  LayoutGrid,
   List,
-  FolderTree,
-  MoreVertical,
-  X,
-  Trash2,
+  FileText,
+  FileSpreadsheet,
+  AlertTriangle,
+  CheckCircle2,
+  Boxes,
+  Edit3,
+  Eye,
+  Scale,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { KPICard, KpiData } from "@/components/ui/kpi-card";
+import { BarcodeScanner } from "@/components/ui/barcode-scanner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -46,490 +64,356 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+import {
+  getSecciones,
+  getUbicaciones,
+  crearUbicacion,
+  actualizarUbicacion,
+  desactivarUbicacion,
+} from "@/lib/ubicaciones";
+import type { Ubicacion } from "@/lib/ubicaciones";
+import { getProductos } from "@/lib/inventario";
+import type { Producto } from "@/lib/tipos";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
   component: UbicacionesPage,
 });
 
-// Tipos de ubicación con jerarquía estricta
-export type TipoUbicacion =
-  | "seccion"
-  | "pasillo"
-  | "reserva"
-  | "armario"
-  | "alto"
-  | "caja"
-  | "cross";
+// ============================================================================
+// TIPOS DE UBICACIÓN
+// ============================================================================
 
-export interface ProductoEnUbicacion {
-  id: string;
-  sku: string;
-  nombre: string;
-  categoria: string;
-  cantidad: number;
-  stock_minimo: number;
-}
-
-export interface UbicacionItem {
-  id: string;
-  codigo: string;
-  nombre: string;
-  tipo: TipoUbicacion;
-  nivel: 0 | 1 | 2;
-  id_padre?: string | null;
-  descripcion?: string;
-  lateral?: "L" | "R" | "C";
-  piso?: number;
-  capacidad_max?: number;
-  peso_max_kg?: number;
-  activo: boolean;
-  productos: ProductoEnUbicacion[];
-  subtitulo?: string;
-  porcentaje_ocupacion?: number;
-}
-
-// Configuración visual estricta de niveles y colores
-export const CONFIG_JERARQUIA: Record<
-  TipoUbicacion,
-  {
-    label: string;
-    nivel: 0 | 1 | 2;
-    icon: typeof Building2;
-    badgeClass: string;
-    borderClass: string;
-    bgHoverClass: string;
-    descripcion: string;
-  }
+const TIPO_INFO: Record<
+  Ubicacion["tipo"],
+  { label: string; icon: React.ReactNode; badge: string; color: string }
 > = {
   seccion: {
     label: "Sección",
-    nivel: 0,
-    icon: Building2,
-    badgeClass: "bg-indigo-100 text-indigo-800 border-indigo-200",
-    borderClass: "border-indigo-300",
-    bgHoverClass: "hover:bg-indigo-50/60",
-    descripcion: "Nivel 0: Área principal (No requiere padre)",
+    icon: <Building2 className="w-4 h-4" />,
+    badge: "bg-indigo-50 text-indigo-800 border-indigo-200",
+    color: "indigo",
   },
   pasillo: {
     label: "Pasillo",
-    nivel: 1,
-    icon: ArrowLeftRight,
-    badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
-    borderClass: "border-blue-300",
-    bgHoverClass: "hover:bg-blue-50/60",
-    descripcion: "Nivel 1: Corredor principal (No requiere padre)",
+    icon: <ArrowLeftRight className="w-4 h-4" />,
+    badge: "bg-blue-50 text-blue-800 border-blue-200",
+    color: "blue",
   },
   reserva: {
     label: "Reserva",
-    nivel: 1,
-    icon: Warehouse,
-    badgeClass: "bg-gray-100 text-gray-800 border-gray-200",
-    borderClass: "border-gray-300",
-    bgHoverClass: "hover:bg-gray-50/60",
-    descripcion: "Nivel 1: Zona de carga o palets (No requiere padre)",
+    icon: <Warehouse className="w-4 h-4" />,
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+    color: "slate",
   },
   armario: {
     label: "Armario",
-    nivel: 2,
-    icon: Archive,
-    badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    borderClass: "border-emerald-300",
-    bgHoverClass: "hover:bg-emerald-50/60",
-    descripcion: "Nivel 2: Estantería media (Requiere Pasillo)",
+    icon: <Archive className="w-4 h-4" />,
+    badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    color: "emerald",
   },
   alto: {
     label: "Alto",
-    nivel: 2,
-    icon: Layers,
-    badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
-    borderClass: "border-amber-300",
-    bgHoverClass: "hover:bg-amber-50/60",
-    descripcion: "Nivel 2: Nivel superior / altillo (Requiere Pasillo)",
+    icon: <Layers className="w-4 h-4" />,
+    badge: "bg-amber-50 text-amber-800 border-amber-200",
+    color: "amber",
   },
   caja: {
     label: "Caja",
-    nivel: 2,
-    icon: Package,
-    badgeClass: "bg-pink-100 text-pink-800 border-pink-200",
-    borderClass: "border-pink-300",
-    bgHoverClass: "hover:bg-pink-50/60",
-    descripcion: "Nivel 2: Cajonera o cubeta específica (Requiere Pasillo)",
+    icon: <Package className="w-4 h-4" />,
+    badge: "bg-rose-50 text-rose-800 border-rose-200",
+    color: "rose",
   },
   cross: {
-    label: "Cross-docking",
-    nivel: 2,
-    icon: Shuffle,
-    badgeClass: "bg-purple-100 text-purple-800 border-purple-200",
-    borderClass: "border-purple-300",
-    bgHoverClass: "hover:bg-purple-50/60",
-    descripcion: "Nivel 2: Cruce de alta rotación (Requiere Pasillo)",
+    label: "Cross",
+    icon: <Shuffle className="w-4 h-4" />,
+    badge: "bg-purple-50 text-purple-800 border-purple-200",
+    color: "purple",
   },
 };
 
-// Datos Mock exactos al diseño Stitch
-const UBICACIONES_INICIALES: UbicacionItem[] = [
-  {
-    id: "sec-1",
-    codigo: "SEC-EXT",
-    nombre: "Pintura Exterior & Revestimientos",
-    tipo: "seccion",
-    nivel: 0,
-    activo: true,
-    subtitulo: "2 Pasillos · 5 Posiciones · 183 uds en stock",
-    productos: [],
-  },
-  {
-    id: "pas-a1",
-    codigo: "A1",
-    nombre: "Pasillo A1 (Látex & Fachadas)",
-    tipo: "pasillo",
-    nivel: 1,
-    id_padre: "sec-1",
-    activo: true,
-    subtitulo: "Estanterías de alta resistencia",
-    productos: [],
-  },
-  {
-    id: "pos-a1-01",
-    codigo: "A1-01",
-    nombre: "Armario A1-01",
-    tipo: "armario",
-    nivel: 2,
-    id_padre: "pas-a1",
-    lateral: "R",
-    piso: 1,
-    capacidad_max: 100,
-    peso_max_kg: 400,
-    porcentaje_ocupacion: 92,
-    activo: true,
-    subtitulo: "3 productos · 92 uds (Látex Exterior 15L, Esmalte...)",
-    productos: [
-      { id: "p1", sku: "LAT-4001-WHT", nombre: "Látex Extracubriente Blanco Mate 15L", categoria: "Pinturas de Exterior", cantidad: 48, stock_minimo: 20 },
-      { id: "p2", sku: "ESM-1020-BLK", nombre: "Esmalte Sintético Negro Satinado 4L", categoria: "Esmaltes & Sintéticos", cantidad: 24, stock_minimo: 10 },
-      { id: "p3", sku: "LAT-4002-GRY", nombre: "Revestimiento Elastomérico Gris Cemento 10L", categoria: "Pinturas de Exterior", cantidad: 20, stock_minimo: 15 },
-    ],
-  },
-  {
-    id: "pos-a1-02",
-    codigo: "A1-02",
-    nombre: "Alto A1-02",
-    tipo: "alto",
-    nivel: 2,
-    id_padre: "pas-a1",
-    lateral: "R",
-    piso: 2,
-    capacidad_max: 80,
-    peso_max_kg: 350,
-    porcentaje_ocupacion: 80,
-    activo: true,
-    subtitulo: "2 productos · 67 uds (Selladores, Hidrorepelentes)",
-    productos: [
-      { id: "p4", sku: "SEL-3108-ACR", nombre: "Primer Acrílico Sellador Antihumedad 5L", categoria: "Pinturas & Selladores", cantidad: 37, stock_minimo: 15 },
-      { id: "p5", sku: "HID-9010-TRN", nombre: "Hidrorepelente Siliconado Fachadas 4L", categoria: "Pinturas de Exterior", cantidad: 30, stock_minimo: 10 },
-    ],
-  },
-  {
-    id: "pos-a1-03",
-    codigo: "A1-03",
-    nombre: "Caja A1-03",
-    tipo: "caja",
-    nivel: 2,
-    id_padre: "pas-a1",
-    lateral: "L",
-    piso: 1,
-    capacidad_max: 60,
-    peso_max_kg: 150,
-    porcentaje_ocupacion: 40,
-    activo: true,
-    subtitulo: "2 productos · 24 uds (Brochas Pro, Rodillos 25cm)",
-    productos: [
-      { id: "p6", sku: "HER-8820-ROD", nombre: "Rodillo Antigota Microfibra Pro 25cm", categoria: "Herramientas", cantidad: 14, stock_minimo: 20 },
-      { id: "p7", sku: "HER-1102-BRO", nombre: "Brocha Cerda Natural Pintor 3 pulgadas", categoria: "Herramientas", cantidad: 10, stock_minimo: 15 },
-    ],
-  },
-  {
-    id: "pas-a2",
-    codigo: "A2",
-    nombre: "Pasillo A2 (Esmaltes Sintéticos)",
-    tipo: "pasillo",
-    nivel: 1,
-    id_padre: "sec-1",
-    activo: true,
-    subtitulo: "Líneas industriales y solventes livianos",
-    productos: [],
-  },
-  {
-    id: "pos-a2-01",
-    codigo: "A2-01",
-    nombre: "Armario A2-01",
-    tipo: "armario",
-    nivel: 2,
-    id_padre: "pas-a2",
-    lateral: "R",
-    piso: 1,
-    capacidad_max: 160,
-    peso_max_kg: 500,
-    porcentaje_ocupacion: 88,
-    activo: true,
-    subtitulo: "2 productos · 145 uds (Acabado Brillo, Mate y Satinad...)",
-    productos: [
-      { id: "p8", sku: "ESM-2040-BLU", nombre: "Esmalte Marino Azul Cobalto 4L", categoria: "Esmaltes & Sintéticos", cantidad: 65, stock_minimo: 20 },
-      { id: "p9", sku: "ESM-3011-RED", nombre: "Antióxido Minio Alquídico 4L", categoria: "Esmaltes & Sintéticos", cantidad: 80, stock_minimo: 25 },
-    ],
-  },
-  {
-    id: "sec-2",
-    codigo: "SEC-QUI",
-    nombre: "Droguería Química & Disolventes",
-    tipo: "seccion",
-    nivel: 0,
-    activo: true,
-    subtitulo: "1 Pasillo · 3 Posiciones Especiales · Nivel Seguridad 2",
-    productos: [],
-  },
-  {
-    id: "pas-b1",
-    codigo: "B1",
-    nombre: "Pasillo B1 (Disolventes Inflamables)",
-    tipo: "pasillo",
-    nivel: 1,
-    id_padre: "sec-2",
-    activo: true,
-    subtitulo: "Ventilación forzada y bandejas de derrame",
-    productos: [],
-  },
-  {
-    id: "pos-b1-01",
-    codigo: "B1-01",
-    nombre: "Cross B1-01",
-    tipo: "cross",
-    nivel: 2,
-    id_padre: "pas-b1",
-    lateral: "C",
-    piso: 1,
-    capacidad_max: 90,
-    peso_max_kg: 600,
-    porcentaje_ocupacion: 95,
-    activo: true,
-    subtitulo: "2 productos · 78 uds (Aguarrás Puro, Thinner Universal ...)",
-    productos: [
-      { id: "p10", sku: "SOL-9902-STD", nombre: "Thinner Universal Extra Calidad 10L", categoria: "Solventes & Químicos", cantidad: 42, stock_minimo: 20 },
-      { id: "p11", sku: "SOL-1120-AGU", nombre: "Aguarrás Mineral Desodorizado 5L", categoria: "Solventes & Químicos", cantidad: 36, stock_minimo: 15 },
-    ],
-  },
-  {
-    id: "res-gen",
-    codigo: "RES-01",
-    nombre: "Reserva General & Carga Palets",
-    tipo: "reserva",
-    nivel: 1,
-    activo: true,
-    porcentaje_ocupacion: 0,
-    subtitulo: "0 palets activos (Área libre para descarga de camión)",
-    productos: [],
-  },
-];
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 function UbicacionesPage() {
-  const [ubicaciones, setUbicaciones] = useState<UbicacionItem[]>(UBICACIONES_INICIALES);
-  const [vista, setVista] = useState<"arbol" | "lista">("arbol");
-  const [busqueda, setBusqueda] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState<string>("todos");
+  const queryClient = useQueryClient();
 
-  const [expandidos, setExpandidos] = useState<Record<string, boolean>>({
-    "sec-1": true,
-    "pas-a1": true,
-    "pas-a2": true,
-    "sec-2": true,
-    "pas-b1": true,
-    "res-gen": true,
+  // 🔌 Consultas reales
+  const { data: secciones = [], isLoading: cargandoSecciones } = useQuery({
+    queryKey: ["secciones"],
+    queryFn: getSecciones,
   });
 
-  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState<UbicacionItem | null>(null);
-  const [dialogProductosAbierto, setDialogProductosAbierto] = useState(false);
+  const { data: ubicaciones = [], isLoading: cargandoUbicaciones } = useQuery({
+    queryKey: ["ubicaciones"],
+    queryFn: getUbicaciones,
+  });
 
-  const [dialogAjusteAbierto, setDialogAjusteAbierto] = useState(false);
-  const [ubicacionParaAjuste, setUbicacionParaAjuste] = useState<UbicacionItem | null>(null);
-  const [productoAjusteId, setProductoAjusteId] = useState("");
-  const [tipoMovimiento, setTipoMovimiento] = useState<"entrada" | "salida" | "reposicion" | "ajuste">("reposicion");
-  const [cantidadAjuste, setCantidadAjuste] = useState<number>(10);
-  const [motivoAjuste, setMotivoAjuste] = useState("Recepción de reposición habitual");
+  const { data: productos = [] } = useQuery({
+    queryKey: ["productos"],
+    queryFn: getProductos,
+  });
 
-  const [ubicacionParaEliminar, setUbicacionParaEliminar] = useState<UbicacionItem | null>(null);
-  const [dialogEliminarAbierto, setDialogEliminarAbierto] = useState(false);
+  // Vista: árbol o lista
+  const [vista, setVista] = useState<"arbol" | "lista">("arbol");
+  const [colapsado, setColapsado] = useState(false);
 
-  const [formNombre, setFormNombre] = useState("Armario A1-04");
-  const [formTipo, setFormTipo] = useState<TipoUbicacion>("armario");
-  const [formPadre, setFormPadre] = useState("pas-a1");
-  const [formLateral, setFormLateral] = useState<"L" | "R" | "C">("R");
-  const [formPiso, setFormPiso] = useState<number>(1);
-  const [formCapMax, setFormCapMax] = useState<number>(120);
-  const [formPesoMax, setFormPesoMax] = useState<number>(450);
+  // Filtros
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<Ubicacion["tipo"] | "todos">("todos");
 
-  const [slotSeleccionado, setSlotSeleccionado] = useState<string>("A1-01");
+  // Modal dinámico
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [modalModo, setModalModo] = useState<"crear" | "editar" | "ver">("crear");
+  const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState<Ubicacion | null>(null);
+
+  // Expandir niveles
+  const [expandirNivel, setExpandirNivel] = useState<Set<string>>(new Set());
+
+  // Scanner
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  // Formulario
+  const [formTipo, setFormTipo] = useState<Ubicacion["tipo"]>("pasillo");
+  const [formNombre, setFormNombre] = useState("");
+  const [formDescripcion, setFormDescripcion] = useState("");
+  const [formPadre, setFormPadre] = useState("");
+  const [formPosicionLateral, setFormPosicionLateral] = useState("");
+  const [formPosicionLongitudinal, setFormPosicionLongitudinal] = useState("");
+  const [formNumero, setFormNumero] = useState<number | "">("");
+
+  // Desactivar
+  const [ubicacionADesactivar, setUbicacionADesactivar] = useState<Ubicacion | null>(null);
+
+  // ============================================================================
+  // MUTACIONES
+  // ============================================================================
+  const mutationCrear = useMutation({
+    mutationFn: crearUbicacion,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ubicaciones"] });
+      toast.success("Ubicación creada correctamente");
+    },
+    onError: (e: Error) => toast.error(e.message || "Error al crear"),
+  });
+
+  const mutationActualizar = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Ubicacion> }) =>
+      actualizarUbicacion(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ubicaciones"] });
+      toast.success("Ubicación actualizada correctamente");
+    },
+    onError: (e: Error) => toast.error(e.message || "Error al actualizar"),
+  });
+
+  const mutationDesactivar = useMutation({
+    mutationFn: desactivarUbicacion,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ubicaciones"] });
+      toast.success("Ubicación desactivada");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+  const abrirModalCrear = () => {
+    setModalModo("crear");
+    setUbicacionSeleccionada(null);
+    setFormTipo("pasillo");
+    setFormNombre("");
+    setFormDescripcion("");
+    setFormPadre("");
+    setFormPosicionLateral("");
+    setFormPosicionLongitudinal("");
+    setFormNumero("");
+    setModalAbierto(true);
+  };
+
+  const abrirModalEditar = (ubicacion: Ubicacion) => {
+    setModalModo("editar");
+    setUbicacionSeleccionada(ubicacion);
+    setFormTipo(ubicacion.tipo);
+    setFormNombre(ubicacion.nombre);
+    setFormDescripcion(ubicacion.descripcion || "");
+    setFormPadre(ubicacion.id_ubicacion_padre || "");
+    setFormPosicionLateral(ubicacion.posicion_lateral || "");
+    setFormPosicionLongitudinal(ubicacion.posicion_longitudinal || "");
+    setFormNumero(ubicacion.numero || "");
+    setModalAbierto(true);
+  };
+
+  const abrirModalVer = (ubicacion: Ubicacion) => {
+    setModalModo("ver");
+    setUbicacionSeleccionada(ubicacion);
+    setModalAbierto(true);
+  };
+
+  const handleCrear = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNombre.trim()) {
+      toast.error("El nombre es obligatorio");
+      return;
+    }
+    mutationCrear.mutate({
+      nombre: formNombre.trim(),
+      tipo: formTipo,
+      descripcion: formDescripcion.trim() || null,
+      id_ubicacion_padre: formPadre || null,
+      posicion_lateral: formPosicionLateral || null,
+      posicion_longitudinal: formPosicionLongitudinal || null,
+      numero: formNumero === "" ? null : Number(formNumero),
+    });
+    setModalAbierto(false);
+  };
+
+  const handleEditar = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ubicacionSeleccionada) return;
+    mutationActualizar.mutate({
+      id: ubicacionSeleccionada.id,
+      updates: {
+        nombre: formNombre.trim(),
+        tipo: formTipo,
+        descripcion: formDescripcion.trim() || null,
+        posicion_lateral: formPosicionLateral || null,
+        posicion_longitudinal: formPosicionLongitudinal || null,
+        numero: formNumero === "" ? null : Number(formNumero),
+      },
+    });
+    setModalAbierto(false);
+  };
+
+  const confirmarDesactivar = () => {
+    if (!ubicacionADesactivar) return;
+    mutationDesactivar.mutate(ubicacionADesactivar.id);
+    setUbicacionADesactivar(null);
+  };
 
   const toggleExpandir = (id: string) => {
-    setExpandidos((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const todosExpandidos = useMemo(() => {
-    return Object.values(expandidos).every(Boolean);
-  }, [expandidos]);
-
-  const toggleExpandirColapsarTodo = () => {
-    const nuevoEstado = !todosExpandidos;
-    const nuevoMapa: Record<string, boolean> = {};
-    ubicaciones.forEach((u) => {
-      nuevoMapa[u.id] = nuevoEstado;
+    setExpandirNivel((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
     });
-    setExpandidos(nuevoMapa);
-    toast.info(nuevoEstado ? "Todas las ubicaciones expandidas" : "Todas las ubicaciones colapsadas");
   };
 
-  const secciones = useMemo(() => ubicaciones.filter((u) => u.tipo === "seccion"), [ubicaciones]);
-  const reservas = useMemo(() => ubicaciones.filter((u) => u.tipo === "reserva"), [ubicaciones]);
+  const colapsarTodo = () => {
+    setExpandirNivel(new Set());
+    setColapsado(true);
+    setTimeout(() => setColapsado(false), 100);
+  };
 
-  const pasillosDeSeccion = (idSeccion: string) =>
-    ubicaciones.filter((u) => u.tipo === "pasillo" && u.id_padre === idSeccion);
-
-  const posicionesDePasillo = (idPasillo: string) =>
-    ubicaciones.filter(
-      (u) => u.id_padre === idPasillo && ["armario", "alto", "caja", "cross"].includes(u.tipo)
-    );
-
+  // ============================================================================
+  // FILTRADO
+  // ============================================================================
   const ubicacionesFiltradas = useMemo(() => {
-    return ubicaciones.filter((item) => {
-      const coincideBusqueda =
-        busqueda === "" ||
-        item.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        item.codigo.toLowerCase().includes(busqueda.toLowerCase());
-      const coincideTipo = filtroTipo === "todos" || item.tipo === filtroTipo;
-      return coincideBusqueda && coincideTipo;
+    return ubicaciones.filter((u) => {
+      const q = busqueda.toLowerCase().trim();
+      const coincideTexto =
+        !q ||
+        u.nombre.toLowerCase().includes(q) ||
+        (u.descripcion || "").toLowerCase().includes(q);
+      const coincideTipo = filtroTipo === "todos" || u.tipo === filtroTipo;
+      return coincideTexto && coincideTipo;
     });
   }, [ubicaciones, busqueda, filtroTipo]);
 
-  const pasillosDisponibles = useMemo(
-    () => ubicaciones.filter((u) => u.tipo === "pasillo"),
-    [ubicaciones]
-  );
+  // ============================================================================
+  // KPIs
+  // ============================================================================
+  const kpisData: KpiData[] = useMemo(() => {
+    const total = ubicaciones.length;
+    const seccionesCount = secciones.length;
+    const pasillosCount = ubicaciones.filter((u) => u.tipo === "pasillo").length;
+    const posicionesCount = ubicaciones.filter((u) =>
+      ["armario", "alto", "caja", "cross"].includes(u.tipo)
+    ).length;
 
-  const handleGuardarUbicacion = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formNombre.trim()) {
-      toast.error("El nombre de la ubicación es obligatorio");
-      return;
-    }
+    return [
+      {
+        label: "Topología de Nave",
+        value: total,
+        sublabel: `${seccionesCount} Secciones • ${pasillosCount} Pasillos • ${posicionesCount} Posiciones`,
+        icon: <Building2 className="h-5 w-5" />,
+        color: "blue",
+      },
+      {
+        label: "Capacidad Ocupada",
+        value: 92,
+        sublabel: "Capacidad crítica",
+        alert: "Alerta: Pasillo B",
+        icon: <AlertTriangle className="h-5 w-5" />,
+        color: "rose",
+      },
+      {
+        label: "Espacios Disponibles",
+        value: 8,
+        sublabel: "huecos libres",
+        icon: <CheckCircle2 className="h-5 w-5" />,
+        color: "emerald",
+      },
+    ];
+  }, [secciones, ubicaciones]);
 
-    const config = CONFIG_JERARQUIA[formTipo];
-    if (config.nivel === 2 && !formPadre) {
-      toast.error("Las ubicaciones de Nivel 2 requieren un Pasillo padre");
-      return;
-    }
+  // ============================================================================
+  // EXPORT PDF
+  // ============================================================================
+  const exportarPDF = (ubicacion: Ubicacion) => {
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(`Ubicación: ${ubicacion.nombre}`, 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Tipo: ${TIPO_INFO[ubicacion.tipo].label}`, 14, 22);
+    doc.text(`Generado: ${new Date().toLocaleString("es-ES")}`, 14, 27);
 
-    const nuevoId = `loc-${Date.now()}`;
-    const nuevoCodigo = formNombre.toUpperCase().replace(/\s+/g, "-").slice(0, 8);
+    const productosEnUbicacion = productos.filter((p) => {
+      // Simulación: en producción vendría de getStockPorUbicacion
+      return true;
+    });
 
-    const nuevaUbi: UbicacionItem = {
-      id: nuevoId,
-      codigo: nuevoCodigo,
-      nombre: formNombre,
-      tipo: formTipo,
-      nivel: config.nivel,
-      id_padre: config.nivel === 2 ? formPadre : null,
-      lateral: formLateral,
-      piso: formPiso,
-      capacidad_max: formCapMax,
-      peso_max_kg: formPesoMax,
-      porcentaje_ocupacion: 0,
-      activo: true,
-      subtitulo: "0 productos · 0 uds (Posición recién creada)",
-      productos: [],
-    };
+    autoTable(doc, {
+      startY: 32,
+      head: [["SKU", "Producto", "Stock", "Unidad"]],
+      body: productosEnUbicacion.map((p) => [
+        p.sku || "-",
+        p.nombre,
+        String(p.stock_actual),
+        p.unidad || "unid",
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [210, 77, 9] },
+    });
 
-    setUbicaciones((prev) => [...prev, nuevaUbi]);
-    if (formPadre) {
-      setExpandidos((prev) => ({ ...prev, [formPadre]: true }));
-    }
-
-    toast.success(`Ubicación "${formNombre}" creada exitosamente`);
-    setFormNombre("");
+    doc.save(`ubicacion_${ubicacion.nombre.replace(/\s+/g, "_")}.pdf`);
+    toast.success("PDF exportado");
   };
 
-    
-    // Manejar Ajuste de Stock respetando la regla de arquitectura (INSERT en movimientos)
-  const handleAplicarAjuste = () => {
-    if (!ubicacionParaAjuste) return;
-    if (!productoAjusteId) {
-      toast.error("Selecciona un producto para ajustar");
-      return;
-    }
-    if (cantidadAjuste <= 0) {
-      toast.error("La cantidad debe ser mayor que cero");
-      return;
-    }
-
-    // Actualizamos el mock simulando el trigger de Supabase
-    setUbicaciones((prev) =>
-      prev.map((u) => {
-        if (u.id === ubicacionParaAjuste.id) {
-          const prods = [...u.productos];
-          
-          // ✅ Usamos .find() para que TypeScript sepa con certeza que 'prod' existe
-          const prod = prods.find((p) => p.id === productoAjusteId);
-          
-          if (prod) {
-            let nuevaCant = prod.cantidad;
-            
-            if (tipoMovimiento === "entrada" || tipoMovimiento === "reposicion") {
-              nuevaCant += cantidadAjuste;
-            } else if (tipoMovimiento === "salida") {
-              nuevaCant = Math.max(0, nuevaCant - cantidadAjuste);
-            } else if (tipoMovimiento === "ajuste") {
-              nuevaCant = cantidadAjuste;
-            }
-            
-            // Actualizamos el producto en el array
-            const idx = prods.indexOf(prod);
-            if (idx !== -1) {
-              prods[idx] = { ...prod, cantidad: nuevaCant };
-            }
-          }
-          
-          const totalUds = prods.reduce((acc, p) => acc + p.cantidad, 0);
-          return {
-            ...u,
-            productos: prods,
-            subtitulo: `${prods.length} productos · ${totalUds} uds (Actualizado vía movimientos)`,
-          };
-        }
-        return u;
-      })
-    );
-
-    toast.success(`Movimiento de ${tipoMovimiento} registrado correctamente en la tabla 'movimientos'`);
-    setDialogAjusteAbierto(false);
-  };
-  const confirmarEliminarUbicacion = () => {
-    if (!ubicacionParaEliminar) return;
-
-    if (ubicacionParaEliminar.productos && ubicacionParaEliminar.productos.length > 0) {
-      toast.error("No se puede eliminar una ubicación con stock activo. Ajusta el stock a 0 primero.");
-      setDialogEliminarAbierto(false);
-      return;
-    }
-
-    setUbicaciones((prev) => prev.filter((u) => u.id !== ubicacionParaEliminar.id));
-    toast.success(`Ubicación "${ubicacionParaEliminar.nombre}" eliminada`);
-    setDialogEliminarAbierto(false);
-    setUbicacionParaEliminar(null);
+  const exportarExcel = (ubicacion: Ubicacion) => {
+    const head = "SKU,Producto,Stock,Unidad\n";
+    const rows = productos
+      .map((p) => `"${p.sku || ""}","${p.nombre}","${p.stock_actual}","${p.unidad || "unid"}"`)
+      .join("\n");
+    const blob = new Blob([head + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ubicacion_${ubicacion.nombre.replace(/\s+/g, "_")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Excel exportado");
   };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <div className="min-h-screen bg-slate-50/60 pb-16">
+      {/* HEADER */}
       <div className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -539,88 +423,56 @@ function UbicacionesPage() {
                 <span>/</span>
                 <span>ALMACÉN</span>
                 <span>/</span>
-                <span className="text-blue-600 font-semibold">JERARQUÍA DE UBICACIONES</span>
+                <span className="text-[#D24D09] font-semibold">JERARQUÍA DE UBICACIONES</span>
               </div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
                   Ubicaciones del Almacén
                 </h1>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                  18 Zonas Activas • 94% Ocupación
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium px-2.5 py-0.5 rounded-full text-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse mr-1.5" />
+                  {ubicaciones.length} Zonas Activas • 94% Ocupación
                 </Badge>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 p-1 rounded-lg border border-slate-200">
-              <Button
-                variant={vista === "arbol" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setVista("arbol")}
-                className={`text-xs gap-1.5 h-8 ${vista === "arbol" ? "bg-white text-blue-700 shadow-xs hover:bg-white" : "text-slate-600 hover:text-slate-900"}`}
-              >
-                <FolderTree className="w-3.5 h-3.5" />
-                Vista Árbol
-              </Button>
-              <Button
-                variant={vista === "lista" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setVista("lista")}
-                className={`text-xs gap-1.5 h-8 ${vista === "lista" ? "bg-white text-blue-700 shadow-xs hover:bg-white" : "text-slate-600 hover:text-slate-900"}`}
-              >
-                <List className="w-3.5 h-3.5" />
-                Vista Lista
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-            <div className="flex flex-1 items-center gap-2 max-w-xl">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  placeholder="Buscar ubicación por nombre o código (ej. A1-01)..."
-                  className="pl-9 bg-slate-50/70 border-slate-200 text-sm h-9 focus-visible:ring-blue-500"
-                />
-                {busqueda && (
-                  <button onClick={() => setBusqueda("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <select
-                value={filtroTipo}
-                onChange={(e) => setFiltroTipo(e.target.value)}
-                className="h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="todos">Tipo de ubicación (Todos)</option>
-                <option value="seccion">Sección (Nivel 0)</option>
-                <option value="pasillo">Pasillo (Nivel 1)</option>
-                <option value="reserva">Reserva (Nivel 1)</option>
-                <option value="armario">Armario (Nivel 2)</option>
-                <option value="alto">Alto (Nivel 2)</option>
-                <option value="caja">Caja (Nivel 2)</option>
-                <option value="cross">Cross (Nivel 2)</option>
-              </select>
-            </div>
-
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={toggleExpandirColapsarTodo} className="text-xs h-9 text-slate-700 border-slate-200 gap-1.5">
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                {todosExpandidos ? "Colapsar todo" : "Expandir todo"}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <Button
+                  variant={vista === "arbol" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setVista("arbol")}
+                  className={`text-xs h-8 gap-1.5 ${vista === "arbol" ? "bg-[#D24D09] text-white" : ""}`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  Vista Árbol
+                </Button>
+                <Button
+                  variant={vista === "lista" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setVista("lista")}
+                  className={`text-xs h-8 gap-1.5 ${vista === "lista" ? "bg-[#D24D09] text-white" : ""}`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  Vista Lista
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={colapsarTodo}
+                className="text-xs h-9 px-3.5 border-slate-200 gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Colapsar todo
               </Button>
-
               <Button
                 size="sm"
-                onClick={() => {
-                  setFormNombre("Nueva Posición");
-                  setFormTipo("armario");
-                  toast.info("Configura la nueva ubicación en el panel lateral");
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold h-9 px-3.5 gap-1.5 shadow-xs"
+                onClick={abrirModalCrear}
+                className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs font-semibold h-9 px-4 gap-1.5"
               >
                 <Plus className="w-4 h-4" />
                 NUEVA UBICACIÓN
@@ -630,469 +482,436 @@ function UbicacionesPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOPOLOGÍA DE NAVE</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold text-slate-900">46</span>
-                  <span className="text-xs font-medium text-slate-500">ubicaciones</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span>3 Secciones • 8 Pasillos • 35 Posiciones</span>
-                </div>
-              </div>
-              <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600">
-                <Building2 className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-blue-600 h-full rounded-full" style={{ width: "78%" }} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">CAPACIDAD OCUPADA</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700">Alerta: Pasillo B</span>
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold text-slate-900">92%</span>
-                  <span className="text-xs font-medium text-rose-600">Capacidad crítica</span>
-                </div>
-                <p className="text-xs text-slate-600 mt-2">1,420 de 1,540 m³ volumen ocupado</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-purple-50 text-purple-600">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-purple-600 h-full rounded-full" style={{ width: "92%" }} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ESPACIOS DISPONIBLES</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold text-slate-900">8</span>
-                  <span className="text-xs font-medium text-emerald-600">huecos libres</span>
-                </div>
-                <p className="text-xs text-slate-600 mt-2">Disponibles para recepción de pinturas y solventes</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-slate-700 h-full rounded-full" style={{ width: "22%" }} />
-            </div>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-5">
+        {/* KPIs */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {kpisData.map((kpi) => (
+            <KPICard key={kpi.label} data={kpi} />
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-8 space-y-4">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <div className="flex items-center gap-2">
-                  <FolderTree className="w-4 h-4 text-blue-600" />
-                  <h2 className="text-sm font-bold text-slate-900 tracking-tight">Estructura Física del Almacén</h2>
-                </div>
-                <span className="text-xs text-slate-500 font-medium">Terminal Nave Central • 3 Niveles</span>
-              </div>
-
-              {vista === "arbol" && (
-                <div className="p-4 sm:p-5 space-y-4">
-                  {secciones.map((sec) => {
-                    const secAbierta = expandidos[sec.id] ?? true;
-                    const pasillos = pasillosDeSeccion(sec.id);
-
-                    return (
-                      <div key={sec.id} className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-xs">
-                        <div className="p-3.5 bg-slate-50/60 hover:bg-slate-100/60 transition-colors flex items-center justify-between gap-3 border-b border-slate-100">
-                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                            <button onClick={() => toggleExpandir(sec.id)} className="p-1 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors">
-                              {secAbierta ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </button>
-                            <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700">
-                              <Building2 className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-sm text-slate-900">{sec.nombre}</span>
-                                <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">Sección</span>
-                              </div>
-                              <p className="text-xs text-slate-500 truncate mt-0.5">{sec.subtitulo}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Button variant="outline" size="sm" onClick={() => { setFormNombre(`Pasillo nuevo`); setFormTipo("pasillo"); toast.info(`Añadiendo Pasillo bajo ${sec.nombre}`); }} className="h-7 text-xs px-2.5 rounded-full border-slate-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 hover:text-blue-800 gap-1">
-                              <Plus className="w-3 h-3" /> Pasillo
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setFormNombre(sec.nombre); setFormTipo("seccion"); toast.info(`Editando ${sec.nombre}`); }} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700">
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        {secAbierta && (
-                          <div className="p-3 sm:p-4 space-y-3 bg-slate-50/20">
-                            {pasillos.map((pas) => {
-                              const pasAbierto = expandidos[pas.id] ?? true;
-                              const posiciones = posicionesDePasillo(pas.id);
-
-                              return (
-                                <div key={pas.id} className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
-                                  <div className="p-3 bg-blue-50/20 hover:bg-blue-50/40 transition-colors flex items-center justify-between gap-3 border-b border-slate-100">
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <button onClick={() => toggleExpandir(pas.id)} className="p-1 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-200/50">
-                                        {pasAbierto ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                                      </button>
-                                      <div className="p-1.5 rounded-md bg-blue-100 text-blue-700">
-                                        <ArrowLeftRight className="w-3.5 h-3.5" />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="font-medium text-sm text-slate-800">{pas.nombre}</span>
-                                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">Pasillo</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <Button variant="outline" size="sm" onClick={() => { setFormNombre(`${pas.codigo}-0${posiciones.length + 1}`); setFormTipo("armario"); setFormPadre(pas.id); toast.info(`Añadiendo Posición bajo ${pas.nombre}`); }} className="h-6 text-[11px] px-2 rounded-full border-slate-200 text-slate-700 hover:bg-slate-100 gap-1">
-                                      <Plus className="w-3 h-3" /> Posición
-                                    </Button>
-                                  </div>
-
-                                  {pasAbierto && (
-                                    <div className="p-2 sm:p-3 space-y-2 bg-white">
-                                      {posiciones.map((pos) => {
-                                        const config = CONFIG_JERARQUIA[pos.tipo];
-                                        const IconoPos = config.icon;
-
-                                        return (
-                                          <div key={pos.id} onClick={() => setSlotSeleccionado(pos.codigo)} className={`p-2.5 rounded-lg border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer ${slotSeleccionado === pos.codigo ? "border-blue-500 bg-blue-50/40 shadow-xs" : "border-slate-150 bg-slate-50/40 hover:bg-slate-100/60"}`}>
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                              <div className="w-4 h-4 flex items-center justify-center text-slate-400">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                                              </div>
-                                              <div className={`p-1.5 rounded-md ${config.badgeClass}`}>
-                                                <IconoPos className="w-3.5 h-3.5" />
-                                              </div>
-                                              <div className="min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                  <span className="font-semibold text-xs text-slate-900">{pos.nombre}</span>
-                                                  <span className={`px-1.5 py-0.2 text-[10px] font-medium rounded-full border ${config.badgeClass}`}>{config.label}</span>
-                                                </div>
-                                                <p className="text-[11px] text-slate-500 truncate mt-0.5">{pos.subtitulo}</p>
-                                              </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                                              <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setUbicacionSeleccionada(pos); setDialogProductosAbierto(true); }} className="h-7 text-xs px-2.5 rounded-md border-slate-200 text-slate-700 hover:bg-slate-100">
-                                                Ver Productos
-                                              </Button>
-                                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setUbicacionParaAjuste(pos); if (pos.productos?.length > 0) setProductoAjusteId(pos.productos[0]?.id ?? ""); setDialogAjusteAbierto(true); }} className="h-7 text-xs px-2 rounded-md text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium">
-                                                Ajuste
-                                              </Button>
-                                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toast.info(`Código de barras: [ ${pos.codigo} ]`); }} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600" title="Ver código de barras">
-                                                <Barcode className="w-3.5 h-3.5" />
-                                              </Button>
-                                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setUbicacionParaEliminar(pos); setDialogEliminarAbierto(true); }} className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600" title="Eliminar posición">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {reservas.map((res) => (
-                    <div key={res.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
-                          <Warehouse className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-slate-900">{res.nombre}</span>
-                            <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-slate-100 text-slate-700 border border-slate-200">Reserva</span>
-                          </div>
-                          <p className="text-xs text-slate-500 truncate mt-0.5">{res.subtitulo}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Recepción Inmediata
-                        </span>
-                        <Button variant="ghost" size="sm" onClick={() => { setUbicacionParaEliminar(res); setDialogEliminarAbierto(true); }} className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {vista === "lista" && (
-                <div className="divide-y divide-slate-100">
-                  {ubicacionesFiltradas.length === 0 ? (
-                    <div className="py-12 text-center text-slate-500 text-sm">No se encontraron ubicaciones con los filtros actuales</div>
-                  ) : (
-                    ubicacionesFiltradas.map((item) => {
-                      const config = CONFIG_JERARQUIA[item.tipo];
-                      const Icono = config.icon;
-                      return (
-                        <div key={item.id} className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 transition-colors">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`p-2 rounded-lg ${config.badgeClass}`}>
-                              <Icono className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm text-slate-900">{item.nombre}</span>
-                                <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${config.badgeClass}`}>{config.label}</span>
-                                <span className="text-xs text-slate-400 font-mono">[{item.codigo}]</span>
-                              </div>
-                              <p className="text-xs text-slate-500 mt-0.5">{item.subtitulo || config.descripcion}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {item.productos && item.productos.length > 0 && (
-                              <Button variant="outline" size="sm" onClick={() => { setUbicacionSeleccionada(item); setDialogProductosAbierto(true); }} className="h-7 text-xs border-slate-200">
-                                {item.productos.length} productos
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="sm" onClick={() => { setFormNombre(item.nombre); setFormTipo(item.tipo); toast.info(`Cargado en editor: ${item.nombre}`); }} className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700">
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
+        {/* FILTROS */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar ubicación por nombre o código (ej. A1-01)..."
+              className="pl-9 h-10 bg-white border-slate-200 text-sm"
+            />
           </div>
 
-          <div className="lg:col-span-4 space-y-5">
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="p-1 rounded-md bg-blue-100 text-blue-700">
-                    <MapPin className="w-3.5 h-3.5" />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900">Modal: Nueva Ubicación en Almacén</h3>
-                </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">EDITOR</span>
-              </div>
+          <Select
+            value={filtroTipo}
+            onValueChange={(v) => setFiltroTipo(v as Ubicacion["tipo"] | "todos")}
+          >
+            <SelectTrigger className="w-[200px] h-10 bg-white border-slate-200 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Tipo de ubicación (Todos)</SelectItem>
+              <SelectItem value="seccion">Secciones</SelectItem>
+              <SelectItem value="pasillo">Pasillos</SelectItem>
+              <SelectItem value="reserva">Reservas</SelectItem>
+              <SelectItem value="armario">Armarios</SelectItem>
+              <SelectItem value="alto">Altos</SelectItem>
+              <SelectItem value="caja">Cajas</SelectItem>
+              <SelectItem value="cross">Cross</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-              <form onSubmit={handleGuardarUbicacion} className="space-y-3.5">
-                <div>
-                  <Label className="text-xs font-semibold text-slate-700 mb-1 block">Nombre de Ubicación</Label>
-                  <Input value={formNombre} onChange={(e) => setFormNombre(e.target.value)} placeholder="Ej. Armario A1-04" className="h-8 text-xs bg-slate-50/60 border-slate-200" />
-                </div>
-
-                <div>
-                  <Label className="text-xs font-semibold text-slate-700 mb-1 block">Tipo de Ubicación</Label>
-                  <select value={formTipo} onChange={(e) => setFormTipo(e.target.value as TipoUbicacion)} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500">
-                    <option value="armario">Armario (Estantería media - Nivel 2)</option>
-                    <option value="alto">Alto (Altillo superior - Nivel 2)</option>
-                    <option value="caja">Caja (Gavetero / Cubeta - Nivel 2)</option>
-                    <option value="cross">Cross-docking (Tránsito - Nivel 2)</option>
-                    <option value="pasillo">Pasillo (Corredor - Nivel 1)</option>
-                    <option value="reserva">Reserva (Palets - Nivel 1)</option>
-                    <option value="seccion">Sección (Zona General - Nivel 0)</option>
-                  </select>
-                </div>
-
-                {CONFIG_JERARQUIA[formTipo].nivel === 2 && (
-                  <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Ubicación Padre</Label>
-                    <select value={formPadre} onChange={(e) => setFormPadre(e.target.value)} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500">
-                      {pasillosDisponibles.map((pas) => (
-                        <option key={pas.id} value={pas.id}>{pas.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Lateral</Label>
-                    <select value={formLateral} onChange={(e) => setFormLateral(e.target.value as "L" | "R" | "C")} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800">
-                      <option value="R">Derecha (R)</option>
-                      <option value="L">Izquierda (L)</option>
-                      <option value="C">Central (C)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Altura / Piso</Label>
-                    <select value={formPiso} onChange={(e) => setFormPiso(Number(e.target.value))} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800">
-                      <option value={1}>Nivel 1 (Suelo)</option>
-                      <option value={2}>Nivel 2 (Medio)</option>
-                      <option value={3}>Nivel 3 (Alto)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Cap. Máx (uds)</Label>
-                    <Input type="number" value={formCapMax} onChange={(e) => setFormCapMax(Number(e.target.value))} className="h-8 text-xs bg-slate-50/60 border-slate-200" />
-                  </div>
-                  <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">Peso Máx (kg)</Label>
-                    <Input type="number" value={formPesoMax} onChange={(e) => setFormPesoMax(Number(e.target.value))} className="h-8 text-xs bg-slate-50/60 border-slate-200" />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => { setFormNombre(""); toast.info("Formulario limpiado"); }} className="h-8 text-xs text-slate-600">
-                    Cancelar
-                  </Button>
-                  <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 shadow-xs">
-                    Guardar Ubicación
-                  </Button>
-                </div>
-              </form>
+        {/* ÁRBOL DE UBICACIONES */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <LayoutGrid className="w-4 h-4 text-[#D24D09]" />
+                Estructura Física del Almacén
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Terminal Nave Central • 3 Niveles
+              </p>
             </div>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+              EDITOR
+            </Badge>
+          </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 tracking-wider">MAPA NAVE A-NORTE</span>
-                <span className="text-xs text-blue-600 font-semibold cursor-pointer hover:underline">Plano 2D</span>
+          <div className="p-4 space-y-3">
+            {cargandoSecciones || cargandoUbicaciones ? (
+              <div className="p-8 text-center text-slate-500">
+                Cargando ubicaciones desde Supabase...
               </div>
+            ) : ubicacionesFiltradas.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">
+                No hay ubicaciones con los filtros seleccionados.
+              </div>
+            ) : (
+              ubicacionesFiltradas
+                .filter((u) => u.tipo === "pasillo" || u.tipo === "reserva")
+                .map((nivel1) => {
+                  const hijos = ubicacionesFiltradas.filter(
+                    (u) => u.id_ubicacion_padre === nivel1.id
+                  );
+                  const estaExpandido = expandirNivel.has(nivel1.id);
 
-              <div className="grid grid-cols-4 gap-2 py-2">
-                {["A1-01", "A1-02", "A1-03", "A1-04", "A2-01", "B1-01"].map((slot) => {
-                  const isLibre = slot === "A1-04";
-                  const isReserva = slot === "RES-01"; // handled separately
                   return (
-                    <div key={slot} onClick={() => setSlotSeleccionado(slot)} className={`p-2.5 rounded-lg border text-center transition-all cursor-pointer ${slotSeleccionado === slot ? (isLibre ? "ring-2 ring-indigo-500 bg-indigo-50/70 border-indigo-400" : "ring-2 ring-blue-500 bg-blue-100/70 border-blue-300") : (isLibre ? "border-slate-300 bg-slate-50/40 hover:bg-slate-100/60" : "bg-blue-50/60 border-blue-200 hover:bg-blue-100/50")}`}>
-                      <div className="text-[11px] font-bold text-slate-800">{slot}</div>
-                      <div className={`text-[10px] font-medium ${isLibre ? "text-indigo-600 font-bold" : "text-blue-700"}`}>{isLibre ? "LIBRE" : "92%"}</div>
+                    <div key={nivel1.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                      {/* NIVEL 1: Pasillo/Reserva */}
+                      <div className="bg-slate-50 p-3 flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleExpandir(nivel1.id)}
+                          className="h-6 w-6 p-0 text-slate-500"
+                        >
+                          {estaExpandido ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <Badge variant="outline" className={`${TIPO_INFO[nivel1.tipo].badge} text-xs`}>
+                          {TIPO_INFO[nivel1.tipo].icon}
+                          <span className="ml-1">{nivel1.nombre}</span>
+                        </Badge>
+                        <span className="text-xs text-slate-500 ml-2">
+                          {hijos.length} posiciones
+                        </span>
+                        <div className="ml-auto flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => abrirModalEditar(nivel1)}
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setUbicacionADesactivar(nivel1)}
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* NIVEL 2: Hijos */}
+                      {estaExpandido && hijos.length > 0 && (
+                        <div className="divide-y divide-slate-100">
+                          {hijos.map((hijo) => (
+                            <div
+                              key={hijo.id}
+                              className="p-3 hover:bg-slate-50/50 transition-colors flex items-center gap-3"
+                            >
+                              <div className="w-8" />
+                              <Badge variant="outline" className={`${TIPO_INFO[hijo.tipo].badge} text-xs`}>
+                                {TIPO_INFO[hijo.tipo].icon}
+                                <span className="ml-1">{hijo.nombre}</span>
+                              </Badge>
+                              {hijo.posicion_lateral && (
+                                <span className="text-[10px] text-slate-500">
+                                  ({hijo.posicion_lateral})
+                                </span>
+                              )}
+                              <div className="ml-auto flex items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => abrirModalVer(hijo)}
+                                  className="h-7 text-xs gap-1"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  Ver Productos
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => exportarPDF(hijo)}
+                                  className="h-7 text-xs gap-1"
+                                >
+                                  <FileText className="w-3 h-3" />
+                                  PDF
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => exportarExcel(hijo)}
+                                  className="h-7 text-xs gap-1"
+                                >
+                                  <FileSpreadsheet className="w-3 h-3" />
+                                  Excel
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => abrirModalEditar(hijo)}
+                                  className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setUbicacionADesactivar(hijo)}
+                                  className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
-                })}
-                <div onClick={() => setSlotSeleccionado("RES-01")} className={`col-span-2 p-2.5 rounded-lg border text-center transition-all cursor-pointer ${slotSeleccionado === "RES-01" ? "ring-2 ring-slate-500 bg-slate-200/70 border-slate-300" : "bg-slate-100/70 border-slate-200 hover:bg-slate-200/50"}`}>
-                  <div className="text-[11px] font-bold text-slate-800">RES-01</div>
-                  <div className="text-[10px] font-medium text-slate-500">VACÍO</div>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>Último inventario físico:</span>
-                <span className="font-semibold text-slate-700">Ayer, 18:40</span>
-              </div>
-            </div>
+                })
+            )}
           </div>
         </div>
       </div>
 
-      <Dialog open={dialogProductosAbierto} onOpenChange={setDialogProductosAbierto}>
-        <DialogContent className="max-w-xl">
+      {/* MODAL DINÁMICO */}
+      <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <div className="flex items-center gap-2">
-              <Boxes className="w-5 h-5 text-blue-600" />
-              <DialogTitle className="text-lg font-bold text-slate-900">Productos en {ubicacionSeleccionada?.nombre}</DialogTitle>
-            </div>
-            <DialogDescription className="text-xs text-slate-500">Inventario físico asignado a la posición [{ubicacionSeleccionada?.codigo}]</DialogDescription>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Edit3 className="w-4 h-4 text-[#D24D09]" />
+              {modalModo === "crear" && "Nueva Ubicación en Almacén"}
+              {modalModo === "editar" && `Editar: ${ubicacionSeleccionada?.nombre}`}
+              {modalModo === "ver" && `Productos en: ${ubicacionSeleccionada?.nombre}`}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {modalModo === "crear" && "Crea una ubicación siguiendo la jerarquía"}
+              {modalModo === "editar" && "Modifica los datos de la ubicación"}
+              {modalModo === "ver" && "Productos almacenados en esta ubicación"}
+            </DialogDescription>
           </DialogHeader>
-          <div className="mt-3 divide-y divide-slate-150 border rounded-lg overflow-hidden bg-white">
-            {ubicacionSeleccionada?.productos && ubicacionSeleccionada.productos.length > 0 ? (
-              ubicacionSeleccionada.productos.map((prod) => (
-                <div key={prod.id} className="p-3 flex items-center justify-between gap-3 text-xs">
-                  <div>
-                    <div className="font-semibold text-slate-900">{prod.nombre}</div>
-                    <div className="text-slate-400 font-mono mt-0.5">SKU: {prod.sku} • {prod.categoria}</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-bold text-sm text-slate-900">{prod.cantidad} uds</span>
-                    <div className="text-[10px] text-slate-400">Mín: {prod.stock_minimo} uds</div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-6 text-center text-slate-400 text-xs">No hay productos asignados a esta ubicación.</div>
-            )}
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" size="sm" onClick={() => setDialogProductosAbierto(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={dialogAjusteAbierto} onOpenChange={setDialogAjusteAbierto}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-5 h-5 text-blue-600" />
-              <DialogTitle className="text-base font-bold text-slate-900">Ajuste de Stock en {ubicacionParaAjuste?.nombre}</DialogTitle>
-            </div>
-            <DialogDescription className="text-xs text-slate-500">Registra un movimiento para auditar y recalcular el stock automáticamente vía PostgreSQL trigger.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3.5 my-2 text-xs">
-            <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Producto</Label>
-              <select value={productoAjusteId} onChange={(e) => setProductoAjusteId(e.target.value)} className="w-full h-8 text-xs rounded-md border border-slate-200 bg-white px-2.5 text-slate-800">
-                {ubicacionParaAjuste?.productos.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nombre} (Actual: {p.cantidad} uds)</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Tipo de Movimiento</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button type="button" variant={tipoMovimiento === "reposicion" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("reposicion")} className={`text-xs h-7 ${tipoMovimiento === "reposicion" ? "bg-emerald-600" : ""}`}>Reposición (+)</Button>
-                <Button type="button" variant={tipoMovimiento === "entrada" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("entrada")} className={`text-xs h-7 ${tipoMovimiento === "entrada" ? "bg-blue-600" : ""}`}>Entrada (+)</Button>
-                <Button type="button" variant={tipoMovimiento === "salida" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("salida")} className={`text-xs h-7 ${tipoMovimiento === "salida" ? "bg-rose-600" : ""}`}>Salida (-)</Button>
-                <Button type="button" variant={tipoMovimiento === "ajuste" ? "default" : "outline"} size="sm" onClick={() => setTipoMovimiento("ajuste")} className={`text-xs h-7 ${tipoMovimiento === "ajuste" ? "bg-amber-600" : ""}`}>Ajuste Físico (=)</Button>
+          {modalModo === "ver" && ubicacionSeleccionada && (
+            <div className="space-y-3">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-slate-700">
+                    Productos en {ubicacionSeleccionada.nombre}
+                  </span>
+                  <Badge variant="outline" className={`${TIPO_INFO[ubicacionSeleccionada.tipo].badge} text-xs`}>
+                    {TIPO_INFO[ubicacionSeleccionada.tipo].label}
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-500">
+                  En producción aquí se mostrarán los productos reales desde Supabase
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportarPDF(ubicacionSeleccionada)}
+                  className="flex-1 gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Exportar PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportarExcel(ubicacionSeleccionada)}
+                  className="flex-1 gap-1.5"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Exportar Excel
+                </Button>
               </div>
             </div>
-            <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Cantidad</Label>
-              <Input type="number" min={1} value={cantidadAjuste} onChange={(e) => setCantidadAjuste(Number(e.target.value))} className="h-8 text-xs" />
-            </div>
-            <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">Motivo / Justificación</Label>
-              <Input value={motivoAjuste} onChange={(e) => setMotivoAjuste(e.target.value)} placeholder="Ej. Conteo físico anual" className="h-8 text-xs" />
-            </div>
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="ghost" size="sm" onClick={() => setDialogAjusteAbierto(false)}>Cancelar</Button>
-            <Button size="sm" onClick={handleAplicarAjuste} className="bg-blue-600 hover:bg-blue-700 text-white">Registrar Movimiento</Button>
-          </DialogFooter>
+          )}
+
+          {(modalModo === "crear" || modalModo === "editar") && (
+            <form
+              onSubmit={modalModo === "crear" ? handleCrear : handleEditar}
+              className="space-y-3.5"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Tipo *</Label>
+                  <Select
+                    value={formTipo}
+                    onValueChange={(v) => setFormTipo(v as Ubicacion["tipo"])}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pasillo">Pasillo</SelectItem>
+                      <SelectItem value="reserva">Reserva</SelectItem>
+                      <SelectItem value="armario">Armario</SelectItem>
+                      <SelectItem value="alto">Alto</SelectItem>
+                      <SelectItem value="caja">Caja</SelectItem>
+                      <SelectItem value="cross">Cross</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Número</Label>
+                  <Input
+                    type="number"
+                    value={formNumero}
+                    onChange={(e) =>
+                      setFormNumero(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className="h-9 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Nombre *</Label>
+                <Input
+                  value={formNombre}
+                  onChange={(e) => setFormNombre(e.target.value)}
+                  className="h-9 text-xs"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Descripción</Label>
+                <Input
+                  value={formDescripcion}
+                  onChange={(e) => setFormDescripcion(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              {["armario", "alto", "caja", "cross"].includes(formTipo) && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Ubicación Padre *
+                    </Label>
+                    <Select value={formPadre} onValueChange={setFormPadre}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Selecciona pasillo o reserva" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {ubicaciones
+                          .filter((u) => u.tipo === "pasillo" || u.tipo === "reserva")
+                          .map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.nombre}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-700">
+                        Lateral *
+                      </Label>
+                      <Select
+                        value={formPosicionLateral}
+                        onValueChange={setFormPosicionLateral}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="izquierda">Izquierda</SelectItem>
+                          <SelectItem value="centro">Centro</SelectItem>
+                          <SelectItem value="derecha">Derecha</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {formTipo === "cross" && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-slate-700">
+                          Longitudinal *
+                        </Label>
+                        <Select
+                          value={formPosicionLongitudinal}
+                          onValueChange={setFormPosicionLongitudinal}
+                        >
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="frente">Frente</SelectItem>
+                            <SelectItem value="medio">Medio</SelectItem>
+                            <SelectItem value="fondo">Fondo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModalAbierto(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs"
+                  disabled={
+                    modalModo === "crear"
+                      ? mutationCrear.isPending
+                      : mutationActualizar.isPending
+                  }
+                >
+                  {modalModo === "crear" ? "Guardar Ubicación" : "Guardar Cambios"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={dialogEliminarAbierto} onOpenChange={setDialogEliminarAbierto}>
+      {/* ALERT DIALOG: DESACTIVAR */}
+      <AlertDialog
+        open={Boolean(ubicacionADesactivar)}
+        onOpenChange={(open) => !open && setUbicacionADesactivar(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base text-slate-900 font-bold">¿Eliminar ubicación "{ubicacionParaEliminar?.nombre}"?</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-slate-500">Esta acción eliminará la ubicación del mapa del almacén. Solo se puede realizar si la ubicación no tiene productos con stock físico activo.</AlertDialogDescription>
+            <AlertDialogTitle>¿Desactivar ubicación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La ubicación «<strong>{ubicacionADesactivar?.nombre}</strong>» dejará de estar disponible.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs h-8">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmarEliminarUbicacion} className="text-xs h-8 bg-rose-600 hover:bg-rose-700 text-white">Eliminar Definitivamente</AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarDesactivar}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              Desactivar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ESCÁNER */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onScan={(code) => {
+          toast.info(`Código escaneado: ${code}`);
+          setBusqueda(code);
+        }}
+      />
     </div>
   );
 }
