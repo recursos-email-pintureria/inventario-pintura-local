@@ -1,6 +1,11 @@
 // src/lib/queries/dashboard.ts
-import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
+import {
+  getProductos,
+  getMovimientos,
+  getStockPorUbicaciones,
+  getUbicacionesCompletas,
+} from "@/lib/inventario";
 
 export interface DashboardKPIs {
   totalProductos: number;
@@ -24,56 +29,55 @@ export interface MovimientoReciente {
 }
 
 async function fetchKPIs(): Promise<DashboardKPIs> {
-  const hoy = new Date().toISOString().split("T")[0];
-
-  const [prodRes, stockBajoRes, movRes, ubiRes] = await Promise.all([
-    supabase.from("productos").select("id", { count: "exact", head: true }).eq("activo", true),
-    supabase.from("stock").select("id", { count: "exact", head: true }).lt("cantidad", 5),
-    supabase.from("movimientos").select("id", { count: "exact", head: true }).eq("fecha", hoy),
-    supabase.from("stock").select("ubicacion_id", { count: "exact", head: true }).gt("cantidad", 0),
+  const hoy = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  
+  const [productos, movimientos, stock, ubicaciones] = await Promise.all([
+    getProductos(),
+    getMovimientos(),
+    getStockPorUbicaciones(),
+    getUbicacionesCompletas(),
   ]);
 
   return {
-    totalProductos: prodRes.count ?? 0,
-    stockBajo: stockBajoRes.count ?? 0,
-    movimientosHoy: movRes.count ?? 0,
-    ubicacionesActivas: ubiRes.count ?? 0,
+    totalProductos: productos.filter((p) => p.activo !== false).length,
+    stockBajo: stock.filter((s) => s.cantidad < 5).length,
+    movimientosHoy: movimientos.filter((m) => {
+      const fechaMov = m.fecha ? m.fecha.split("T")[0] : "";
+      return fechaMov === hoy;
+    }).length,
+    ubicacionesActivas: ubicaciones.filter((u) => u.activo !== false).length,
   };
 }
 
 async function fetchMovimientosRecientes(): Promise<MovimientoReciente[]> {
-  const { data, error } = await supabase
-    .from("movimientos")
-    .select(`
-      id,
-      fecha,
-      hora,
-      tipo,
-      cantidad,
-      unidad,
-      ubicacion,
-      usuario,
-      productos:producto_id (nombre, sku)
-    `)
-    .order("fecha", { ascending: false })
-    .order("hora", { ascending: false })
-    .limit(20);
+  const movimientos = await getMovimientos();
 
-  if (error) throw error;
+  return movimientos
+    .sort((a, b) => {
+      const fechaA = a.fecha || "";
+      const fechaB = b.fecha || "";
+      return fechaB.localeCompare(fechaA);
+    })
+    .slice(0, 20)
+    .map((m) => {
+      const fechaCompleta = m.fecha || new Date().toISOString();
+      const [fecha, horaRaw] = fechaCompleta.split("T");
+      const hora = horaRaw ? horaRaw.slice(0, 5) : "00:00";
 
-  return (data || []).map((m: any) => ({
-    id: m.id,
-    fecha: m.fecha,
-    hora: m.hora,
-    producto: m.productos?.nombre ?? "Producto desconocido",
-    sku: m.productos?.sku ?? "S/N",
-    tipo: m.tipo,
-    cantidad: m.cantidad,
-    unidad: m.unidad,
-    ubicacion: m.ubicacion,
-    usuario: m.usuario,
-    usuarioInicial: m.usuario ? m.usuario.charAt(0).toUpperCase() : "?",
-  }));
+      return {
+        id: m.id,
+        fecha: fecha || "Hoy",
+        hora: hora,
+        producto: (m as any).producto_nombre || "Producto",
+        sku: (m as any).producto_sku || "S/N",
+        tipo: m.tipo as MovimientoReciente["tipo"],
+        cantidad: m.cantidad,
+        unidad: "uds",
+        ubicacion: (m as any).ubicacion_nombre || "Sin ubicación",
+        usuario: (m as any).usuario_nombre || "Sistema",
+        usuarioInicial: ((m as any).usuario_nombre || "S").charAt(0).toUpperCase(),
+      };
+    });
 }
 
 export function useDashboardKPIs() {
@@ -81,6 +85,7 @@ export function useDashboardKPIs() {
     queryKey: ["dashboard", "kpis"],
     queryFn: fetchKPIs,
     refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 }
 
@@ -89,5 +94,6 @@ export function useMovimientosRecientes() {
     queryKey: ["dashboard", "movimientos"],
     queryFn: fetchMovimientosRecientes,
     refetchInterval: 30_000,
+    staleTime: 15_000,
   });
 }
