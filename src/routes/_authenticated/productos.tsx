@@ -19,6 +19,9 @@ import {
   Camera,
   Box,
   Scale,
+  FolderOpen,
+  FileText,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -176,7 +181,7 @@ function ProductosPage() {
   });
 
   const mutationActualizar = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Producto> }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: any }) =>
       actualizarProducto(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
@@ -222,6 +227,8 @@ function ProductosPage() {
   // Formulario nuevo/editar
   const [formNombre, setFormNombre] = useState("");
   const [formSku, setFormSku] = useState("");
+  const [formCodigoBarras, setFormCodigoBarras] = useState("");
+  const [formDescripcion, setFormDescripcion] = useState("");
   const [formCategoria, setFormCategoria] = useState("");
   const [formStock, setFormStock] = useState<number | "">(10);
   const [formStockMinimo, setFormStockMinimo] = useState<number | "">(5);
@@ -243,10 +250,7 @@ function ProductosPage() {
     return productos.filter((p) => {
       const q = busqueda.toLowerCase().trim();
       const coincideTexto =
-        !q ||
-        p.nombre.toLowerCase().includes(q) ||
-        (p.sku || "").toLowerCase().includes(q) ||
-        ((p as any).codigo_barras || "").toLowerCase().includes(q);
+        !q || p.nombre.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
 
       const coincideCategoria =
         categoriaSeleccionada === "todas" || p.categoria === categoriaSeleccionada;
@@ -330,34 +334,42 @@ function ProductosPage() {
 
   // 📷 Manejador del escaneo
   const handleScan = (code: string) => {
-    const q = code.trim().toLowerCase();
+    const codeUpper = code.toUpperCase().trim();
+    if (modalNuevoAbierto) {
+      setFormCodigoBarras(codeUpper);
+      if (!formSku || formSku.startsWith("LAT-")) {
+        setFormSku(codeUpper);
+      }
+      toast.success(`✅ Código escaneado: ${codeUpper}`);
+      setScannerOpen(false);
+      return;
+    }
+
+    if (productoEditar) {
+      setFormCodigoBarras(codeUpper);
+      toast.success(`✅ Código asignado al producto: ${codeUpper}`);
+      setScannerOpen(false);
+      return;
+    }
+
     const productoEncontrado = productos.find(
       (p) =>
-        (p.sku || "").toLowerCase() === q ||
-        ((p as any).codigo_barras || "").toLowerCase() === q ||
-        p.id.toLowerCase() === q,
+        (p.sku || "").toLowerCase() === code.toLowerCase() ||
+        ((p as any).codigo_barras || "").toLowerCase() === code.toLowerCase() ||
+        p.id === code,
     );
 
     if (productoEncontrado) {
       setBusqueda(productoEncontrado.sku);
       setPaginaActual(1);
-      toast.success(
-        `✅ Producto identificado: ${productoEncontrado.nombre} (${productoEncontrado.sku})`,
-      );
+      toast.success(`✅ Producto encontrado: ${productoEncontrado.nombre}`);
     } else {
-      setFormSku(code.toUpperCase());
-
+      setFormSku(codeUpper);
+      setFormCodigoBarras(codeUpper);
       setFormNombre("");
-      setFormCategoria(categoriasRaw[0]?.nombre || "");
-      setFormStock(0);
-      setFormStockMinimo(0);
+      setFormCategoria(categoriasRaw[0]?.nombre || "Sin categoría");
+      setFormDescripcion("");
       setFormPrecio(0);
-      setFormUbicacion("");
-      setFormUnidad("unid");
-      setFormLargo(0);
-      setFormAncho(0);
-      setFormAlto(0);
-      setFormPeso(0);
 
       setModalNuevoAbierto(true);
       toast.info(`🆕 Código ${code} no encontrado. Complete los datos para crearlo.`);
@@ -365,37 +377,24 @@ function ProductosPage() {
   };
 
   const abrirModalCrear = () => {
+    const skuGenerado = `LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(10 + Math.random() * 90)}`;
     setFormNombre("");
-    setFormSku(
-      `LAT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(10 + Math.random() * 90)}`,
-    );
-    setFormCategoria(categoriasRaw[0]?.nombre || "");
-    setFormStock(15);
-    setFormStockMinimo(5);
-    setFormPrecio(32000);
-    setFormUbicacion("Pasillo A - A02");
-    setFormUnidad("gal");
-    setFormLargo(0);
-    setFormAncho(0);
-    setFormAlto(0);
-    setFormPeso(0);
+    setFormSku(skuGenerado);
+    setFormCodigoBarras(skuGenerado);
+    setFormCategoria(categoriasRaw[0]?.nombre || "Sin categoría");
+    setFormDescripcion("");
+    setFormPrecio(0);
     setModalNuevoAbierto(true);
   };
 
   const abrirModalEditar = (p: ProductoItem) => {
     setProductoEditar(p);
-    setFormNombre(p.nombre);
+    setFormNombre(p.nombre || "");
     setFormSku(p.sku || "");
-    setFormCategoria(p.categoria || "");
-    setFormStock(p.stock_actual);
-    setFormStockMinimo(p.stock_minimo);
-    setFormPrecio(p.precio || 0);
-    setFormUbicacion(p.ubicacion || "");
-    setFormUnidad(p.unidad || "gal");
-    setFormLargo(p.dimensiones?.largo || 0);
-    setFormAncho(p.dimensiones?.ancho || 0);
-    setFormAlto(p.dimensiones?.alto || 0);
-    setFormPeso(p.dimensiones?.peso || 0);
+    setFormCodigoBarras((p as any).codigo_barras || p.sku || "");
+    setFormDescripcion((p as any).descripcion || "");
+    setFormCategoria(p.categoria || "Sin categoría");
+    setFormPrecio(p.precio || (p as any).precio_unitario || 0);
   };
 
   // 🔌 Guardar nuevo producto (SUPABASE)
@@ -408,18 +407,13 @@ function ProductosPage() {
 
     mutationCrear.mutate({
       sku: formSku.trim().toUpperCase(),
+      codigo_barras: formCodigoBarras.trim() || formSku.trim().toUpperCase(),
       nombre: formNombre.trim(),
-      categoria: formCategoria || null,
-      stock_actual: Number(formStock) || 0,
-      stock_minimo: Number(formStockMinimo) || 0,
-      unidad: formUnidad,
-      ubicacion: formUbicacion || null,
+      descripcion: formDescripcion.trim() || null,
+      categoria: formCategoria === "Sin categoría" ? null : formCategoria || null,
       precio: Number(formPrecio) || 0,
-      largo: Number(formLargo) || null,
-      ancho: Number(formAncho) || null,
-      alto: Number(formAlto) || null,
-      peso: Number(formPeso) || null,
-    });
+      precio_unitario: Number(formPrecio) || 0,
+    } as any);
 
     setModalNuevoAbierto(false);
   };
@@ -429,21 +423,21 @@ function ProductosPage() {
     e.preventDefault();
     if (!productoEditar) return;
 
+    if (!formNombre.trim() || !formSku.trim()) {
+      toast.error("Por favor completa el nombre y el SKU.");
+      return;
+    }
+
     mutationActualizar.mutate({
       id: productoEditar.id,
       updates: {
         nombre: formNombre.trim(),
         sku: formSku.trim().toUpperCase(),
-        categoria: formCategoria || null,
-        stock_actual: Number(formStock) || 0,
-        stock_minimo: Number(formStockMinimo) || 0,
+        codigo_barras: formCodigoBarras.trim() || formSku.trim().toUpperCase(),
+        descripcion: formDescripcion.trim() || null,
+        categoria: formCategoria === "Sin categoría" ? null : formCategoria || null,
         precio: Number(formPrecio) || 0,
-        ubicacion: formUbicacion || null,
-        unidad: formUnidad,
-        largo: Number(formLargo) || null,
-        ancho: Number(formAncho) || null,
-        alto: Number(formAlto) || null,
-        peso: Number(formPeso) || null,
+        precio_unitario: Number(formPrecio) || 0,
       },
     });
 
@@ -892,188 +886,160 @@ function ProductosPage() {
           </DialogHeader>
 
           <form onSubmit={handleGuardarNuevo} className="space-y-4 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-sku">SKU *</Label>
-                <div className="flex gap-2">
+            {/* 1. INFORMACIÓN BÁSICA */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Información Básica</h3>
+                  <p className="text-xs text-gray-500">Datos principales del producto</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="nuevo-nombre" className="text-xs font-medium text-gray-700">
+                    Nombre *
+                  </Label>
+                  <Input
+                    id="nuevo-nombre"
+                    value={formNombre}
+                    onChange={(e) => setFormNombre(e.target.value)}
+                    placeholder="Ej: Látex Supercubriente Blanco 20L"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="nuevo-sku" className="text-xs font-medium text-gray-700">
+                    SKU *
+                  </Label>
                   <Input
                     id="nuevo-sku"
                     value={formSku}
                     onChange={(e) => setFormSku(e.target.value)}
                     placeholder="Ej: LAT-4001-WHT"
-                    className="font-mono text-sm uppercase flex-1"
+                    className="font-mono text-sm uppercase"
                     required
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setScannerOpen(true)}
-                    title="Escanear código"
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="nuevo-codigo-barras"
+                    className="text-xs font-medium text-gray-700"
                   >
-                    <Camera className="h-4 w-4" />
-                  </Button>
+                    Código de Barras
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="nuevo-codigo-barras"
+                      value={formCodigoBarras}
+                      onChange={(e) => setFormCodigoBarras(e.target.value)}
+                      placeholder="Ej: 8435000000000"
+                      className="font-mono text-sm flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setScannerOpen(true)}
+                      title="Escanear código de barras con la cámara"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-cat">Categoría *</Label>
-                <Select value={formCategoria} onValueChange={setFormCategoria}>
-                  <SelectTrigger id="nuevo-cat">
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoriasRaw.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.nombre}>
-                        {cat.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* 2. CATEGORIZACIÓN */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">Categorización</h3>
+                    <p className="text-xs text-gray-500">Clasificación del producto</p>
+                  </div>
+                </div>
+                {(!formCategoria || formCategoria === "Sin categoría") && (
+                  <Badge
+                    variant="outline"
+                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-normal"
+                  >
+                    Sin categoría
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="nuevo-cat" className="text-xs font-medium text-gray-700">
+                    Categoría *
+                  </Label>
+                  <Select value={formCategoria} onValueChange={setFormCategoria}>
+                    <SelectTrigger id="nuevo-cat">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sin categoría">Sin categoría</SelectItem>
+                      {categoriasRaw.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.nombre}>
+                          {cat.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="nuevo-nombre">Nombre del Producto *</Label>
-              <Input
-                id="nuevo-nombre"
-                value={formNombre}
-                onChange={(e) => setFormNombre(e.target.value)}
-                placeholder="Ej: Látex Supercubriente Blanco 20L"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-stock">Stock Inicial</Label>
-                <Input
-                  id="nuevo-stock"
-                  type="number"
-                  min={0}
-                  value={formStock}
-                  onChange={(e) =>
-                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-minimo">Stock Mínimo</Label>
-                <Input
-                  id="nuevo-minimo"
-                  type="number"
-                  min={0}
-                  value={formStockMinimo}
-                  onChange={(e) =>
-                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-unidad">Unidad</Label>
-                <Select value={formUnidad} onValueChange={setFormUnidad}>
-                  <SelectTrigger id="nuevo-unidad">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gal">gal (Galones)</SelectItem>
-                    <SelectItem value="unid">unid (Unidades)</SelectItem>
-                    <SelectItem value="Kg">Kg (Kilos)</SelectItem>
-                    <SelectItem value="L">L (Litros)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="nuevo-precio">Precio Unitario ($)</Label>
-                <Input
-                  id="nuevo-precio"
-                  type="number"
-                  min={0}
-                  value={formPrecio}
-                  onChange={(e) =>
-                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="nuevo-ubicacion">Ubicación física</Label>
-              <Input
-                id="nuevo-ubicacion"
-                value={formUbicacion}
-                onChange={(e) => setFormUbicacion(e.target.value)}
-                placeholder="Ej: Pasillo A - A01"
-              />
-            </div>
-
-            {/* 📦 SECCIÓN DE DIMENSIONES Y PESO */}
-            <div className="pt-2 border-t border-gray-200">
+            {/* 3. DESCRIPCIÓN */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <Box className="h-4 w-4 text-amber-700" />
-                <h3 className="text-sm font-semibold text-gray-800">
-                  Dimensiones y Peso (Opcional)
-                </h3>
+                <FileText className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Descripción</h3>
+                  <p className="text-xs text-gray-500">Detalles adicionales del producto</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="nuevo-largo" className="text-xs">
-                    Largo (cm)
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="nuevo-descripcion" className="text-xs font-medium text-gray-700">
+                    Descripción
                   </Label>
-                  <Input
-                    id="nuevo-largo"
-                    type="number"
-                    min={0}
-                    value={formLargo}
-                    onChange={(e) =>
-                      setFormLargo(e.target.value === "" ? "" : Number(e.target.value))
-                    }
+                  <Textarea
+                    id="nuevo-descripcion"
+                    value={formDescripcion}
+                    onChange={(e) => setFormDescripcion(e.target.value)}
+                    placeholder="Detalles adicionales del producto, características o recomendaciones de uso..."
+                    rows={3}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="nuevo-ancho" className="text-xs">
-                    Ancho (cm)
-                  </Label>
-                  <Input
-                    id="nuevo-ancho"
-                    type="number"
-                    min={0}
-                    value={formAncho}
-                    onChange={(e) =>
-                      setFormAncho(e.target.value === "" ? "" : Number(e.target.value))
-                    }
-                  />
+              </div>
+            </div>
+
+            {/* 4. PRECIO */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Precio</h3>
+                  <p className="text-xs text-gray-500">Valor por unidad</p>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-alto" className="text-xs">
-                    Alto (cm)
+                  <Label htmlFor="nuevo-precio" className="text-xs font-medium text-gray-700">
+                    Precio Unitario ($)
                   </Label>
                   <Input
-                    id="nuevo-alto"
+                    id="nuevo-precio"
                     type="number"
                     min={0}
-                    value={formAlto}
+                    step="0.01"
+                    value={formPrecio}
                     onChange={(e) =>
-                      setFormAlto(e.target.value === "" ? "" : Number(e.target.value))
+                      setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
                     }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="nuevo-peso" className="text-xs flex items-center gap-1">
-                    <Scale className="h-3 w-3" /> Peso (kg)
-                  </Label>
-                  <Input
-                    id="nuevo-peso"
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    value={formPeso}
-                    onChange={(e) =>
-                      setFormPeso(e.target.value === "" ? "" : Number(e.target.value))
-                    }
+                    placeholder="0.00"
                   />
                 </div>
               </div>
@@ -1090,7 +1056,7 @@ function ProductosPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-[#8c4314] hover:bg-[#78370e] text-white"
+                className="bg-amber-700 hover:bg-amber-800 text-white font-medium"
                 disabled={mutationCrear.isPending}
               >
                 {mutationCrear.isPending ? "Guardando..." : "Guardar Producto"}
@@ -1109,173 +1075,166 @@ function ProductosPage() {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-gray-900">Editar Producto</DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
-              Modifica los detalles del producto seleccionado.
+              Modifica los detalles del producto en el catálogo.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleGuardarEdicion} className="space-y-4 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="edit-sku">SKU</Label>
-                <Input
-                  id="edit-sku"
-                  value={formSku}
-                  onChange={(e) => setFormSku(e.target.value)}
-                  className="font-mono text-sm uppercase"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="edit-cat">Categoría</Label>
-                <Select value={formCategoria} onValueChange={setFormCategoria}>
-                  <SelectTrigger id="edit-cat">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoriasRaw.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.nombre}>
-                        {cat.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-nombre">Nombre</Label>
-              <Input
-                id="edit-nombre"
-                value={formNombre}
-                onChange={(e) => setFormNombre(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="edit-stock">Stock Actual</Label>
-                <Input
-                  id="edit-stock"
-                  type="number"
-                  min={0}
-                  value={formStock}
-                  onChange={(e) =>
-                    setFormStock(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="edit-minimo">Stock Mínimo</Label>
-                <Input
-                  id="edit-minimo"
-                  type="number"
-                  min={0}
-                  value={formStockMinimo}
-                  onChange={(e) =>
-                    setFormStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="edit-unidad">Unidad</Label>
-                <Input
-                  id="edit-unidad"
-                  value={formUnidad}
-                  onChange={(e) => setFormUnidad(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="edit-precio">Precio Unitario ($)</Label>
-                <Input
-                  id="edit-precio"
-                  type="number"
-                  min={0}
-                  value={formPrecio}
-                  onChange={(e) =>
-                    setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-ubicacion">Ubicación</Label>
-              <Input
-                id="edit-ubicacion"
-                value={formUbicacion}
-                onChange={(e) => setFormUbicacion(e.target.value)}
-              />
-            </div>
-
-            {/* 📦 SECCIÓN DE DIMENSIONES Y PESO (EDITAR) */}
-            <div className="pt-2 border-t border-gray-200">
+            {/* 1. INFORMACIÓN BÁSICA */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <Box className="h-4 w-4 text-amber-700" />
-                <h3 className="text-sm font-semibold text-gray-800">
-                  Dimensiones y Peso (Opcional)
-                </h3>
+                <Package className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Información Básica</h3>
+                  <p className="text-xs text-gray-500">Datos principales del producto</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-largo" className="text-xs">
-                    Largo (cm)
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="edit-nombre" className="text-xs font-medium text-gray-700">
+                    Nombre del Producto *
                   </Label>
                   <Input
-                    id="edit-largo"
-                    type="number"
-                    min={0}
-                    value={formLargo}
-                    onChange={(e) =>
-                      setFormLargo(e.target.value === "" ? "" : Number(e.target.value))
-                    }
+                    id="edit-nombre"
+                    value={formNombre}
+                    onChange={(e) => setFormNombre(e.target.value)}
+                    placeholder="Ej. Esmalte Sintético Brillante Blanco 4L"
+                    required
                   />
                 </div>
+
                 <div className="space-y-1">
-                  <Label htmlFor="edit-ancho" className="text-xs">
-                    Ancho (cm)
+                  <Label htmlFor="edit-sku" className="text-xs font-medium text-gray-700">
+                    SKU *
                   </Label>
                   <Input
-                    id="edit-ancho"
-                    type="number"
-                    min={0}
-                    value={formAncho}
-                    onChange={(e) =>
-                      setFormAncho(e.target.value === "" ? "" : Number(e.target.value))
-                    }
+                    id="edit-sku"
+                    value={formSku}
+                    onChange={(e) => setFormSku(e.target.value.toUpperCase())}
+                    className="font-mono text-sm uppercase"
+                    placeholder="LAT-0000-00"
+                    required
                   />
                 </div>
+
                 <div className="space-y-1">
-                  <Label htmlFor="edit-alto" className="text-xs">
-                    Alto (cm)
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="edit-codigo-barras"
+                      className="text-xs font-medium text-gray-700"
+                    >
+                      Código de Barras
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => setScannerOpen(true)}
+                      className="text-[11px] text-amber-700 hover:text-amber-800 flex items-center gap-1 font-medium"
+                    >
+                      <Camera className="h-3 w-3" />
+                      Escanear
+                    </button>
+                  </div>
                   <Input
-                    id="edit-alto"
-                    type="number"
-                    min={0}
-                    value={formAlto}
-                    onChange={(e) =>
-                      setFormAlto(e.target.value === "" ? "" : Number(e.target.value))
-                    }
+                    id="edit-codigo-barras"
+                    value={formCodigoBarras}
+                    onChange={(e) => setFormCodigoBarras(e.target.value)}
+                    placeholder="Código de barras EAN o referencia"
+                    className="font-mono text-sm"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* 2. CATEGORIZACIÓN */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">Categorización</h3>
+                    <p className="text-xs text-gray-500">Clasificación del producto</p>
+                  </div>
+                </div>
+                {(!formCategoria || formCategoria === "Sin categoría") && (
+                  <Badge
+                    variant="outline"
+                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-normal"
+                  >
+                    Sin categoría
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="edit-cat" className="text-xs font-medium text-gray-700">
+                    Categoría
+                  </Label>
+                  <Select value={formCategoria} onValueChange={setFormCategoria}>
+                    <SelectTrigger id="edit-cat">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sin categoría">Sin categoría</SelectItem>
+                      {categoriasRaw.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.nombre}>
+                          {cat.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. DESCRIPCIÓN */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Descripción</h3>
+                  <p className="text-xs text-gray-500">Detalles adicionales del producto</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="edit-descripcion" className="text-xs font-medium text-gray-700">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="edit-descripcion"
+                    value={formDescripcion}
+                    onChange={(e) => setFormDescripcion(e.target.value)}
+                    placeholder="Detalles adicionales del producto..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 4. PRECIO */}
+            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Precio</h3>
+                  <p className="text-xs text-gray-500">Valor por unidad</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="edit-peso" className="text-xs flex items-center gap-1">
-                    <Scale className="h-3 w-3" /> Peso (kg)
+                  <Label htmlFor="edit-precio" className="text-xs font-medium text-gray-700">
+                    Precio Unitario ($)
                   </Label>
                   <Input
-                    id="edit-peso"
+                    id="edit-precio"
                     type="number"
                     min={0}
-                    step="0.1"
-                    value={formPeso}
+                    step="0.01"
+                    value={formPrecio}
                     onChange={(e) =>
-                      setFormPeso(e.target.value === "" ? "" : Number(e.target.value))
+                      setFormPrecio(e.target.value === "" ? "" : Number(e.target.value))
                     }
+                    placeholder="0.00"
                   />
                 </div>
               </div>
@@ -1292,7 +1251,7 @@ function ProductosPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-[#8c4314] hover:bg-[#78370e] text-white"
+                className="bg-amber-700 hover:bg-amber-800 text-white font-medium"
                 disabled={mutationActualizar.isPending}
               >
                 {mutationActualizar.isPending ? "Guardando..." : "Guardar Cambios"}
@@ -1323,63 +1282,30 @@ function ProductosPage() {
             <div className="space-y-3 py-2 text-xs">
               <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <div>
-                  <span className="text-gray-500 block">Stock Actual:</span>
-                  <span className="font-bold text-sm text-gray-900">
-                    {productoVer.stock_actual} {productoVer.unidad}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Stock Mínimo:</span>
-                  <span className="font-bold text-sm text-gray-900">
-                    {productoVer.stock_minimo} {productoVer.unidad}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Ubicación Física:</span>
-                  <span className="font-semibold text-gray-800">
-                    {productoVer.ubicacion || "-"}
+                  <span className="text-gray-500 block">Código de Barras:</span>
+                  <span className="font-mono text-xs font-semibold text-gray-900">
+                    {(productoVer as any).codigo_barras || productoVer.sku || "-"}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-500 block">Precio Unitario:</span>
                   <span className="font-semibold text-gray-800">
-                    ${(productoVer.precio || 0).toLocaleString("es-CL")}
+                    $
+                    {(
+                      productoVer.precio ||
+                      (productoVer as any).precio_unitario ||
+                      0
+                    ).toLocaleString("es-CL")}
                   </span>
                 </div>
               </div>
 
-              {productoVer.dimensiones && (
-                <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-200">
-                  <div className="flex items-center gap-1.5 mb-2 text-amber-800 font-semibold">
-                    <Box className="h-3.5 w-3.5" />
-                    <span>Dimensiones y Peso</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    <div>
-                      <span className="text-[10px] text-gray-500 block">Largo</span>
-                      <span className="font-bold text-gray-900">
-                        {productoVer.dimensiones.largo} cm
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 block">Ancho</span>
-                      <span className="font-bold text-gray-900">
-                        {productoVer.dimensiones.ancho} cm
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 block">Alto</span>
-                      <span className="font-bold text-gray-900">
-                        {productoVer.dimensiones.alto} cm
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 block">Peso</span>
-                      <span className="font-bold text-gray-900">
-                        {productoVer.dimensiones.peso} kg
-                      </span>
-                    </div>
-                  </div>
+              {(productoVer as any).descripcion && (
+                <div className="bg-white p-3 rounded-lg border border-gray-200">
+                  <span className="text-gray-500 block text-[11px] mb-1 font-medium">
+                    Descripción:
+                  </span>
+                  <p className="text-gray-700 text-xs">{(productoVer as any).descripcion}</p>
                 </div>
               )}
 

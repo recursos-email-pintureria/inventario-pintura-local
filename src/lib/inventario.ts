@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   Categoria,
   Producto,
   MovimientoDetallado,
@@ -105,7 +105,7 @@ export async function crearUbicacionBD(ubi: {
 }): Promise<Ubicacion> {
   const { data: userData } = await supabase.auth.getUser();
 
-  const payload: Record<string, any> = {
+  const payload: any = {
     nombre: ubi.nombre,
     tipo: ubi.tipo,
     descripcion: ubi.descripcion ?? null,
@@ -118,7 +118,7 @@ export async function crearUbicacionBD(ubi: {
   };
 
   if (userData?.user?.id) {
-    payload['creado_por'] = userData.user.id;
+    payload["creado_por"] = userData.user.id;
   }
 
   let res = await supabase.from("ubicaciones").insert(payload).select().single();
@@ -132,8 +132,8 @@ export async function crearUbicacionBD(ubi: {
       descripcion: ubi.descripcion ?? null,
       activo: true,
     };
-    if (ubi.id_ubicacion_padre) payloadMinimo['id_ubicacion_padre'] = ubi.id_ubicacion_padre;
-    if (ubi.seccion) payloadMinimo['seccion'] = ubi.seccion;
+    if (ubi.id_ubicacion_padre) payloadMinimo["id_ubicacion_padre"] = ubi.id_ubicacion_padre;
+    if (ubi.seccion) payloadMinimo["seccion"] = ubi.seccion;
     res = await supabase.from("ubicaciones").insert(payloadMinimo).select().single();
   }
 
@@ -396,17 +396,9 @@ export async function getProductos(): Promise<Producto[]> {
 
     return (data || []).map((p: any) => ({
       ...p,
-      precio: p.precio_unitario ?? p.precio ?? 0,
-      precio_unitario: p.precio_unitario ?? p.precio ?? 0,
+      precio: p.precio_unitario ?? 0,
+      precio_unitario: p.precio_unitario ?? 0,
       categoria: p.categoria || p.categoria_rel?.nombre || "Sin categoría",
-      stock_actual: p.stock_actual ?? 0,
-      stock_minimo: p.stock_minimo ?? 0,
-      unidad: p.unidad ?? "unid",
-      ubicacion: p.ubicacion ?? null,
-      largo: p.largo ?? 0,
-      ancho: p.ancho ?? 0,
-      alto: p.alto ?? 0,
-      peso: p.peso ?? 0,
     }));
   } catch (err: any) {
     console.warn("Excepción al consultar productos:", err.message);
@@ -415,77 +407,72 @@ export async function getProductos(): Promise<Producto[]> {
 }
 
 /** Crear un nuevo producto */
-export async function crearProducto(
-  producto: Partial<Producto> & Record<string, any>,
-): Promise<Producto> {
-  const payload: Record<string, any> = {
-    sku: producto['sku'],
-    nombre: producto['nombre'],
-    codigo_barras: producto['codigo_barras'] || producto['sku'] || `BAR-${Date.now()}`,
-    activo: producto['activo'] ?? true,
-    precio_unitario: producto['precio_unitario'] ?? producto['precio'] ?? 0,
-    descripcion: producto['descripcion'] ?? null,
+export async function crearProducto(producto: any): Promise<Producto> {
+  const payload: any = {
+    sku: producto.sku,
+    nombre: producto.nombre,
+    codigo_barras: producto.codigo_barras || producto.sku || `BAR-{Date.now()}`,
+    activo: producto.activo ?? true,
+    precio_unitario: producto.precio_unitario ?? producto.precio ?? 0,
+    descripcion: producto.descripcion ?? null,
   };
 
-  if (producto['id_categoria']) {
-    payload['id_categoria'] = producto['id_categoria'];
-  } else if (producto['categoria'] && producto['categoria'] !== "Sin categoría") {
+  if (producto.id_categoria) {
+    payload.id_categoria = producto.id_categoria;
+  } else if (producto.categoria && producto.categoria !== 'Sin categoría') {
     const { data: cat } = await supabase
-      .from("categorias")
-      .select("id")
-      .eq("nombre", producto['categoria'])
+      .from('categorias')
+      .select('id')
+      .eq('nombre', producto.categoria)
       .maybeSingle();
     if (cat?.id) {
-      payload['id_categoria'] = cat.id;
+      payload.id_categoria = cat.id;
     }
   }
 
-  const { data, error } = await supabase.from("productos").insert(payload).select().single();
+  const { data, error } = await supabase.from('productos').insert(payload).select().single();
 
   if (error) throw error;
   return data;
 }
 
 /** Actualizar un producto (solo columnas válidas de la tabla productos) */
-export async function actualizarProducto(
-  id: string,
-  updates: Partial<Producto> & Record<string, any>,
-): Promise<Producto> {
-  const payload: Record<string, any> = {};
+export async function actualizarProducto(id: string, updates: any): Promise<Producto> {
+  const payload: any = {};
 
-  if (updates['nombre'] !== undefined) payload['nombre'] = updates['nombre'];
-  if (updates['sku'] !== undefined) payload['sku'] = updates['sku'];
-  if (updates['codigo_barras'] !== undefined) payload['codigo_barras'] = updates['codigo_barras'];
-  if (updates['descripcion'] !== undefined) payload['descripcion'] = updates['descripcion'];
-  if (updates['activo'] !== undefined) payload['activo'] = updates['activo'];
+  if (updates.nombre !== undefined) payload.nombre = updates.nombre;
+  if (updates.sku !== undefined) payload.sku = updates.sku;
+  if (updates.codigo_barras !== undefined) payload.codigo_barras = updates.codigo_barras;
+  if (updates.descripcion !== undefined) payload.descripcion = updates.descripcion;
+  if (updates.activo !== undefined) payload.activo = updates.activo;
 
-  if (updates['precio_unitario'] !== undefined) {
-    payload['precio_unitario'] = updates['precio_unitario'];
-  } else if (updates['precio'] !== undefined) {
-    payload['precio_unitario'] = updates['precio'];
+  if (updates.precio_unitario !== undefined) {
+    payload.precio_unitario = updates.precio_unitario;
+  } else if (updates.precio !== undefined) {
+    payload.precio_unitario = updates.precio;
   }
 
-  if (updates['id_categoria'] !== undefined) {
-    payload['id_categoria'] = updates['id_categoria'];
-  } else if (updates['categoria']) {
-    if (updates['categoria'] === "Sin categoría") {
-      payload['id_categoria'] = null;
+  if (updates.id_categoria !== undefined) {
+    payload.id_categoria = updates.id_categoria;
+  } else if (updates.categoria !== undefined) {
+    if (updates.categoria === 'Sin categoría' || !updates.categoria) {
+      payload.id_categoria = null;
     } else {
       const { data: cat } = await supabase
-        .from("categorias")
-        .select("id")
-        .eq("nombre", updates['categoria'])
+        .from('categorias')
+        .select('id')
+        .eq('nombre', updates.categoria)
         .maybeSingle();
       if (cat?.id) {
-        payload['id_categoria'] = cat.id;
+        payload.id_categoria = cat.id;
       }
     }
   }
 
   const { data, error } = await supabase
-    .from("productos")
+    .from('productos')
     .update(payload)
-    .eq("id", id)
+    .eq('id', id)
     .select()
     .single();
 
@@ -498,44 +485,6 @@ export async function desactivarProducto(id: string, activo: boolean): Promise<v
   const { error } = await supabase.from("productos").update({ activo }).eq("id", id);
 
   if (error) throw error;
-}
-
-
-// ============================================================================
-// TOP UBICACIONES (para Dashboard)
-// ============================================================================
-
-export async function getTopUbicaciones(limit: number = 5): Promise<any[]> {
-  const { data, error } = await supabase
-    .from("stock")
-    .select("cantidad, ubicaciones!inner(id, nombre, tipo)");
-
-  if (error) throw error;
-
-  const ubicacionesMap = new Map<string, { nombre: string; tipo: string; total: number }>();
-
-  for (const row of data ?? []) {
-    const ubi = row.ubicaciones as any;
-    const key = ubi.id;
-    if (!ubicacionesMap.has(key)) {
-      ubicacionesMap.set(key, { nombre: ubi.nombre, tipo: ubi.tipo, total: 0 });
-    }
-    ubicacionesMap.get(key)!.total += Number(row.cantidad ?? 0);
-  }
-
-  const ubicacionesArray = Array.from(ubicacionesMap.entries())
-    .map(([id, data]) => ({ id, ...data }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, limit);
-
-  const maxStock = ubicacionesArray[0]?.total || 1;
-
-  return ubicacionesArray.map((u) => ({
-    nombre: u.nombre,
-    stock_total: u.total,
-    unidad: u.tipo === "armario" || u.tipo === "alto" ? "unid" : "gal",
-    porcentaje: Math.round((u.total / maxStock) * 100),
-  }));
 }
 
 // ============================================================================
@@ -573,11 +522,6 @@ export const inventarioQueryOptions = {
       queryKey: ["stock"],
       queryFn: getStockPorUbicaciones,
     }),
-  movimientos: () =>
-    queryOptions({
-      queryKey: ["movimientos"],
-      queryFn: getMovimientos,
-    }),
 };
 
 // ============================================================================
@@ -614,31 +558,22 @@ export async function getUbicaciones(): Promise<UbicacionSimple[]> {
  * con consultas paralelas (evita depender de nombres de relaciones embed).
  */
 export async function getMovimientos(): Promise<MovimientoDetallado[]> {
+  // 1. Obtener movimientos usando los nombres REALES de las columnas
   let movRes = await supabase
     .from("movimientos")
     .select("*")
     .order("fecha_movimiento", { ascending: false })
     .limit(500);
 
-  // Resiliencia: si la columna de fecha no es fecha_movimiento, probar created_at o sin order
-  if (movRes.error) {
-    movRes = await supabase
-      .from("movimientos")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500);
-  }
-  if (movRes.error) {
+  if (movRes.error && /fecha_movimiento/.test(movRes.error.message)) {
     movRes = await supabase.from("movimientos").select("*").limit(500);
   }
-  if (movRes.error) {
-    console.warn("Aviso al consultar movimientos:", movRes.error.message);
-    return [];
-  }
+  if (movRes.error) throw movRes.error;
 
+  // 2. Obtener productos, ubicaciones y perfiles en paralelo
   const [prodRes, ubiRes, perRes] = await Promise.all([
-    supabase.from("productos").select("id, nombre, sku"),
-    supabase.from("ubicaciones").select("*"),
+    supabase.from("productos").select("id, nombre, sku, codigo_barras"),
+    supabase.from("ubicaciones").select("id, nombre, tipo, descripcion"),
     supabase.from("perfiles_usuario").select("*"),
   ]);
 
@@ -646,21 +581,31 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
   const ubiMap = new Map((ubiRes.data ?? []).map((u: any) => [u.id, u]));
   const perMap = new Map((perRes.data ?? []).map((u: any) => [u.id, u]));
 
+  // 3. Mapear usando los nombres REALES: id_producto, id_ubicacion, realizado_por, fecha_movimiento
   const filas: MovimientoDetallado[] = (movRes.data ?? []).map((m: any) => {
-    const prodId = m.id_producto ?? m.producto_id;
-    const ubiId = m.id_ubicacion ?? m.ubicacion_id;
-    const userId = m.realizado_por ?? m.usuario_id;
-    const p = prodMap.get(prodId);
-    const u = ubiMap.get(ubiId);
-    const per = userId ? perMap.get(userId) : undefined;
+    const p = prodMap.get(m.id_producto); // ✅ id_producto (no producto_id)
+    const u = ubiMap.get(m.id_ubicacion); // ✅ id_ubicacion (no ubicacion_id)
+    const per = m.realizado_por ? perMap.get(m.realizado_por) : undefined; // ✅ realizado_por (no usuario_id)
+
     return {
       id: m.id,
       tipo: m.tipo,
-      cantidad: Number(m.cantidad || 0),
-      fecha: m.fecha_movimiento ?? m.created_at ?? m.fecha ?? new Date().toISOString(),
-      motivo: m.notas ?? m.motivo ?? null,
-      producto: p ? { id: p.id, nombre: p.nombre, sku: p.sku ?? null } : null,
-      ubicacion: u ? { id: u.id, codigo: u.codigo ?? u.nombre ?? String(u.id).slice(0, 8) } : null,
+      cantidad: Number(m.cantidad),
+      fecha: m.fecha_movimiento ?? new Date().toISOString(), // ✅ fecha_movimiento (no created_at)
+      motivo: m.notas ?? null, // ✅ notas (no motivo)
+      producto: p
+        ? {
+            id: p.id,
+            nombre: p.nombre,
+            sku: p.codigo_barras ?? p.sku ?? "S/N", // ✅ codigo_barras primero
+          }
+        : null,
+      ubicacion: u
+        ? {
+            id: u.id,
+            codigo: u.nombre ?? String(u.id).slice(0, 8), // ✅ nombre real de la ubicación
+          }
+        : null,
       usuario: per
         ? {
             id: per.id,
@@ -670,8 +615,7 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
     };
   });
 
-  // Orden estable por fecha descendente en cliente
-  return filas.sort((a, b) => (new Date(a.fecha).getTime() < new Date(b.fecha).getTime() ? 1 : -1));
+  return filas.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 }
 
 /**
@@ -741,4 +685,57 @@ export async function crearMovimiento(input: {
     res = await supabase.from("movimientos").insert(resto);
   }
   if (res.error) throw res.error;
+}
+
+export async function getTopUbicaciones(
+  limit: number = 5,
+): Promise<{ nombre: string; stock_total: number; unidad: string; porcentaje: number }[]> {
+  try {
+    const [stockRes, ubiRes] = await Promise.all([
+      supabase.from("stock").select("cantidad, id_ubicacion"),
+      supabase.from("ubicaciones").select("id, nombre, tipo").eq("activo", true),
+    ]);
+
+    if (stockRes.error) {
+      console.warn("Aviso en getTopUbicaciones (stock):", stockRes.error.message);
+      return [];
+    }
+
+    const ubiMap = new Map<string, { nombre: string; tipo: string }>(
+      (ubiRes.data ?? []).map((u: any) => [u.id, u]),
+    );
+
+    const ubicacionesMap = new Map<string, { nombre: string; tipo: string; total: number }>();
+
+    for (const item of stockRes.data ?? []) {
+      const ubiId = item.id_ubicacion;
+      if (!ubiId) continue;
+      const ubi = ubiMap.get(ubiId);
+      if (!ubicacionesMap.has(ubiId)) {
+        ubicacionesMap.set(ubiId, {
+          nombre: ubi?.nombre || `Ubicación ${String(ubiId).slice(0, 8)}`,
+          tipo: ubi?.tipo || "armario",
+          total: 0,
+        });
+      }
+      ubicacionesMap.get(ubiId)!.total += Number(item.cantidad) || 0;
+    }
+
+    const ubicacionesArray = Array.from(ubicacionesMap.entries())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit);
+
+    const maxStock = ubicacionesArray[0]?.total || 1;
+
+    return ubicacionesArray.map((u) => ({
+      nombre: u.nombre,
+      stock_total: u.total,
+      unidad: u.tipo === "armario" || u.tipo === "alto" ? "unid" : "gal",
+      porcentaje: Math.round((u.total / maxStock) * 100),
+    }));
+  } catch (err) {
+    console.warn("Excepción en getTopUbicaciones:", err);
+    return [];
+  }
 }
