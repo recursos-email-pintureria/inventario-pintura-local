@@ -50,7 +50,9 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             setLastScanned(decodedText);
             onScan(decodedText);
             stopScanning();
+            onOpenChange(false);
           },
+
           (errorMessage) => {
             // Errores de escaneo (ignoramos los de "no code found")
             if (!errorMessage.includes("No MultiFormat Readers")) {

@@ -243,7 +243,10 @@ function ProductosPage() {
     return productos.filter((p) => {
       const q = busqueda.toLowerCase().trim();
       const coincideTexto =
-        !q || p.nombre.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
+        !q ||
+        p.nombre.toLowerCase().includes(q) ||
+        (p.sku || "").toLowerCase().includes(q) ||
+        ((p as any).codigo_barras || "").toLowerCase().includes(q);
 
       const coincideCategoria =
         categoriaSeleccionada === "todas" || p.categoria === categoriaSeleccionada;
@@ -327,16 +330,23 @@ function ProductosPage() {
 
   // 📷 Manejador del escaneo
   const handleScan = (code: string) => {
+    const q = code.trim().toLowerCase();
     const productoEncontrado = productos.find(
-      (p) => (p.sku || "").toLowerCase() === code.toLowerCase() || p.id === code,
+      (p) =>
+        (p.sku || "").toLowerCase() === q ||
+        ((p as any).codigo_barras || "").toLowerCase() === q ||
+        p.id.toLowerCase() === q,
     );
 
     if (productoEncontrado) {
       setBusqueda(productoEncontrado.sku);
       setPaginaActual(1);
-      toast.success(`✅ Producto encontrado: ${productoEncontrado.nombre}`);
+      toast.success(
+        `✅ Producto identificado: ${productoEncontrado.nombre} (${productoEncontrado.sku})`,
+      );
     } else {
       setFormSku(code.toUpperCase());
+
       setFormNombre("");
       setFormCategoria(categoriasRaw[0]?.nombre || "");
       setFormStock(0);
