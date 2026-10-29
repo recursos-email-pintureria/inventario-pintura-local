@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { Camera, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { Camera, X, CheckCircle2, AlertCircle, Flashlight, FlashlightOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -17,187 +18,312 @@ interface BarcodeScannerProps {
   onScan: (code: string) => void;
 }
 
-// 🔊 Función para reproducir un bip corto (no requiere archivos externos)
-const playBeep = () => {
+const READER_ID = "barcode-reader";
+const CONFIRMACIONES = 2; // lecturas idénticas consecutivas necesarias
+
+const FORMATOS = [
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.QR_CODE,
+];
+
+// ── Utilidades ───────────────────────────────────────────────
+
+/** Valida el dígito de control de EAN-13 / EAN-8 / UPC-A. Otros formatos pasan. */
+function checksumValido(code: string): boolean {
+  if (!/^\d+$/.test(code) || ![8, 12, 13].includes(code.length)) return true;
+  const digitos = code.split("").map(Number);
+  const control = digitos.pop()!;
+  // Desde la derecha, el primer dígito (sin control) pesa 3, el siguiente 1, etc.
+  const suma = digitos
+    .reverse()
+    .reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (suma % 10)) % 10 === control;
+}
+
+let audioCtx: AudioContext | null = null;
+function pitido() {
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    
-    const ctx = new AudioContext();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, ctx.currentTime); // Frecuencia 880Hz (tono agudo claro)
-    gainNode.gain.setValueAtTime(0.1, ctx.currentTime); // Volumen bajo para que no sea molesto
-    
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.15); // Duración de 150ms
-  } catch (e) {
-    // Ignorar errores de audio (ej: políticas de autoplay del navegador)
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    audioCtx ??= new AC();
+    if (audioCtx.state === "suspended") void audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.1;
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.12);
+  } catch {
+    /* sin audio */
   }
-};
+  navigator.vibrate?.(60);
+}
+
+// ── Componente ───────────────────────────────────────────────
 
 export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
+
+  const [activo, setActivo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastScanned, setLastScanned] = useState<string | null>(null);
-  
-  // 🔒 BLINDAJE: Evita lecturas múltiples en la misma apertura del modal
-  const hasScannedRef = useRef(false);
+  const [ultimo, setUltimo] = useState<string | null>(null);
+  const [manual, setManual] = useState("");
+
+  const [linternaOk, setLinternaOk] = useState(false);
+  const [linterna, setLinterna] = useState(false);
+  const [zoom, setZoom] = useState<{ min: number; max: number; step: number; value: number } | null>(null);
+
+  const detener = useCallback(async () => {
+    const s = scannerRef.current;
+    scannerRef.current = null;
+    if (!s) return;
+    try {
+      if (s.isScanning) await s.stop();
+      s.clear();
+    } catch {
+      /* ya detenido */
+    }
+  }, []);
 
   useEffect(() => {
-    if (!open) {
-      stopScanning();
-      return;
-    }
+    if (!open) return;
 
-    const startScanner = async () => {
-      setError(null);
-      setLastScanned(null);
-      hasScannedRef.current = false; // Resetear el candado al abrir
+    let cancelado = false;
+    let candidato = "";
+    let repeticiones = 0;
+    let terminado = false;
+
+    setError(null);
+    setUltimo(null);
+    setActivo(false);
+    setLinterna(false);
+    setLinternaOk(false);
+    setZoom(null);
+
+    const iniciar = async () => {
+      if (!navigator.mediaDevices?.getUserMedia || !window.isSecureContext) {
+        setError("La cámara requiere HTTPS. Usa la entrada manual.");
+        return;
+      }
+      if (!document.getElementById(READER_ID)) return;
 
       try {
-        const element = document.getElementById("barcode-reader");
-        if (!element) {
-          throw new Error("Elemento de cámara no encontrado en el DOM");
-        }
-
-        const scanner = new Html5Qrcode("barcode-reader");
+        const scanner = new Html5Qrcode(READER_ID, {
+          verbose: false,
+          formatsToSupport: FORMATOS,
+          // Usa el BarcodeDetector nativo si el navegador lo tiene (mucho más rápido y preciso)
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        } as any);
         scannerRef.current = scanner;
 
         await scanner.start(
           { facingMode: "environment" },
           {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: 1.0,
+            fps: 15,
+            disableFlip: true, // los códigos de barras no necesitan la imagen espejada
+            qrbox: (w, h) => ({
+              width: Math.floor(Math.min(w * 0.85, 420)),
+              height: Math.floor(Math.min(h * 0.4, 160)),
+            }),
+            videoConstraints: {
+              facingMode: "environment",
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              advanced: [{ focusMode: "continuous" } as any],
+            },
           },
-          (decodedText) => {
-            // Si ya escaneamos uno, ignoramos el resto
-            if (hasScannedRef.current) return;
-            hasScannedRef.current = true;
+          (texto) => {
+            if (terminado) return;
+            const code = texto.trim();
+            if (!code || !checksumValido(code)) return; // lectura corrupta
 
-            // 🔊 REPRODUCIR BIP AQUÍ
-            playBeep();
+            repeticiones = code === candidato ? repeticiones + 1 : 1;
+            candidato = code;
+            if (repeticiones < CONFIRMACIONES) return;
 
-            setLastScanned(decodedText);
-            onScan(decodedText);
-            stopScanning();
+            terminado = true;
+            pitido();
+            setUltimo(code);
+            onScanRef.current(code);
+            void detener();
             onOpenChange(false);
           },
-          (errorMessage) => {
-            if (!errorMessage.includes("No MultiFormat Readers") && !errorMessage.includes("NotFoundException")) {
-              console.warn("Scanner warning:", errorMessage);
-            }
+          () => {
+            /* frames sin código: ignorar */
+          },
+        );
+
+        if (cancelado) {
+          await detener();
+          return;
+        }
+        setActivo(true);
+
+        // Linterna y zoom (si el dispositivo los soporta)
+        try {
+          const caps = scanner.getRunningTrackCameraCapabilities();
+          setLinternaOk(caps.torchFeature().isSupported());
+          const z = caps.zoomFeature();
+          if (z.isSupported()) {
+            const min = z.min(), max = z.max(), step = z.step();
+            const inicial = Math.min(max, Math.max(min, 2)); // ~2x ayuda con códigos pequeños
+            await z.apply(inicial);
+            setZoom({ min, max, step, value: inicial });
           }
-        );
-
-        setIsScanning(true);
+        } catch {
+          /* capacidades no disponibles */
+        }
       } catch (err: any) {
-        console.error("Error al iniciar escáner:", err);
+        if (cancelado) return;
+        const msg = String(err?.name || err?.message || err);
         setError(
-          err?.message?.includes("Permission") || err?.message?.includes("NotAllowedError")
-            ? "Permiso de cámara denegado. Actívalo en la configuración del navegador."
-            : "No se pudo acceder a la cámara. Verifica que tengas una cámara disponible."
+          /NotAllowed|Permission/i.test(msg)
+            ? "Permiso de cámara denegado. Actívalo en el candado de la barra de direcciones."
+            : /NotFound|Overconstrained/i.test(msg)
+              ? "No se encontró una cámara disponible."
+              : /NotReadable/i.test(msg)
+                ? "La cámara está siendo usada por otra aplicación."
+                : "No se pudo acceder a la cámara. Usa la entrada manual.",
         );
-        setIsScanning(false);
+        setActivo(false);
       }
     };
 
-    const timeout = setTimeout(startScanner, 500);
+    // Espera a que Radix monte el contenido del diálogo en el DOM
+    const timer = setTimeout(iniciar, 300);
+
     return () => {
-      clearTimeout(timeout);
-      stopScanning();
+      cancelado = true;
+      clearTimeout(timer);
+      void detener();
     };
-  }, [open]);
+  }, [open, detener, onOpenChange]);
 
-  const stopScanning = async () => {
-    if (scannerRef.current && isScanning) {
-      try {
-        await scannerRef.current.stop();
-        await scannerRef.current.clear();
-      } catch (err) {
-        console.warn("Error al detener scanner:", err);
-      }
-      scannerRef.current = null;
-      setIsScanning(false);
+  const alternarLinterna = async () => {
+    try {
+      const f = scannerRef.current?.getRunningTrackCameraCapabilities().torchFeature();
+      if (!f) return;
+      await f.apply(!linterna);
+      setLinterna(!linterna);
+    } catch {
+      setLinternaOk(false);
     }
   };
 
-  const handleClose = () => {
-    stopScanning();
+  const cambiarZoom = async (valor: number) => {
+    try {
+      await scannerRef.current?.getRunningTrackCameraCapabilities().zoomFeature().apply(valor);
+      setZoom((z) => (z ? { ...z, value: valor } : z));
+    } catch {
+      /* ignorar */
+    }
+  };
+
+  const usarManual = () => {
+    const code = manual.trim();
+    if (!code) return;
+    onScanRef.current(code);
+    setManual("");
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-orange-900">
-            <Camera className="h-5 w-5 text-orange-600" />
-            Escanear Código de Barras
+          <DialogTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            Escanear código
           </DialogTitle>
           <DialogDescription>
-            Apunta la cámara al código. Se detectará, sonará un bip y se cerrará automáticamente.
+            Coloca el código dentro del recuadro, a unos 15–20 cm, con buena luz.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="relative overflow-hidden rounded-lg border border-orange-200 bg-gray-900">
-            <div
-              id="barcode-reader"
-              className="w-full"
-              style={{ minHeight: isScanning ? "300px" : "200px" }}
-            />
-
-            {!isScanning && !error && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
-                <div className="text-center text-white">
-                  <Camera className="mx-auto h-12 w-12 mb-2 opacity-50 animate-pulse" />
-                  <p className="text-sm">Solicitando acceso a la cámara...</p>
+          <div className="relative overflow-hidden rounded-lg border bg-gray-900">
+            <div id={READER_ID} className="w-full" style={{ minHeight: 240 }} />
+            {!activo && !error && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 text-white">
+                <div className="text-center">
+                  <Camera className="mx-auto mb-2 h-10 w-10 animate-pulse opacity-60" />
+                  <p className="text-sm">Iniciando cámara…</p>
                 </div>
               </div>
             )}
-
             {error && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 p-4">
-                <div className="text-center">
-                  <AlertCircle className="mx-auto h-12 w-12 mb-2 text-rose-500" />
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 p-4 text-center">
+                <div>
+                  <AlertCircle className="mx-auto mb-2 h-10 w-10 text-rose-500" />
                   <p className="text-sm text-white">{error}</p>
                 </div>
               </div>
             )}
+            {activo && linternaOk && (
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="absolute right-2 top-2 z-10"
+                onClick={alternarLinterna}
+                aria-label="Linterna"
+              >
+                {linterna ? <FlashlightOff className="h-4 w-4" /> : <Flashlight className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
 
-          {lastScanned && (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <div className="flex-1">
-                <p className="text-xs font-medium text-emerald-700">Código detectado:</p>
-                <p className="font-mono text-sm font-bold text-emerald-900">{lastScanned}</p>
-              </div>
+          {zoom && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>Zoom</span>
+              <input
+                type="range"
+                className="flex-1"
+                min={zoom.min}
+                max={zoom.max}
+                step={zoom.step}
+                value={zoom.value}
+                onChange={(e) => cambiarZoom(Number(e.target.value))}
+              />
+              <span className="w-8 text-right">{zoom.value.toFixed(1)}x</span>
             </div>
           )}
 
-          <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
-            <p className="font-semibold mb-1">💡 Consejos:</p>
-            <ul className="list-disc list-inside space-y-0.5 text-orange-700">
-              <li>Usa la cámara trasera del móvil.</li>
-              <li>Asegúrate de tener buena iluminación.</li>
-              <li>Mantén el código a 10-15 cm de la cámara.</li>
-            </ul>
+          {ultimo && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <p className="font-mono text-sm font-bold text-emerald-900">{ultimo}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Input
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && usarManual()}
+              placeholder="O escribe el código manualmente"
+              inputMode="numeric"
+            />
+            <Button type="button" variant="secondary" disabled={!manual.trim()} onClick={usarManual}>
+              Usar
+            </Button>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            <X className="mr-2 h-4 w-4" />
-            Cerrar
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <X className="mr-2 h-4 w-4" /> Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>
