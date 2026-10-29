@@ -17,14 +17,39 @@ interface BarcodeScannerProps {
   onScan: (code: string) => void;
 }
 
+// 🔊 Función para reproducir un bip corto (no requiere archivos externos)
+const playBeep = () => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime); // Frecuencia 880Hz (tono agudo claro)
+    gainNode.gain.setValueAtTime(0.1, ctx.currentTime); // Volumen bajo para que no sea molesto
+    
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.15); // Duración de 150ms
+  } catch (e) {
+    // Ignorar errores de audio (ej: políticas de autoplay del navegador)
+  }
+};
+
 export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
+  
+  // 🔒 BLINDAJE: Evita lecturas múltiples en la misma apertura del modal
+  const hasScannedRef = useRef(false);
 
-  // Iniciar escaneo cuando se abre el diálogo
   useEffect(() => {
     if (!open) {
       stopScanning();
@@ -34,8 +59,14 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     const startScanner = async () => {
       setError(null);
       setLastScanned(null);
+      hasScannedRef.current = false; // Resetear el candado al abrir
 
       try {
+        const element = document.getElementById("barcode-reader");
+        if (!element) {
+          throw new Error("Elemento de cámara no encontrado en el DOM");
+        }
+
         const scanner = new Html5Qrcode("barcode-reader");
         scannerRef.current = scanner;
 
@@ -44,36 +75,41 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
           {
             fps: 10,
             qrbox: { width: 250, height: 150 },
+            aspectRatio: 1.0,
           },
           (decodedText) => {
-            // Código escaneado exitosamente
+            // Si ya escaneamos uno, ignoramos el resto
+            if (hasScannedRef.current) return;
+            hasScannedRef.current = true;
+
+            // 🔊 REPRODUCIR BIP AQUÍ
+            playBeep();
+
             setLastScanned(decodedText);
             onScan(decodedText);
             stopScanning();
             onOpenChange(false);
           },
-
           (errorMessage) => {
-            // Errores de escaneo (ignoramos los de "no code found")
-            if (!errorMessage.includes("No MultiFormat Readers")) {
-              console.warn("Scanner error:", errorMessage);
+            if (!errorMessage.includes("No MultiFormat Readers") && !errorMessage.includes("NotFoundException")) {
+              console.warn("Scanner warning:", errorMessage);
             }
-          },
+          }
         );
 
         setIsScanning(true);
       } catch (err: any) {
+        console.error("Error al iniciar escáner:", err);
         setError(
-          err?.message?.includes("Permission")
+          err?.message?.includes("Permission") || err?.message?.includes("NotAllowedError")
             ? "Permiso de cámara denegado. Actívalo en la configuración del navegador."
-            : "No se pudo acceder a la cámara. Verifica que tengas una cámara disponible.",
+            : "No se pudo acceder a la cámara. Verifica que tengas una cámara disponible."
         );
         setIsScanning(false);
       }
     };
 
-    // Pequeño delay para que el DOM del Dialog esté listo
-    const timeout = setTimeout(startScanner, 300);
+    const timeout = setTimeout(startScanner, 500);
     return () => {
       clearTimeout(timeout);
       stopScanning();
@@ -84,7 +120,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     if (scannerRef.current && isScanning) {
       try {
         await scannerRef.current.stop();
-        scannerRef.current.clear();
+        await scannerRef.current.clear();
       } catch (err) {
         console.warn("Error al detener scanner:", err);
       }
@@ -102,22 +138,17 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5 text-amber-700" />
+          <DialogTitle className="flex items-center gap-2 text-orange-900">
+            <Camera className="h-5 w-5 text-orange-600" />
             Escanear Código de Barras
           </DialogTitle>
           <DialogDescription>
-            Apunta la cámara al código de barras del producto. El código se detectará
-            automáticamente.
+            Apunta la cámara al código. Se detectará, sonará un bip y se cerrará automáticamente.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          {/* Contenedor de la cámara */}
-          <div
-            ref={containerRef}
-            className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-900"
-          >
+          <div className="relative overflow-hidden rounded-lg border border-orange-200 bg-gray-900">
             <div
               id="barcode-reader"
               className="w-full"
@@ -127,8 +158,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             {!isScanning && !error && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
                 <div className="text-center text-white">
-                  <Camera className="mx-auto h-12 w-12 mb-2 opacity-50" />
-                  <p className="text-sm">Iniciando cámara...</p>
+                  <Camera className="mx-auto h-12 w-12 mb-2 opacity-50 animate-pulse" />
+                  <p className="text-sm">Solicitando acceso a la cámara...</p>
                 </div>
               </div>
             )}
@@ -143,7 +174,6 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             )}
           </div>
 
-          {/* Último código escaneado */}
           {lastScanned && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
               <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -154,13 +184,12 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             </div>
           )}
 
-          {/* Instrucciones */}
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+          <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
             <p className="font-semibold mb-1">💡 Consejos:</p>
-            <ul className="list-disc list-inside space-y-0.5 text-amber-700">
-              <li>Asegúrate de tener buena iluminación</li>
-              <li>Mantén el código a 10-20 cm de la cámara</li>
-              <li>El código se detectará automáticamente</li>
+            <ul className="list-disc list-inside space-y-0.5 text-orange-700">
+              <li>Usa la cámara trasera del móvil.</li>
+              <li>Asegúrate de tener buena iluminación.</li>
+              <li>Mantén el código a 10-15 cm de la cámara.</li>
             </ul>
           </div>
         </div>
