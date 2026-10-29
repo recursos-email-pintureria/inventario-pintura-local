@@ -79,7 +79,7 @@ import { KPICard, KpiData } from "@/components/ui/kpi-card";
 // 📷 Escáner de código de barras
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 
-// 🔌 Supabase + TanStack Query
+//  Supabase + TanStack Query
 import {
   getProductos,
   getCategorias,
@@ -181,7 +181,7 @@ function ProductosPage() {
   });
 
   const mutationActualizar = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Producto> }) =>
       actualizarProducto(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
@@ -332,7 +332,7 @@ function ProductosPage() {
     });
   };
 
-  // 📷 Manejador del escaneo
+  //  Manejador del escaneo
   const handleScan = (code: string) => {
     const codeUpper = code.toUpperCase().trim();
     if (modalNuevoAbierto) {
@@ -494,7 +494,7 @@ function ProductosPage() {
             <span className="text-gray-300">/</span>
             <span>CATÁLOGO</span>
             <span className="text-gray-300">/</span>
-            <span className="text-amber-700 font-bold">EXISTENCIAS</span>
+            <span className="text-orange-700 font-bold">EXISTENCIAS</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
             Catálogo de Productos
@@ -502,8 +502,8 @@ function ProductosPage() {
         </div>
 
         <div className="flex items-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/90 text-blue-700 border border-blue-200/80 text-xs font-medium shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-medium shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
             <span>
               {cargandoProductos
                 ? "Conectando a Supabase..."
@@ -525,7 +525,7 @@ function ProductosPage() {
                 setPaginaActual(1);
               }}
               placeholder="Buscar por nombre, SKU o código..."
-              className="pl-9 h-10 bg-white border-gray-300 rounded-lg text-sm focus:border-amber-600 focus:ring-amber-600"
+              className="pl-9 h-10 bg-white border-gray-300 rounded-lg text-sm focus:border-orange-600 focus:ring-orange-600"
             />
           </div>
 
@@ -593,7 +593,7 @@ function ProductosPage() {
 
           <Button
             onClick={abrirModalCrear}
-            className="h-10 bg-[#8c4314] hover:bg-[#78370e] text-white rounded-lg text-xs font-semibold px-4 gap-1.5 shadow-xs transition-colors"
+            className="h-10 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold px-4 gap-1.5 shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo Producto</span>
@@ -679,7 +679,7 @@ function ProductosPage() {
                     <TableRow
                       key={p.id}
                       className={`transition-colors ${
-                        estaSeleccionado ? "bg-amber-50/40" : "hover:bg-gray-50/80"
+                        estaSeleccionado ? "bg-white" : "hover:bg-gray-50/80"
                       }`}
                     >
                       <TableCell className="px-4">
@@ -717,7 +717,7 @@ function ProductosPage() {
                       </TableCell>
 
                       <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-800 border border-orange-100">
                           {p.categoria || "Sin categoría"}
                         </span>
                       </TableCell>
@@ -736,7 +736,7 @@ function ProductosPage() {
                               esAgotado
                                 ? "text-rose-600"
                                 : esBajo
-                                  ? "text-amber-800"
+                                  ? "text-orange-800"
                                   : "text-gray-900"
                             }`}
                           >
@@ -749,8 +749,8 @@ function ProductosPage() {
                               Agotado
                             </span>
                           ) : esBajo ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                               Bajo
                             </span>
                           ) : (
@@ -793,7 +793,7 @@ function ProductosPage() {
                                 onClick={() => abrirModalEditar(p)}
                                 className="gap-2 text-xs font-medium cursor-pointer"
                               >
-                                <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                <Pencil className="w-3.5 h-3.5 text-orange-600" />
                                 <span>Editar producto</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
@@ -850,7 +850,7 @@ function ProductosPage() {
               onClick={() => setPaginaActual(num)}
               className={`h-8 w-8 p-0 text-xs font-semibold ${
                 paginaActual === num
-                  ? "bg-[#8c4314] hover:bg-[#78370e] text-white border-transparent"
+                  ? "bg-orange-600 hover:bg-orange-700 text-white border-transparent"
                   : "border-gray-300 text-gray-700"
               }`}
             >
@@ -863,7 +863,7 @@ function ProductosPage() {
             size="sm"
             onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
             disabled={paginaActual === totalPaginas}
-            className="h-8 text-xs font-medium border-gray-300 text-amber-900 border-amber-300 hover:bg-amber-50"
+            className="h-8 text-xs font-medium border-gray-300 text-orange-900 border-orange-200 hover:bg-orange-50"
           >
             Siguiente
           </Button>
@@ -875,9 +875,9 @@ function ProductosPage() {
 
       {/* MODAL: NUEVO PRODUCTO */}
       <Dialog open={modalNuevoAbierto} onOpenChange={setModalNuevoAbierto}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">
+            <DialogTitle className="text-lg font-bold text-orange-900">
               Registrar Nuevo Producto
             </DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
@@ -889,7 +889,7 @@ function ProductosPage() {
             {/* 1. INFORMACIÓN BÁSICA */}
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <Package className="h-5 w-5 text-gray-600" />
+                <Package className="h-5 w-5 text-orange-600" />
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Información Básica</h3>
                   <p className="text-xs text-gray-500">Datos principales del producto</p>
@@ -954,7 +954,7 @@ function ProductosPage() {
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 text-gray-600" />
+                  <FolderOpen className="h-5 w-5 text-orange-600" />
                   <div>
                     <h3 className="font-semibold text-gray-900 text-sm">Categorización</h3>
                     <p className="text-xs text-gray-500">Clasificación del producto</p>
@@ -963,7 +963,7 @@ function ProductosPage() {
                 {(!formCategoria || formCategoria === "Sin categoría") && (
                   <Badge
                     variant="outline"
-                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-normal"
+                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs font-normal"
                   >
                     Sin categoría
                   </Badge>
@@ -994,7 +994,7 @@ function ProductosPage() {
             {/* 3. DESCRIPCIÓN */}
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-5 w-5 text-gray-600" />
+                <FileText className="h-5 w-5 text-orange-600" />
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Descripción</h3>
                   <p className="text-xs text-gray-500">Detalles adicionales del producto</p>
@@ -1019,7 +1019,7 @@ function ProductosPage() {
             {/* 4. PRECIO */}
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="h-5 w-5 text-gray-600" />
+                <DollarSign className="h-5 w-5 text-orange-600" />
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Precio</h3>
                   <p className="text-xs text-gray-500">Valor por unidad</p>
@@ -1056,7 +1056,7 @@ function ProductosPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-amber-700 hover:bg-amber-800 text-white font-medium"
+                className="bg-orange-600 hover:bg-orange-700 text-white font-medium"
                 disabled={mutationCrear.isPending}
               >
                 {mutationCrear.isPending ? "Guardando..." : "Guardar Producto"}
@@ -1071,9 +1071,9 @@ function ProductosPage() {
         open={Boolean(productoEditar)}
         onOpenChange={(open) => !open && setProductoEditar(null)}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Editar Producto</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-orange-900">Editar Producto</DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
               Modifica los detalles del producto en el catálogo.
             </DialogDescription>
@@ -1083,7 +1083,7 @@ function ProductosPage() {
             {/* 1. INFORMACIÓN BÁSICA */}
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <Package className="h-5 w-5 text-gray-600" />
+                <Package className="h-5 w-5 text-orange-600" />
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Información Básica</h3>
                   <p className="text-xs text-gray-500">Datos principales del producto</p>
@@ -1128,7 +1128,7 @@ function ProductosPage() {
                     <button
                       type="button"
                       onClick={() => setScannerOpen(true)}
-                      className="text-[11px] text-amber-700 hover:text-amber-800 flex items-center gap-1 font-medium"
+                      className="text-[11px] text-orange-700 hover:text-orange-800 flex items-center gap-1 font-medium"
                     >
                       <Camera className="h-3 w-3" />
                       Escanear
@@ -1149,7 +1149,7 @@ function ProductosPage() {
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 text-gray-600" />
+                  <FolderOpen className="h-5 w-5 text-orange-600" />
                   <div>
                     <h3 className="font-semibold text-gray-900 text-sm">Categorización</h3>
                     <p className="text-xs text-gray-500">Clasificación del producto</p>
@@ -1158,7 +1158,7 @@ function ProductosPage() {
                 {(!formCategoria || formCategoria === "Sin categoría") && (
                   <Badge
                     variant="outline"
-                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-normal"
+                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs font-normal"
                   >
                     Sin categoría
                   </Badge>
@@ -1189,7 +1189,7 @@ function ProductosPage() {
             {/* 3. DESCRIPCIÓN */}
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-5 w-5 text-gray-600" />
+                <FileText className="h-5 w-5 text-orange-600" />
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Descripción</h3>
                   <p className="text-xs text-gray-500">Detalles adicionales del producto</p>
@@ -1214,7 +1214,7 @@ function ProductosPage() {
             {/* 4. PRECIO */}
             <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="h-5 w-5 text-gray-600" />
+                <DollarSign className="h-5 w-5 text-orange-600" />
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Precio</h3>
                   <p className="text-xs text-gray-500">Valor por unidad</p>
@@ -1251,7 +1251,7 @@ function ProductosPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-amber-700 hover:bg-amber-800 text-white font-medium"
+                className="bg-orange-600 hover:bg-orange-700 text-white font-medium"
                 disabled={mutationActualizar.isPending}
               >
                 {mutationActualizar.isPending ? "Guardando..." : "Guardar Cambios"}
@@ -1269,18 +1269,18 @@ function ProductosPage() {
               <span className="text-xs font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold">
                 {productoVer?.sku}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 font-medium border border-blue-100">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 font-medium border border-orange-100">
                 {productoVer?.categoria}
               </span>
             </div>
-            <DialogTitle className="text-base font-bold text-gray-900">
+            <DialogTitle className="text-base font-bold text-orange-900">
               {productoVer?.nombre}
             </DialogTitle>
           </DialogHeader>
 
           {productoVer && (
             <div className="space-y-3 py-2 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <div className="grid grid-cols-2 gap-2 bg-orange-50/50 p-3 rounded-lg border border-orange-200">
                 <div>
                   <span className="text-gray-500 block">Código de Barras:</span>
                   <span className="font-mono text-xs font-semibold text-gray-900">
@@ -1301,7 +1301,7 @@ function ProductosPage() {
               </div>
 
               {(productoVer as any).descripcion && (
-                <div className="bg-white p-3 rounded-lg border border-gray-200">
+                <div className="bg-white p-3 rounded-lg border border-orange-200">
                   <span className="text-gray-500 block text-[11px] mb-1 font-medium">
                     Descripción:
                   </span>
@@ -1309,7 +1309,7 @@ function ProductosPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between p-2 rounded border bg-white">
+              <div className="flex items-center justify-between p-2 rounded border border-orange-200 bg-orange-50">
                 <span className="text-gray-600">Estado del producto:</span>
                 <span
                   className={`px-2 py-0.5 rounded-full font-semibold ${

@@ -19,6 +19,13 @@ export interface Producto {
   unidad: string;
   ubicacion: string | null;
   precio: number;
+  
+  // ➕ PROPIEDADES AÑADIDAS PARA COMPATIBILIDAD CON GEMINI
+  codigo_barras?: string | null;
+  descripcion?: string | null;
+  precio_unitario?: number | null;
+  // -------------------------------------------------------
+
   largo?: number | null;
   ancho?: number | null;
   alto?: number | null;
@@ -88,6 +95,7 @@ export interface Seccion {
   activo?: boolean;
   creado_en?: string;
 }
+
 // Movimiento ya resuelto con sus relaciones (para UI)
 export interface MovimientoDetallado {
   id: string;
