@@ -1,58 +1,59 @@
 # Inventario Pintura - LM
 
-Sistema profesional de gestión de inventario jerárquico para tienda de pinturas. Permite el control de stock por ubicaciones específicas (secciones, pasillos, armarios, altos, cross, cajas y reserva), con escáner de código de barras, ajustes rápidos, métricas en tiempo real, gestión de usuarios con permisos granulares y exportación a Excel/PDF.
+**Versión estable:** v1.4.0-palets | **Última actualización:** 30/10/2026
 
-** Aplicación en producción:** [https://inventario-pintura-local.vercel.app](https://inventario-pintura-local.vercel.app)
-**Repositorio GitHub:** [https://github.com/recursos-email-pintureria/inventario-pintura-local](https://github.com/recursos-email-pintureria/inventario-pintura-local)
-🏷️ **Versión estable actual:** [v1.3.0-informe-imprimible](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.3.0-informe-imprimible)
-📋 **Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
-🗄️ **Panel de Supabase:** [https://app.supabase.com](https://app.supabase.com)
+Sistema de gestión de inventario jerárquico para tienda de pinturas. Control de stock por ubicaciones físicas (secciones, pasillos, armarios, cross, cajas y reserva con palets), escáner de código de barras, ajustes rápidos, métricas en tiempo real, usuarios con permisos granulares y exportación/impresión de informes.
 
-## ️ Stack Tecnológico
+- **Producción:** https://inventario-pintura-local.vercel.app
+- **Repositorio:** https://github.com/recursos-email-pintureria/inventario-pintura-local
+- **Release estable:** https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets
+- **Despliegues Vercel:** https://vercel.com/aritx26-3717/~/deployments
+- **Supabase:** https://app.supabase.com
 
-| Capa         | Tecnología                                            | Enlace                                                                                                                                                        |
-| ------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Frontend     | React 18, TypeScript, TanStack Router, TanStack Query | [react.dev](https://react.dev) · [tanstack.com](https://tanstack.com)                                                                                         |
-| UI/Estilos   | Tailwind CSS, Radix UI, Lucide React, shadcn/ui       | [tailwindcss.com](https://tailwindcss.com) · [radix-ui.com](https://radix-ui.com) · [lucide.dev](https://lucide.dev) · [ui.shadcn.com](https://ui.shadcn.com) |
-| Backend/BD   | Supabase (PostgreSQL con Row Level Security)          | [supabase.com](https://supabase.com)                                                                                                                          |
-| Despliegue   | Vercel (CI/CD automático desde `main`)                | [vercel.com](https://vercel.com)                                                                                                                              |
-| Testing      | Vitest                                                | [vitest.dev](https://vitest.dev)                                                                                                                              |
-| Herramientas | Git, ESLint, Prettier, Bun                            | [git-scm.com](https://git-scm.com) · [bun.sh](https://bun.sh)                                                                                                 |
+## 🛠️ Stack Tecnológico
 
-## 📂 Estructura Jerárquica de Ubicaciones
+| Capa         | Tecnología                                                    |
+| ------------ | ------------------------------------------------------------- |
+| Frontend     | React 18, TypeScript, TanStack Router, TanStack Query, Vite 8.1.5 |
+| UI / Estilos | Tailwind CSS, shadcn/ui, Radix UI, Lucide React               |
+| Backend / BD | Supabase (PostgreSQL con RLS, Auth, Storage)                  |
+| Despliegue   | Vercel (CI/CD automático desde `main`)                        |
+| Testing      | Vitest                                                        |
+| Herramientas | Git, ESLint, Prettier, **npm** (no se usa Bun)                |
 
-El sistema soporta una jerarquía estricta de 3 niveles:
-️ **Sección** (Ej: Pintura Exterior, Droguería)
-└── ↔️ **Pasillo** / 🏭 **Reserva** (Nivel 1 - Padre)
-└── 🗄️ **Armario** / 📚 **Alto** / 🔀 **Cross** / 📦 **Caja** (Nivel 2 - Hijo)
-└── Productos con stock
+## 📂 Jerarquía de Ubicaciones (actualizada 30/10/2026)
 
-Tipos de ubicación y sus reglas:
+```
+Nivel 0: Sección (tabla ubicaciones)
+├── Nivel 1: Pasillo   (hijo de Sección)
+│   ├── Nivel 2: Armario  (hijo de Pasillo)
+│   └── Nivel 2: Cross    (hijo de Pasillo)
+├── Nivel 1: Reserva   (hijo de Sección)  ←  tiene Palets (tabla independiente)
+└── Nivel 1: Caja      (hijo de Sección)
+```
 
-| Tipo    | Nivel | Icono             | Color     | Requiere padre | Posición lateral | Posición longitudinal | Sección origen |
-| ------- | ----- | ----------------- | --------- | -------------- | ---------------- | --------------------- | -------------- |
-| seccion | 0     | 🏢 Building2      | Índigo    | ❌ No          | No               | ❌ No                 | ❌ No          |
-| pasillo | 1     | ↔️ ArrowLeftRight | Azul      | No             | ❌ No            | ❌ No                 | No             |
-| reserva | 1     | Warehouse         | Gris      | ❌ No          | No               | ❌ No                 | ❌ No          |
-| armario | 2     | 🗄️ Archive        | Esmeralda | ✅ Sí          | ✅ Sí            | No                    | ❌ No (hereda) |
-| alto    | 2     | 📚 Layers         | Ámbar     | ✅ Sí          | ✅ Sí            | No                    | ❌ No (hereda) |
-| caja    | 2     | 📦 Package        | Rosa      | ✅ Sí          | ✅ Sí            | No                    | ❌ No (hereda) |
-| cross   | 2     | 🔀 Shuffle        | Púrpura   | ✅ Sí          | ✅ Sí            | ✅ Sí                 | ✅ Sí          |
+- El tipo `alto` **ya no existe**: se renombró a `armario` en la Fase 6.
+- `palets` es una **tabla independiente, NO un nivel de ubicación**. Se relaciona con ubicaciones de tipo Reserva mediante `id_ubicacion`.
+- "Padre" en la tabla siguiente se refiere a **otra ubicación** (la fila padre en `ubicaciones`), no a la tabla de secciones.
+
+| Tipo    | Nivel | Icono (Lucide)  | Color     | Padre (ubicación) |
+| ------- | ----- | --------------- | --------- | ----------------- |
+| seccion | 0     | Building2       | Índigo    | Ninguno           |
+| pasillo | 1     | ArrowLeftRight  | Azul      | Sección           |
+| reserva | 1     | Warehouse       | Gris      | Sección           |
+| caja    | 1     | Package         | Rosa      | Sección           |
+| armario | 2     | Archive         | Esmeralda | Pasillo           |
+| cross   | 2     | Shuffle         | Púrpura   | Pasillo           |
+
+Los armarios tienen el campo `posicion_lateral` (`'derecha'` o `'izquierda'`). Los colores e iconos se centralizan en `src/lib/tiposUbicacion.ts` y se muestran con `BadgeTipoUbicacion`.
 
 ## 🏗️ Arquitectura de Stock (CRÍTICO)
 
-**Principio fundamental:** El cliente NUNCA escribe directamente en la tabla `stock`
+**El cliente NUNCA escribe directamente en la tabla `stock`** (solo tiene `GRANT SELECT` para usuarios autenticados). Toda modificación se hace así:
 
-La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificación se realiza mediante:
-
-1. `INSERT` en tabla `movimientos` (entrada, salida, reposición, ajuste)
-2. Trigger `actualizar_stock` en PostgreSQL que:
-   - Bloquea la fila con `FOR UPDATE`
-   - Calcula el nuevo stock según el tipo de movimiento
-   - Actualiza/inserta/elimina la fila en `stock`
-   - Libera el bloqueo
-
-**Tipos de movimiento:**
+1. `INSERT` en la tabla `movimientos` (tipos: `entrada`, `salida`, `reposicion`, `ajuste`).
+2. El trigger `actualizar_stock` de PostgreSQL actualiza `stock` automáticamente (también para filas asociadas a un palet).
+3. Para palets, la reposición usa la RPC transaccional `reponer_producto_palet`.
 
 | Tipo       | Efecto en stock                   | Caso de uso              |
 | ---------- | --------------------------------- | ------------------------ |
@@ -61,184 +62,235 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 | reposicion | stock + cantidad                  | Repuesto de lineal       |
 | ajuste     | stock = cantidad (valor absoluto) | Corrección de inventario |
 
-_Nota: El trigger rechaza `cantidad <= 0` en movimientos. Para ajustar a 0, el sistema convierte automáticamente el ajuste en una `salida` por la cantidad total actual._
+El trigger rechaza `cantidad <= 0`. Para ajustar a 0, el sistema convierte el ajuste en una `salida` por la cantidad total actual.
+
+## 🗄️ Tablas principales
+
+| Tabla                  | Descripción                                                   |
+| ---------------------- | ------------------------------------------------------------- |
+| `ubicaciones`          | Jerarquía física (incluye secciones)                          |
+| `productos`            | Catálogo                                                      |
+| `stock`                | Relación producto-ubicación (incluye `id_palet`). Solo lectura desde el cliente |
+| `movimientos`          | Historial; única vía de modificación de stock                 |
+| `palets`               | Contenedores dentro de una Reserva (tabla independiente)      |
+| `categorias`           | Categorías de producto                                        |
+| `producto_ubicaciones` | Asociación producto-ubicación                                 |
+| `perfiles_usuario`     | Perfiles y roles                                              |
+| `permisos_usuario`     | Permisos granulares por usuario                               |
+
+RLS activo en todas las tablas.
+
+## 📍 Estado Actual: Sección Pintura (30/10/2026)
+
+**6 Pasillos, 94 Armarios (E651-E744), 1 Reserva.** Cajas y Cross: pendientes de crear.
+
+| Pasillo | Contenido                         | Derecha          | Izquierda        | Armarios |
+| ------- | --------------------------------- | ---------------- | ---------------- | -------- |
+| 12      | Pintura exterior                  | E651-E658 (8)    | E659-E670 (12)   | 20       |
+| 14      | Adhesivos Droguería               | E671-E683 (13)   | E684-E697 (14)   | 27       |
+| 16      | Pint Blc y Rodillos               | E698-E710 (13)   | E711-E716 (6)    | 19       |
+| 18      | Esmaltes, Spray, Pintura hierro   | E717-E728 (12)   | E729-E734 (6)    | 18       |
+| 20      | Pintura Mural, Efectos (vacío)    | -                | -                | 0        |
+| Perimetral | Herramientas                   | E735-E744 (10)   | -                | 10       |
+
+Script de migración: `sql/fase6_reestructurar_ubicaciones.sql`.
+
+## 🧩 Sistema de Palets
+
+- Tabla `palets` independiente, ligada a ubicaciones tipo Reserva por `id_ubicacion`; `stock.id_palet` asocia productos al palet.
+- Creación manual con código de barras automático (`PAL-###-Usuario-Fecha`).
+- Gestión de productos dentro del palet (igual que armarios).
+- Autodestrucción automática con alerta de seguridad cuando el stock llega a 0.
+- Impresión de etiquetas con código de barras y listado A4.
+- Componentes: `src/components/inventario/PaletsReserva.tsx` (palets en reserva) y `src/components/inventario/ModalProductosPalet.tsx` (productos del palet).
+- Lógica y queries: `src/lib/palets.ts`.
+- Impresión global reutilizable: `src/components/ui/print-preview-dialog.tsx` (sin librerías externas; usa `window.print()`).
+
+## 📁 Estructura de Carpetas (`src/`)
+
+```
+src/
+├── router.tsx, routeTree.gen.ts, server.ts, start.ts, styles.css
+├── components/
+│   ├── auth/         AuthLayout.tsx
+│   ├── inventario/   BadgeTipoUbicacion.tsx, Escaner.tsx, EstadoInventario.tsx,
+│   │                 ModalProductosPalet.tsx, PaletsReserva.tsx
+│   ├── layout/       AppLayout.tsx
+│   └── ui/           componentes shadcn + print-preview-dialog.tsx
+├── contexts/         AuthContext.tsx
+├── hooks/            use-mobile.tsx, usePermissions.ts
+├── lib/              error-capture.ts, error-page.ts, getCategorias.ts, inventario.ts,
+│                     lovable-error-reporting.ts, meta.ts, palets.ts, queryClient.ts,
+│                     supabase.ts, tipos.ts, tiposUbicacion.ts, ubicaciones.ts,
+│                     usuarios.ts, utils.ts
+│   └── queries/      dashboard.ts
+├── pages/            ForgotPassword.tsx, Login.tsx, Register.tsx,
+│                     ResetPassword.tsx, VerifyEmail.tsx
+├── routes/           __root.tsx, index.tsx, login.tsx, register.tsx, forgot-password.tsx,
+│   │                 reset-password.tsx, verify-email.tsx, README.md
+│   └── _authenticated/  route.tsx, dashboard.tsx, categorias.tsx, configuracion.tsx,
+│                        movimientos.tsx, productos.tsx, ubicaciones.tsx, usuarios.tsx
+└── test/             app-routing.test.tsx, inventario-sql.test.ts, palets.test.ts,
+                      setup.ts, usuarios.test.ts
+```
+
+## 🧱 Migraciones SQL (carpeta `sql/`)
+
+Ejecutar en el SQL Editor de Supabase, en este orden:
+
+1. `sql/fase5_4b_stock_palets.sql`: columna `id_palet` en `stock` y permisos RLS.
+2. `sql/fase5_5_movimientos_palets.sql`: revoca escrituras directas a `stock`, amplía el trigger `actualizar_stock` para filas con palet y crea la RPC `reponer_producto_palet`.
+3. `sql/fase6_reestructurar_ubicaciones.sql`: reestructura de ubicaciones (`alto` → `armario`, nueva jerarquía).
 
 ## ✅ Fases Completadas
 
 ### Fase 1: Estructura base y autenticación
-
-- [x] Configuración de Supabase con RLS
-- [x] Sistema de autenticación con roles
-- [x] Tablas: `perfiles_usuario`, `permisos_usuario`, `categorias`, `productos`
+- [x] Supabase con RLS, autenticación con roles
+- [x] Tablas `perfiles_usuario`, `permisos_usuario`, `categorias`, `productos`
 
 ### Fase 2: Ubicaciones jerárquicas
-
-- [x] Tablas: `secciones`, `ubicaciones`, `stock`, `movimientos`, `producto_ubicaciones`
-- [x] Triggers de actualización de stock
-- [x] Políticas RLS para todas las tablas
+- [x] Tablas `ubicaciones`, `stock`, `movimientos`, `producto_ubicaciones`
+- [x] Triggers de actualización de stock y políticas RLS
 
 ### Fase 3: Dashboard y métricas
-
-- [x] KPIs: Total productos, stock bajo, movimientos hoy, ubicaciones activas
+- [x] KPIs: total productos, stock bajo, movimientos hoy, ubicaciones activas
 - [x] Gráficos de actividad y top ubicaciones
 - [x] Exportación de movimientos a Excel y PDF
 
 ### Fase 4: Interfaz jerárquica completa
-
-- [x] Vista de árbol expandible (pasillos → armarios/altos)
-- [x] Badges de colores por tipo de ubicación
+- [x] Vista de árbol expandible, badges de colores por tipo
 - [x] Gestión de productos por ubicación (añadir, editar, eliminar)
 - [x] Escáner de código de barras con cámara
-- [x] Autocompletado de productos con búsqueda flexible
-- [x] Ajuste rápido de stock
-- [x] Limpieza de stock de lineales
+- [x] Autocompletado con búsqueda flexible, ajuste rápido y limpieza de lineales
 
 ### Fase 4.5: Corrección de bugs críticos (v1.0.0-stable)
-
-- [x] Eliminación de escritura directa en `stock` desde el cliente
-- [x] Cálculo real de stock por ubicación usando `data.stock`
-- [x] Desglose expandible de productos por armario/pasillo
-- [x] Estabilización del escáner con `useRef` y `Dialog` de Radix
-- [x] Modal de ajuste rápido convertido a `Dialog` oficial
+- [x] Eliminada la escritura directa en `stock` desde el cliente
+- [x] Stock por ubicación calculado desde `data.stock`
+- [x] Desglose expandible por armario/pasillo
+- [x] Escáner y ajuste rápido migrados a `Dialog` de Radix
 - [x] Mensajes de error RLS claros y específicos
 
-### Fase 4.6: Gestión de Usuarios y Permisos (v1.1.0)
-
-- [x] Página `/usuarios` con lista de usuarios y permisos
-- [x] Modal de edición con toggles individuales por permiso
-- [x] Protección contra auto-desprivilegio (no puedes quitarte el rol admin)
-- [x] Toasts de éxito/advertencia en operaciones
-- [x] Modal de confirmación (AlertDialog) para cambios críticos
-- [x] Visibilidad del menú condicionada a `isAdmin` o `puede_gestionar_usuarios`
+### Fase 4.6: Gestión de usuarios y permisos (v1.1.0)
+- [x] Página `/usuarios` con edición de permisos por toggles
+- [x] Protección contra auto-desprivilegio y confirmación para cambios críticos
+- [x] Menú visible según `isAdmin` o `puede_gestionar_usuarios`
 
 ### Fase 4.7: Confirmaciones para acciones críticas (v1.1.5)
-
-- [x] AlertDialog al eliminar producto de ubicación
-- [x] AlertDialog al ajustar stock a 0 (ajuste rápido y edición)
-- [x] AlertDialog al desactivar/borrar ubicación
-- [x] AlertDialog al limpiar stock masivo de lineales
-- [x] Sustitución completa de `window.confirm` por AlertDialog de shadcn/ui
+- [x] `AlertDialog` en eliminar producto, ajustar a 0, desactivar/borrar ubicación y limpiar stock masivo
+- [x] Sustituido `window.confirm` por `AlertDialog` de shadcn/ui
 
 ### Fase 4.8: Mejoras visuales y UX (v1.2.0-visual)
+- [x] Iconos y colores por tipo de ubicación, `BadgeTipoUbicacion` (sm, md, lg)
+- [x] Configuración centralizada en `tiposUbicacion.ts`
+- [x] Árbol con indentación y líneas conectoras
 
-- [x] Iconos específicos por tipo de ubicación (Lucide React)
-- [x] Paleta de colores distintiva por tipo (índigo, azul, esmeralda, ámbar, púrpura, rosa, gris)
-- [x] Componente reutilizable `BadgeTipoUbicacion` con 3 tamaños (sm, md, lg)
-- [x] Archivo de configuración `tiposUbicacion.ts` centralizado
-- [x] Hover effects suaves en filas de ubicaciones
-- [x] Vista de árbol con indentación y líneas conectoras
+### Fase 4.9: Informe detallado imprimible (v1.3.0-informe-imprimible)
+- [x] Vista Listado con filtros en cascada (Tipo, Sección, Pasillo) y "Solo con stock"
+- [x] Informe jerárquico A4 con carga bajo demanda y vista previa antes de imprimir
+- [x] Estilos de impresión sin cortes entre páginas
 
-### Fase 4.9: Informe Detallado Imprimible (v1.3.0-informe-imprimible)
+### Fase 5: Sistema de palets (v1.4.0-palets)
+- [x] Tabla `palets` con RLS y columna `id_palet` en `stock`
+- [x] Librería `src/lib/palets.ts` con CRUD y autodestrucción
+- [x] UI de gestión (`PaletsReserva.tsx`) y modal de productos (`ModalProductosPalet.tsx`)
+- [x] Impresión de etiqueta y listado A4 con `PrintPreviewDialog`
+- [x] Expandir/colapsar palets en la Vista Listado
+- [x] Movimientos para entradas, ajustes y reposiciones en palets
 
-- [x] Vista Listado con 3 filtros en cascada (Tipo, Sección, Pasillo)
-- [x] Checkbox "Solo con stock" para filtrar ubicaciones vacías
-- [x] Informe jerárquico A4 (Pasillo → Armario → Productos)
-- [x] Carga bajo demanda con query JOIN optimizada a Supabase
-- [x] Vista previa antes de imprimir (modal Dialog)
-- [x] Estilos de impresión optimizados (sin cortes entre páginas)
-- [x] Botones "Vista previa" e "Imprimir informe"
-- [x] Corrección de imports faltantes (Dialog, Button, Eye, Loader2)
-  - [x] **Fase 5: Sistema de Palets (v1.4.0-palets)**
-    - [x] Tabla `palets` en Supabase con RLS y columna `id_palet` en `stock`.
-    - [x] Librería `src/lib/palets.ts` con funciones CRUD y autodestrucción.
-    - [x] UI de gestión de palets en reservas (`PaletsReserva.tsx`).
-    - [x] Modal de productos por palet (`ModalProductosPalet.tsx`) con impresión de etiqueta y listado A4.
-    - [x] Badge de productos en reservas como elemento inactivo (cursor-default).
-    - [x] Expandir/colapsar palets al hacer clic en fila de reserva (Vista Listado).
-    - [x] Corrección de permisos RLS para tabla `stock` con `id_palet`.
+### Fase 6: Reestructuración de ubicaciones
+- [x] Tipo `alto` renombrado a `armario`
+- [x] Nueva jerarquía (Sección → Pasillo/Reserva/Caja → Armario/Cross)
+- [x] Sección Pintura cargada: 6 pasillos, 94 armarios, 1 Reserva
 
 ## 🐛 Bugs Críticos Corregidos
 
 | #   | Bug                                            | Causa raíz                                                    | Solución                                       |
 | --- | ---------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------- |
 | 1   | Error 42501 al guardar cantidad                | Cliente escribía directo en `stock` (RLS bloquea)             | Delegar al trigger vía INSERT en `movimientos` |
-| 2   | Totales de stock incorrectos en Movimientos    | Reconstrucción desde movimientos (no distinguía productos)    | Usar `data.stock` como fuente de verdad        |
+| 2   | Totales de stock incorrectos en Movimientos    | Reconstrucción desde movimientos                              | Usar `data.stock` como fuente de verdad        |
 | 3   | Escáner de cámara no funcionaba en Ubicaciones | `div` casero bloqueado por Dialog padre de Radix              | Envolver en `<Dialog>` oficial de Radix UI     |
-| 4   | Botón "Ajuste rápido" no respondía a clicks    | Mini-modal `div` bajo `pointer-events: none` del Dialog padre | Convertir a `<Dialog>` oficial con portal DOM  |
-| 5   | Autocompletado no mostraba todos los productos | Catálogo en caché obsoleto                                    | Recargar al abrir modal "Añadir"               |
+| 4   | Botón "Ajuste rápido" no respondía             | Mini-modal bajo `pointer-events: none` del Dialog padre       | Convertir a `<Dialog>` oficial con portal DOM  |
+| 5   | Autocompletado sin todos los productos         | Catálogo en caché obsoleto                                    | Recargar al abrir modal "Añadir"               |
 | 6   | Mensaje genérico de permisos                   | `errorInventario()` no diferenciaba 42501/PGRST116            | Mensajes específicos según contexto            |
 
-## 🏷️ Versiones y Recuperación de Emergencia
+## 🏷️ Versión estable y recuperación de emergencia
 
-🏷️ Versión estable actual: [v1.4.0-palets]`
-**Fecha:** 25/10/2026
+**Versión estable actual:** [v1.4.0-palets](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets)
 **Estado:** ✅ Producción en Vercel
-**Tag:** [v1.3.0-informe-imprimible](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.3.0-informe-imprimible)
 
-### 🚨 Cómo recuperar esta versión en caso de error crítico futuro
+### 🚨 Cómo recuperar esta versión en caso de error crítico
 
 ```bash
 # 1. Asegúrate de estar en la rama principal
 git checkout main
 
 # 2. Restablece el código local al estado de la versión estable
-git reset --hard v1.3.0-informe-imprimible
+git reset --hard v1.4.0-palets
 
 # 3. Fuerza la actualización en GitHub
-# ⚠️ ATENCIÓN: Esto sobrescribe el historial remoto
+# ⚠️ ATENCIÓN: esto sobrescribe el historial remoto
 git push origin main --force
-🔐 Seguridad y Credenciales
-Variables de entorno
-El archivo .env.example contiene las variables necesarias. Nunca subir .env al repositorio.
+```
+
+## 🔐 Seguridad y credenciales
+
+Variables de entorno (`.env.example`). **Nunca subir `.env` al repositorio.**
+
+```
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu_clave_anonima_aqui
-Reglas de seguridad
-✅ La clave anon de Supabase es pública por diseño (segura en frontend)
-✅ RLS (Row Level Security) activo en todas las tablas
-✅ Permisos granulares por usuario en permisos_usuario
-✅ Protección contra auto-desprivilegio en gestión de usuarios
-🚫 NUNCA subir tokens personales de GitHub (PAT) al código o chats
-🚫 NUNCA escribir directamente en tablas protegidas desde el cliente
-Si un token se expone: Ir a GitHub Settings → Tokens → Revocar el token inmediatamente → Generar uno nuevo con los permisos mínimos necesarios.
-🚀 Comandos Útiles
-# Desarrollo local
-npm run dev              # Iniciar servidor de desarrollo
-npm run build            # Compilar para producción
-npm test                 # Ejecutar tests (Vitest)
-npx tsc --noEmit         # Verificar tipos TypeScript
-
-# Git básico
-git status               # Estado del repositorio
-git log --oneline -5     # Últimos 5 commits
-git tag                  # Listar etiquetas
-git fetch --prune        # Limpiar referencias remotas obsoletas
-
-# Despliegue
-git push origin main     # Vercel despliega automáticamente
-📋 Próximas Fases Planificadas
-Fase 5: Sistema de Palets (v1.4.0-palets)
-- `v1.4.0-palets` (26/10/2026): Sistema completo de palets, autodestrucción automática e impresión de etiquetas/listados.
-Tabla independiente palets relacionada con ubicaciones tipo "Reserva"
-Creación manual de palets con código de barras automático (PAL-###-Usuario-Fecha)
-Gestión de productos dentro del palet (igual que armarios)
-Autodestrucción automática con alerta de seguridad cuando stock = 0
-Impresión de etiquetas con código de barras
-Fase 6: Automatización de datos (Leroy Merlin)
-Script para extraer Ref/SKU y descripción desde web de Leroy Merlin
-Integración con el formulario de creación de productos
-Validación automática de códigos de barras
-Fase 7: Mejoras visuales adicionales
-Rediseño del Dashboard con KPIs con semáforo de colores
-Badges de colores para tipos de movimiento en tabla de actividad
-Gráfico de movimientos de los últimos 7 días
-Filtros en tabla de actividad (por tipo, fecha, ubicación)
-Modo oscuro/claro
-Atajos de teclado para operaciones frecuentes
-Fase 8: Reportes y analítica avanzada
-Dashboard de rotación de stock
-Alertas automáticas de stock bajo por email
-Historial de movimientos por producto con gráficos
-Comparativa de inventarios entre fechas
-👥 Contribución
-Este proyecto fue desarrollado para gestión interna. Si necesitas colaborar:
-Crea una rama desde main: git checkout -b feature/nueva-funcionalidad
-Haz commits descriptivos siguiendo el patrón: tipo: descripción corta
-feat: nueva funcionalidad
-fix: corrección de bug
-docs: cambios en documentación
-style: cambios de formato (sin afectar lógica)
-Abre un Pull Request describiendo los cambios
-📄 Licencia
-Propietario. Uso interno para gestión de inventario de la tienda.
-Última actualización: 25/10/2026 · Versión: v1.3.0-informe-imprimible
 ```
+
+- ✅ La clave `anon` de Supabase es pública por diseño (segura en frontend).
+- ✅ RLS activo en todas las tablas; permisos granulares en `permisos_usuario`.
+- ✅ Protección contra auto-desprivilegio en gestión de usuarios.
+- 🚫 NUNCA subir tokens personales de GitHub (PAT) al código o chats.
+- 🚫 NUNCA escribir directamente en tablas protegidas desde el cliente.
+
+Si un token se expone: GitHub Settings → Tokens → revocarlo de inmediato y generar uno nuevo con permisos mínimos.
+
+## 🚀 Comandos útiles
+
+```bash
+npm run dev          # Servidor de desarrollo
+npm run build        # Compilar para producción
+npm test             # Tests (Vitest)
+npx tsc --noEmit     # Verificar tipos
+
+git status
+git log --oneline -5
+git tag
+git fetch --prune
+git push origin main # Vercel despliega automáticamente
+```
+
+## 📋 Próximas fases planificadas
+
+### Fase 7: Automatización de datos (Leroy Merlin)
+- Script para extraer Ref/SKU y descripción desde la web de Leroy Merlin
+- Integración con el formulario de creación de productos
+- Validación automática de códigos de barras
+
+### Fase 8: Mejoras visuales adicionales
+- Dashboard con KPIs con semáforo de colores
+- Badges de colores por tipo de movimiento y gráfico de los últimos 7 días
+- Filtros en la tabla de actividad (tipo, fecha, ubicación)
+- Modo oscuro/claro y atajos de teclado
+
+### Fase 9: Reportes y analítica avanzada
+- Dashboard de rotación de stock
+- Alertas automáticas de stock bajo por email
+- Historial de movimientos por producto con gráficos
+- Comparativa de inventarios entre fechas
+
+## 👥 Contribución
+
+1. Crea una rama desde `main`: `git checkout -b feature/nueva-funcionalidad`
+2. Commits con el patrón `tipo: descripción corta` (`feat`, `fix`, `docs`, `style`)
+3. Abre un Pull Request describiendo los cambios
+
+## 📄 Licencia
+
+Propietario. Uso interno para gestión de inventario de la tienda.
+
+_Última actualización: 30/10/2026 · Versión: v1.4.0-palets_
