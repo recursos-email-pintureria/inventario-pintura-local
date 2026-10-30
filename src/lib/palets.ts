@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { crearMovimiento } from "@/lib/inventario";
 
 export interface Palet {
   id: string;
@@ -206,6 +207,17 @@ export interface GuardarProductoEnPaletParams {
   cantidad: number;
 }
 
+export interface AjustarCantidadProductoEnPaletParams extends GuardarProductoEnPaletParams {
+  cantidad_actual: number;
+}
+
+export interface ReponerProductoDePaletParams {
+  id_palet: string;
+  id_producto: string;
+  id_ubicacion_destino: string;
+  cantidad: number;
+}
+
 /**
  * Consulta el stock de productos asignados a un palet determinado (cantidad > 0).
  */
@@ -228,46 +240,95 @@ export async function cargarProductosPalet(idPalet: string): Promise<ProductoEnP
 }
 
 /**
- * Guarda o incrementa un producto dentro de un palet.
+ * Registra una entrada de mercancía asociada a un palet mediante movimientos.
  */
 export async function guardarProductoEnPalet(params: GuardarProductoEnPaletParams): Promise<void> {
   const { id_palet, id_reserva, id_producto, cantidad } = params;
-
-  const { data: existente } = await supabase
-    .from("stock")
-    .select("id_producto, cantidad")
-    .eq("id_palet", id_palet)
-    .eq("id_producto", id_producto)
-    .maybeSingle();
-
-  if (existente) {
-    const nuevaCantidad = (existente.cantidad || 0) + cantidad;
-    const { error } = await supabase
-      .from("stock")
-      .update({ cantidad: nuevaCantidad })
-      .eq("id_palet", id_palet)
-      .eq("id_producto", id_producto);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.from("stock").insert({
-      id_palet,
-      id_ubicacion: id_reserva,
-      id_producto,
-      cantidad,
-    });
-    if (error) throw error;
+  if (!id_palet || !id_reserva || !id_producto) {
+    throw new Error("Se requieren palet, reserva y producto.");
   }
+  if (!Number.isInteger(cantidad) || cantidad <= 0) {
+    throw new Error("La cantidad debe ser un entero mayor que 0.");
+  }
+
+  await crearMovimiento({
+    id_producto: id_producto,
+    id_ubicacion: id_reserva,
+    id_palet,
+    tipo: "entrada",
+    cantidad,
+    motivo: "Entrada de producto en palet de reserva",
+  });
 }
 
 /**
- * Elimina la asociación de un producto con un palet específico en stock.
+ * Ajusta la cantidad de un producto del palet registrando solo la diferencia como movimiento.
+ */
+export async function ajustarCantidadProductoEnPalet(
+  params: AjustarCantidadProductoEnPaletParams,
+): Promise<void> {
+  const { id_palet, id_reserva, id_producto, cantidad_actual, cantidad } = params;
+  if (!Number.isInteger(cantidad) || cantidad < 0 || !Number.isInteger(cantidad_actual)) {
+    throw new Error("Las cantidades deben ser enteros iguales o mayores que 0.");
+  }
+
+  const diferencia = cantidad - cantidad_actual;
+  if (diferencia === 0) return;
+
+  await crearMovimiento({
+    id_producto: id_producto,
+    id_ubicacion: id_reserva,
+    id_palet,
+    tipo: diferencia > 0 ? "entrada" : "salida",
+    cantidad: Math.abs(diferencia),
+    motivo: "Ajuste de cantidad de producto en palet",
+  });
+}
+
+/**
+ * Retira la cantidad completa de un producto del palet mediante un movimiento de salida.
  */
 export async function eliminarProductoDePalet(idPalet: string, idProducto: string): Promise<void> {
-  const { error } = await supabase
+  const { data: existente, error: errorConsulta } = await supabase
     .from("stock")
-    .delete()
+    .select("id_ubicacion, cantidad")
     .eq("id_palet", idPalet)
-    .eq("id_producto", idProducto);
+    .eq("id_producto", idProducto)
+    .maybeSingle();
+
+  if (errorConsulta) throw errorConsulta;
+  if (!existente || existente.cantidad <= 0) return;
+
+  await crearMovimiento({
+    id_producto: idProducto,
+    id_ubicacion: existente.id_ubicacion,
+    id_palet: idPalet,
+    tipo: "salida",
+    cantidad: existente.cantidad,
+    motivo: "Retirada de producto del palet",
+  });
+}
+
+/**
+ * Traslada mercancía del palet a una ubicación de tienda en una única transacción de servidor.
+ */
+export async function reponerProductoDePalet(
+  params: ReponerProductoDePaletParams,
+): Promise<void> {
+  const { id_palet, id_producto, id_ubicacion_destino, cantidad } = params;
+  if (!id_palet || !id_producto || !id_ubicacion_destino) {
+    throw new Error("Se requieren palet, producto y ubicación de destino.");
+  }
+  if (!Number.isInteger(cantidad) || cantidad <= 0) {
+    throw new Error("La cantidad debe ser un entero mayor que 0.");
+  }
+
+  const { error } = await supabase.rpc("reponer_producto_palet", {
+    p_id_palet: id_palet,
+    p_id_producto: id_producto,
+    p_id_ubicacion_destino: id_ubicacion_destino,
+    p_cantidad: cantidad,
+  });
 
   if (error) throw error;
 }

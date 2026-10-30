@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type Palet, desactivarPalet } from "@/lib/palets";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ajustarCantidadProductoEnPalet,
+  cargarProductosPalet,
+  desactivarPalet,
+  eliminarProductoDePalet,
+  guardarProductoEnPalet,
+  paletsPorReservaQueryOptions,
+  type Palet,
+} from "@/lib/palets";
 import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -46,6 +54,31 @@ export interface ProductoPaletItem {
   cantidad: number;
 }
 
+interface ProductoCatalogo {
+  id: string;
+  codigo_barras: string | null;
+  sku: string;
+  nombre: string;
+}
+
+type ProductoPaletOperacion =
+  | {
+      tipo: "anadir";
+      id_palet: string;
+      id_reserva: string;
+      id_producto: string;
+      cantidad: number;
+    }
+  | {
+      tipo: "ajustar";
+      id_palet: string;
+      id_reserva: string;
+      id_producto: string;
+      cantidad_actual: number;
+      cantidad: number;
+    }
+  | { tipo: "eliminar"; id_palet: string; id_producto: string };
+
 interface ModalProductosPaletProps {
   palet: Palet | null;
   abierto: boolean;
@@ -64,13 +97,12 @@ export function ModalProductosPalet({
   // Estados de vista y gestión
   const [modo, setModo] = useState<"lista" | "anadir" | "etiqueta" | "listado_impresion">("lista");
   const [busqueda, setBusqueda] = useState("");
-  const [guardando, setGuardando] = useState(false);
 
   // Estados para añadir/editar producto
   const [inputBusquedaCatalogo, setInputBusquedaCatalogo] = useState("");
-  const [catalogoSugerencias, setCatalogoSugerencias] = useState<any[]>([]);
+  const [catalogoSugerencias, setCatalogoSugerencias] = useState<ProductoCatalogo[]>([]);
   const [buscandoCatalogo, setBuscandoCatalogo] = useState(false);
-  const [productoSeleccionado, setProductoSeleccionado] = useState<any | null>(null);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoCatalogo | null>(null);
   const [cantidadNueva, setCantidadNueva] = useState<number | "">(1);
 
   // Edición directa de cantidad
@@ -151,40 +183,45 @@ export function ModalProductosPalet({
 
   // Consulta reactiva de productos dentro del palet
   const {
-    data: productos = [],
+    data: productosDatos = [],
     isLoading: cargandoProductos,
+    error: errorProductos,
     refetch: refetchProductos,
   } = useQuery({
     queryKey: ["palet-productos", palet?.id],
-    queryFn: async (): Promise<ProductoPaletItem[]> => {
+    queryFn: () => {
       if (!palet?.id) return [];
-      try {
-        const { data, error } = await supabase
-          .from("stock")
-          .select("id_producto, cantidad, producto:productos(id, codigo_barras, sku, nombre)")
-          .eq("id_palet", palet.id)
-          .gt("cantidad", 0);
-
-        if (error) {
-          console.warn("Consulta de stock por palet:", error.message);
-          return [];
-        }
-
-        return (data ?? []).map((row: any) => ({
-          id: row.producto?.id || row.id_producto,
-          id_producto: row.id_producto,
-          codigo_barras: row.producto?.codigo_barras || "",
-          sku: row.producto?.sku || "",
-          nombre: row.producto?.nombre || "Producto sin nombre",
-          cantidad: row.cantidad || 0,
-        }));
-      } catch (err) {
-        console.warn("Excepción cargando stock del palet:", err);
-        return [];
-      }
+      return cargarProductosPalet(palet.id);
     },
     enabled: Boolean(abierto && palet?.id),
   });
+  const productos: ProductoPaletItem[] = productosDatos.map((item) => ({
+    id: item.id_producto,
+    id_producto: item.id_producto,
+    codigo_barras: item.codigo_barras ?? "",
+    sku: item.sku ?? "",
+    nombre: item.nombre ?? "Producto sin nombre",
+    cantidad: item.cantidad,
+  }));
+
+  const productoMutation = useMutation({
+    mutationFn: async (operacion: ProductoPaletOperacion) => {
+      if (operacion.tipo === "anadir") return guardarProductoEnPalet(operacion);
+      if (operacion.tipo === "ajustar") return ajustarCantidadProductoEnPalet(operacion);
+      return eliminarProductoDePalet(operacion.id_palet, operacion.id_producto);
+    },
+    onSuccess: async (_data, operacion) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["palet-productos", operacion.id_palet] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({
+          queryKey: palet ? paletsPorReservaQueryOptions(palet.id_reserva).queryKey : ["palets"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["palets"] }),
+      ]);
+    },
+  });
+  const guardando = productoMutation.isPending || ejecutandoBaja;
 
   // Reset al abrir o cambiar de palet
   useEffect(() => {
@@ -283,33 +320,13 @@ export function ModalProductosPalet({
     }
 
     try {
-      setGuardando(true);
-
-      const { data: existente } = await supabase
-        .from("stock")
-        .select("id_producto, cantidad")
-        .eq("id_palet", palet.id)
-        .eq("id_producto", productoSeleccionado.id)
-        .maybeSingle();
-
-      if (existente) {
-        const nuevaCantidadTotal = (existente.cantidad || 0) + cant;
-        const { error: errorUpdate } = await supabase
-          .from("stock")
-          .update({ cantidad: nuevaCantidadTotal })
-          .eq("id_palet", palet.id)
-          .eq("id_producto", productoSeleccionado.id);
-
-        if (errorUpdate) throw errorUpdate;
-      } else {
-        const { error: errorInsert } = await supabase.from("stock").insert({
-          id_palet: palet.id,
-          id_producto: productoSeleccionado.id,
-          id_ubicacion: palet.id_reserva,
-          cantidad: cant,
-        });
-        if (errorInsert) throw errorInsert;
-      }
+      await productoMutation.mutateAsync({
+        tipo: "anadir",
+        id_palet: palet.id,
+        id_reserva: palet.id_reserva,
+        id_producto: productoSeleccionado.id,
+        cantidad: cant,
+      });
 
       toast.success(`${cant} uds de "${productoSeleccionado.nombre}" añadidas al palet`);
       await refetchProductos();
@@ -319,8 +336,6 @@ export function ModalProductosPalet({
       setCantidadNueva(1);
     } catch (err: any) {
       toast.error(`Error al registrar producto en palet: ${err.message || err}`);
-    } finally {
-      setGuardando(false);
     }
   }
 
@@ -335,25 +350,18 @@ export function ModalProductosPalet({
     }
 
     try {
-      setGuardando(true);
+      await productoMutation.mutateAsync({
+        tipo: "ajustar",
+        id_palet: palet.id,
+        id_reserva: palet.id_reserva,
+        id_producto: editandoItem.id_producto,
+        cantidad_actual: editandoItem.cantidad,
+        cantidad: nuevaCant,
+      });
 
       if (nuevaCant === 0) {
-        const { error: errorDelete } = await supabase
-          .from("stock")
-          .delete()
-          .eq("id_palet", palet.id)
-          .eq("id_producto", editandoItem.id_producto);
-
-        if (errorDelete) throw errorDelete;
         toast.info(`"${editandoItem.nombre}" retirado del palet`);
       } else {
-        const { error: errorUpdate } = await supabase
-          .from("stock")
-          .update({ cantidad: nuevaCant })
-          .eq("id_palet", palet.id)
-          .eq("id_producto", editandoItem.id_producto);
-
-        if (errorUpdate) throw errorUpdate;
         toast.success(`Cantidad actualizada a ${nuevaCant} uds`);
       }
 
@@ -367,22 +375,17 @@ export function ModalProductosPalet({
       }
     } catch (err: any) {
       toast.error(`Error al actualizar cantidad: ${err.message || err}`);
-    } finally {
-      setGuardando(false);
     }
   }
 
   async function handleEliminarProductoDirecto(item: ProductoPaletItem) {
     if (!palet) return;
     try {
-      setGuardando(true);
-      const { error } = await supabase
-        .from("stock")
-        .delete()
-        .eq("id_palet", palet.id)
-        .eq("id_producto", item.id_producto);
-
-      if (error) throw error;
+      await productoMutation.mutateAsync({
+        tipo: "eliminar",
+        id_palet: palet.id,
+        id_producto: item.id_producto,
+      });
 
       toast.info(`"${item.nombre}" retirado del palet`);
       const { data: restantes } = await refetchProductos();
@@ -393,8 +396,6 @@ export function ModalProductosPalet({
       }
     } catch (err: any) {
       toast.error(`Error al eliminar producto: ${err.message || err}`);
-    } finally {
-      setGuardando(false);
     }
   }
 
@@ -541,7 +542,7 @@ export function ModalProductosPalet({
                     className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 h-9 text-xs"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Añadir producto</span>
+                    <span>Añadir más productos</span>
                   </Button>
                 </div>
 
@@ -587,6 +588,11 @@ export function ModalProductosPalet({
                     <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
                     <span>Consultando existencias...</span>
                   </div>
+                ) : errorProductos ? (
+                  <p className="rounded border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                    No se pudieron consultar los productos del palet:{" "}
+                    {errorProductos instanceof Error ? errorProductos.message : "Error desconocido"}
+                  </p>
                 ) : productosFiltrados.length === 0 ? (
                   <div className="py-10 border-2 border-dashed border-gray-200 rounded-lg text-center p-6 space-y-2 bg-gray-50/50">
                     <Package className="w-8 h-8 text-gray-400 mx-auto" />

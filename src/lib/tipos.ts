@@ -69,9 +69,9 @@ export interface Movimiento {
   fecha: string;
   tipo: "entrada" | "salida" | "reposicion" | "ajuste";
   cantidad: number;
-  producto_id: string;
-  ubicacion_id: string;
-  usuario_id?: string;
+  id_producto: string;
+  id_ubicacion: string;
+  realizado_por?: string;
   motivo?: string;
   created_at?: string;
 }
@@ -83,8 +83,8 @@ export interface Stock {
   cantidad: number;
   actualizado_en?: string;
   id_palet?: string | null;
-  producto_id?: string;
-  ubicacion_id?: string;
+  id_producto?: string;
+  id_ubicacion?: string;
 }
 
 export interface Seccion {

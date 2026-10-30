@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { PermisosUsuario } from "@/hooks/usePermissions";
 
-export type TipoUbicacion = "pasillo" | "armario" | "alto" | "cross" | "caja" | "reserva";
+export type TipoUbicacion = "pasillo" | "armario" | "cross" | "caja" | "reserva";
 
 export interface Ubicacion {
   id: string;
@@ -12,7 +12,7 @@ export interface Ubicacion {
   id_ubicacion_padre: string | null;
   seccion: string | null;
   seccion_origen: string | null;
-  posicion_lateral: "izquierda" | "derecha" | "centro" | null;
+  posicion_lateral: "izquierda" | "derecha" | null;
   posicion_longitudinal: "principio" | "final" | "paso" | null;
   numero: number | null;
   activo: boolean;
@@ -31,7 +31,7 @@ export interface DatosUbicacion {
   id_ubicacion_padre?: string | null;
   seccion?: string | null;
   seccion_origen?: string | null;
-  posicion_lateral?: "izquierda" | "derecha" | "centro" | null;
+  posicion_lateral?: "izquierda" | "derecha" | null;
   posicion_longitudinal?: "principio" | "final" | "paso" | null;
   numero?: number | null;
 }
@@ -39,7 +39,6 @@ export interface DatosUbicacion {
 export const tiposUbicacion: Record<TipoUbicacion, string> = {
   pasillo: "Pasillo",
   armario: "Armario",
-  alto: "Alto",
   cross: "Cross",
   caja: "Caja",
   reserva: "Reserva",
@@ -49,11 +48,11 @@ export function puedeGestionarUbicaciones(permisos: PermisosUsuario | null | und
   return permisos?.puede_crear_ubicaciones === true;
 }
 
-export function filtrarUbicaciones(items: Ubicacion[], seccion: "pasillos" | "altos") {
+export function filtrarUbicaciones(items: Ubicacion[], seccion: "pasillos" | "armarios") {
   return items.filter(
     (u) =>
       u.activo &&
-      (seccion === "pasillos" ? u.tipo === "pasillo" : u.tipo === "alto" || u.tipo === "armario"),
+      (seccion === "pasillos" ? u.tipo === "pasillo" : u.tipo === "armario"),
   );
 }
 

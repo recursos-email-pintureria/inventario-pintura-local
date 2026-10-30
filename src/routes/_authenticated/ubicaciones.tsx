@@ -1,11 +1,10 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   ArrowLeftRight,
   Archive,
-  Layers,
   Package,
   Shuffle,
   Warehouse,
@@ -47,11 +46,23 @@ import {
   getProductos,
   crearUbicacionBD,
   desactivarUbicacionBD,
-  crearPaletBD,
   darDeBajaPaletBD,
   crearMovimiento,
   sincronizarEstructuraInicialSupabase,
 } from "@/lib/inventario";
+import {
+  cargarProductosPalet,
+  crearPalet,
+  desactivarPalet,
+  generarCodigoBarrasPalet,
+  getSiguienteNumeroPalet,
+  paletsPorReservaQueryOptions,
+  reponerProductoDePalet,
+  type Palet as PaletRegistro,
+} from "@/lib/palets";
+import { useAuth } from "@/contexts/AuthContext";
+import { getColorLateral } from "@/lib/tiposUbicacion";
+import { ModalProductosPalet } from "@/components/inventario/ModalProductosPalet";
 import {
   Sheet,
   SheetContent,
@@ -81,6 +92,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import Escaner from "@/components/inventario/Escaner";
 
@@ -90,7 +108,7 @@ export const Route = createFileRoute("/_authenticated/ubicaciones")({
 
 // Tipos de ubicación con jerarquía estricta
 export type TipoUbicacion =
-  "seccion" | "pasillo" | "reserva" | "armario" | "alto" | "caja" | "cross";
+  "seccion" | "pasillo" | "reserva" | "armario" | "caja" | "cross";
 
 export interface ProductoEnUbicacion {
   id: string;
@@ -121,7 +139,7 @@ export interface UbicacionItem {
   id_padre?: string | null;
   seccion_id?: string | null;
   descripcion?: string;
-  lateral?: "L" | "R" | "C";
+  lateral?: string | null;
   piso?: number;
   capacidad_max?: number;
   peso_max_kg?: number;
@@ -188,15 +206,6 @@ export const CONFIG_JERARQUIA: Record<
     borderClass: "border-emerald-300",
     bgHoverClass: "hover:bg-emerald-50/60",
     descripcion: "Nivel 2: Estantería media (Requiere Pasillo)",
-  },
-  alto: {
-    label: "Alto",
-    nivel: 2,
-    icon: Layers,
-    badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    borderClass: "border-emerald-300",
-    bgHoverClass: "hover:bg-emerald-50/60",
-    descripcion: "Nivel 2: Nivel superior / altillo (Requiere Pasillo)",
   },
   cross: {
     label: "Cross",
@@ -350,7 +359,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
     nivel: 2,
     id_padre: "pas-a1",
     seccion_id: "sec-pintura",
-    lateral: "R",
+    lateral: "derecha",
     piso: 1,
     capacidad_max: 100,
     peso_max_kg: 400,
@@ -387,12 +396,12 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
   {
     id: "pos-a1-02",
     codigo: "A1-02",
-    nombre: "Alto A1-02",
-    tipo: "alto",
+    nombre: "Armario A1-02",
+    tipo: "armario",
     nivel: 2,
     id_padre: "pas-a1",
     seccion_id: "sec-pintura",
-    lateral: "R",
+    lateral: "derecha",
     piso: 2,
     capacidad_max: 80,
     peso_max_kg: 350,
@@ -426,7 +435,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
     nivel: 2,
     id_padre: "pas-a1",
     seccion_id: "sec-pintura",
-    lateral: "C",
+    lateral: null,
     piso: 1,
     capacidad_max: 90,
     peso_max_kg: 500,
@@ -464,7 +473,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
     nivel: 2,
     id_padre: "pas-a2",
     seccion_id: "sec-pintura",
-    lateral: "R",
+    lateral: "derecha",
     piso: 1,
     capacidad_max: 160,
     peso_max_kg: 500,
@@ -567,7 +576,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
     nivel: 2,
     id_padre: "pas-s1",
     seccion_id: "sec-sanitario",
-    lateral: "L",
+    lateral: "izquierda",
     piso: 1,
     capacidad_max: 100,
     peso_max_kg: 300,
@@ -641,7 +650,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
     nivel: 2,
     id_padre: "pas-f1",
     seccion_id: "sec-ferreteria",
-    lateral: "R",
+    lateral: "derecha",
     piso: 1,
     capacidad_max: 200,
     peso_max_kg: 800,
@@ -661,59 +670,17 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
   },
 ];
 
-// Palets iniciales de Reserva General
-const PALETS_INICIALES: PaletItem[] = [
-  {
-    id: "pal-001",
-    id_reserva: "res-gen",
-    numero_palet: 1,
-    codigo_barras: "PAL-001-Javier-27102026",
-    generado_por: "Javier Vendedor",
-    generado_en: "2026-10-27T08:30:00.000Z",
-    activo: true,
-    productos: [
-      {
-        id: "p1",
-        sku: "LAT-4001-WHT",
-        nombre: "Látex Extracubriente Blanco Mate 15L",
-        categoria: "Pinturas de Exterior",
-        cantidad: 32,
-        stock_minimo: 10,
-      },
-      {
-        id: "p4",
-        sku: "SEL-3108-ACR",
-        nombre: "Primer Acrílico Sellador Antihumedad 5L",
-        categoria: "Pinturas & Selladores",
-        cantidad: 20,
-        stock_minimo: 10,
-      },
-    ],
-  },
-  {
-    id: "pal-002",
-    id_reserva: "res-gen",
-    numero_palet: 2,
-    codigo_barras: "PAL-002-Javier-27102026",
-    generado_por: "Javier Vendedor",
-    generado_en: "2026-10-27T09:15:00.000Z",
-    activo: true,
-    productos: [
-      {
-        id: "p8",
-        sku: "ESM-2040-BLU",
-        nombre: "Esmalte Marino Azul Cobalto 4L",
-        categoria: "Esmaltes & Sintéticos",
-        cantidad: 18,
-        stock_minimo: 10,
-      },
-    ],
-  },
-];
-
 function UbicacionesPage() {
   // 🔌 Supabase + TanStack Query para datos en tiempo real
   const queryClient = useQueryClient();
+  const { user, loading: cargandoSesion } = useAuth();
+  const usuarioNombre =
+    [
+      user?.user_metadata?.["full_name"] as string,
+      user?.user_metadata?.["name"] as string,
+      user?.email,
+    ].find((nombre): nombre is string => typeof nombre === "string" && nombre.trim().length > 0)
+      ?.trim() ?? "";
 
   const { data: seccionesBD = [] } = useQuery({
     queryKey: ["secciones"],
@@ -778,7 +745,7 @@ function UbicacionesPage() {
         });
       });
 
-      // 2. Ubicaciones hijas (Pasillos, Cajas, Reserva, Armarios, Altos, Cross)
+      // 2. Ubicaciones hijas (Pasillos, Cajas, Reserva, Armarios y Cross)
       ubicacionesBD.forEach((u) => {
         const tipo = (u.tipo as TipoUbicacion) || "armario";
         const config = CONFIG_JERARQUIA[tipo] || CONFIG_JERARQUIA.armario;
@@ -809,7 +776,7 @@ function UbicacionesPage() {
           nivel: config.nivel,
           id_padre: u.id_ubicacion_padre || u.seccion || null,
           seccion_id: u.seccion || u.seccion_id || null,
-          lateral: (u.posicion_lateral as "L" | "R" | "C") || "R",
+          lateral: u.posicion_lateral ?? null,
           piso: u.numero || 1,
           capacidad_max: cap,
           peso_max_kg: 400,
@@ -829,7 +796,7 @@ function UbicacionesPage() {
     return UBICACIONES_INICIALES;
   }, [seccionesBD, ubicacionesBD, stockBD, productosBD]);
 
-  // Palets combinados de Supabase o fallback
+  // Los palets y sus cantidades solo proceden de Supabase.
   const paletsCombinados: PaletItem[] = useMemo(() => {
     if (paletsBD.length > 0) {
       return paletsBD.map((p) => {
@@ -838,11 +805,11 @@ function UbicacionesPage() {
           const prod = productosBD.find((pr) => pr.id === s.id_producto);
           return {
             id: s.id_producto,
-            sku: prod?.sku || "SKU-GEN",
-            nombre: prod?.nombre || "Producto",
-            categoria: prod?.categoria || "Pintura",
+            sku: prod?.sku ?? "",
+            nombre: prod?.nombre ?? "Producto sin nombre",
+            categoria: prod?.categoria ?? "",
             cantidad: s.cantidad,
-            stock_minimo: prod?.stock_minimo || 5,
+            stock_minimo: prod?.stock_minimo ?? 0,
           };
         });
 
@@ -851,30 +818,18 @@ function UbicacionesPage() {
           id_reserva: p.id_reserva,
           numero_palet: p.numero_palet,
           codigo_barras: p.codigo_barras,
-          generado_por: p.generado_por || "Personal Tienda",
-          generado_en: p.generado_en || p.creado_en || new Date().toISOString(),
+          generado_por: p.generado_por ?? "",
+          generado_en: p.generado_en ?? p.creado_en ?? "",
           activo: p.activo,
-          productos:
-            prods.length > 0
-              ? prods
-              : [
-                  {
-                    id: "p1",
-                    sku: "LAT-4001-WHT",
-                    nombre: "Látex Extracubriente Blanco Mate 15L",
-                    categoria: "Pinturas de Exterior",
-                    cantidad: 24,
-                    stock_minimo: 10,
-                  },
-                ],
+          productos: prods,
         };
       });
     }
-    return PALETS_INICIALES;
+    return [];
   }, [paletsBD, stockBD, productosBD]);
 
   const [ubicaciones, setUbicaciones] = useState<UbicacionItem[]>(UBICACIONES_INICIALES);
-  const [palets, setPalets] = useState<PaletItem[]>(PALETS_INICIALES);
+  const [palets, setPalets] = useState<PaletItem[]>([]);
 
   useEffect(() => {
     if (ubicacionesCombinadas.length > 0) {
@@ -882,11 +837,7 @@ function UbicacionesPage() {
     }
   }, [ubicacionesCombinadas]);
 
-  useEffect(() => {
-    if (paletsCombinados.length > 0) {
-      setPalets(paletsCombinados);
-    }
-  }, [paletsCombinados]);
+  useEffect(() => setPalets(paletsCombinados), [paletsCombinados]);
 
   const [vista, setVista] = useState<"arbol" | "lista">("arbol");
   const [busqueda, setBusqueda] = useState("");
@@ -932,17 +883,181 @@ function UbicacionesPage() {
   // ----------------------------------------------------
   // MODAL DE PALETS Y AUTODESTRUCCIÓN
   // ----------------------------------------------------
+  const [modalCrearPaletAbierto, setModalCrearPaletAbierto] = useState(false);
+  const [idReservaParaCrearPalet, setIdReservaParaCrearPalet] = useState("");
+  const [codigoPaletPrevisto, setCodigoPaletPrevisto] = useState("");
+  const [cargandoPrevisualizacionPalet, setCargandoPrevisualizacionPalet] = useState(false);
+  const [errorPrevisualizacionPalet, setErrorPrevisualizacionPalet] = useState("");
   const [modalEtiquetaPaletAbierto, setModalEtiquetaPaletAbierto] = useState(false);
   const [paletParaImprimir, setPaletParaImprimir] = useState<PaletItem | null>(null);
   const [paletSeleccionadoParaGestion, setPaletSeleccionadoParaGestion] =
     useState<PaletItem | null>(null);
   const [modalGestionPaletAbierto, setModalGestionPaletAbierto] = useState(false);
+  const [paletSeleccionadoParaProductos, setPaletSeleccionadoParaProductos] =
+    useState<PaletRegistro | null>(null);
+  const [filtroSeccionDestino, setFiltroSeccionDestino] = useState("todas");
+  const [filtroTipoDestino, setFiltroTipoDestino] = useState("todos");
+  const [ubicacionDestinoPalet, setUbicacionDestinoPalet] = useState("");
+  const [cantidadesReposicion, setCantidadesReposicion] = useState<Record<string, number>>({});
+
+  const productosPaletQuery = useQuery({
+    queryKey: ["palet-productos", paletSeleccionadoParaGestion?.id],
+    queryFn: () => cargarProductosPalet(paletSeleccionadoParaGestion!.id),
+    enabled: Boolean(modalGestionPaletAbierto && paletSeleccionadoParaGestion?.id),
+  });
+
+  useEffect(() => {
+    if (productosPaletQuery.data) {
+      setCantidadesReposicion(
+        Object.fromEntries(
+          productosPaletQuery.data.map((producto) => [producto.id_producto, producto.cantidad]),
+        ),
+      );
+    }
+  }, [productosPaletQuery.data]);
+
+  const ubicacionesDestinoDisponibles = useMemo(
+    () => {
+      const perteneceASeccion = (ubicacionId: string): boolean => {
+        let actual = ubicacionesBD.find((item) => item.id === ubicacionId);
+        const visitadas = new Set<string>();
+
+        while (actual && !visitadas.has(actual.id)) {
+          visitadas.add(actual.id);
+          if (
+            actual.seccion_id === filtroSeccionDestino ||
+            actual.seccion === filtroSeccionDestino ||
+            actual.id_ubicacion_padre === filtroSeccionDestino
+          ) {
+            return true;
+          }
+          actual = actual.id_ubicacion_padre
+            ? ubicacionesBD.find((item) => item.id === actual?.id_ubicacion_padre)
+            : undefined;
+        }
+
+        return false;
+      };
+
+      return ubicacionesBD.filter(
+        (ubicacion) =>
+          ["pasillo", "armario"].includes(ubicacion.tipo) &&
+          (filtroTipoDestino === "todos" || ubicacion.tipo === filtroTipoDestino) &&
+          (filtroSeccionDestino === "todas" || perteneceASeccion(ubicacion.id)),
+      );
+    },
+    [ubicacionesBD, filtroSeccionDestino, filtroTipoDestino],
+  );
+
+  const crearPaletMutation = useMutation({
+    mutationFn: crearPalet,
+    onSuccess: async (palet) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: paletsPorReservaQueryOptions(palet.id_reserva).queryKey,
+        }),
+        queryClient.invalidateQueries({ queryKey: ["palets"] }),
+      ]);
+
+      const paletCreado: PaletItem = { ...palet, productos: [] };
+      setPalets((prev) => [paletCreado, ...prev.filter((item) => item.id !== palet.id)]);
+      setPaletParaImprimir(paletCreado);
+      setModalCrearPaletAbierto(false);
+      setModalEtiquetaPaletAbierto(true);
+      toast.success(`Palet ${palet.codigo_barras} creado correctamente`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear el palet");
+    },
+  });
+
+  const reponerProductoMutation = useMutation({
+    mutationFn: ({
+      nombre_producto: _nombreProducto,
+      ...params
+    }: Parameters<typeof reponerProductoDePalet>[0] & { nombre_producto: string }) =>
+      reponerProductoDePalet(params),
+    onSuccess: async (_data, params) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["palet-productos", params.id_palet] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["palets"] }),
+        queryClient.invalidateQueries({
+          queryKey: paletsPorReservaQueryOptions(
+            paletSeleccionadoParaGestion?.id_reserva ?? "",
+          ).queryKey,
+        }),
+      ]);
+    },
+    onError: (error, params) => {
+      toast.error(
+        `No se pudo reponer "${params.nombre_producto}": ${
+          error instanceof Error ? error.message : "Error desconocido"
+        }`,
+      );
+    },
+  });
+
+  const abrirGestionPalet = (palet: PaletItem) => {
+    const registro = paletsBD.find((item) => item.id === palet.id);
+    if (!registro) {
+      toast.error("Este palet no está disponible en los datos actuales de Supabase.");
+      return;
+    }
+    setPaletSeleccionadoParaProductos({
+      id: registro.id,
+      id_reserva: registro.id_reserva,
+      numero_palet: registro.numero_palet,
+      codigo_barras: registro.codigo_barras,
+      generado_por: registro.generado_por ?? "",
+      generado_en: registro.generado_en ?? registro.creado_en ?? "",
+      activo: registro.activo,
+      creado_en: registro.creado_en ?? "",
+      actualizado_en: registro.actualizado_en ?? registro.creado_en ?? "",
+      reserva_nombre: ubicacionesBD.find((ubicacion) => ubicacion.id === registro.id_reserva)?.nombre ?? "Sin reserva",
+    });
+  };
+
+  useEffect(() => {
+    if (!modalCrearPaletAbierto || !idReservaParaCrearPalet || !usuarioNombre) {
+      setCodigoPaletPrevisto("");
+      setCargandoPrevisualizacionPalet(false);
+      setErrorPrevisualizacionPalet("");
+      return;
+    }
+
+    let cancelado = false;
+    setCodigoPaletPrevisto("");
+    setErrorPrevisualizacionPalet("");
+    setCargandoPrevisualizacionPalet(true);
+
+    getSiguienteNumeroPalet(idReservaParaCrearPalet)
+      .then((numero) => {
+        if (!cancelado) {
+          setCodigoPaletPrevisto(generarCodigoBarrasPalet(numero, usuarioNombre));
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelado) {
+          setErrorPrevisualizacionPalet(
+            error instanceof Error ? error.message : "No se pudo calcular el código previsto.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoPrevisualizacionPalet(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [modalCrearPaletAbierto, idReservaParaCrearPalet, usuarioNombre]);
 
   // Formulario de nueva ubicación
   const [formNombre, setFormNombre] = useState("Armario A1-04");
   const [formTipo, setFormTipo] = useState<TipoUbicacion>("armario");
   const [formPadre, setFormPadre] = useState("pas-a1");
-  const [formLateral, setFormLateral] = useState<"L" | "R" | "C">("R");
+  const [formLateral, setFormLateral] = useState("derecha");
   const [formPiso, setFormPiso] = useState<number>(1);
   const [formCapMax, setFormCapMax] = useState<number>(120);
   const [formPesoMax, setFormPesoMax] = useState<number>(450);
@@ -984,7 +1099,7 @@ function UbicacionesPage() {
   const posicionesDePasillo = useCallback(
     (idPasillo: string) =>
       ubicaciones.filter(
-        (u) => u.id_padre === idPasillo && ["armario", "alto", "cross"].includes(u.tipo),
+        (u) => u.id_padre === idPasillo && ["armario", "cross"].includes(u.tipo),
       ),
     [ubicaciones],
   );
@@ -1024,7 +1139,7 @@ function UbicacionesPage() {
     );
   }, []);
 
-  // Nivel 2: Posiciones dentro de un pasillo (armario, alto, cross)
+  // Nivel 2: Posiciones dentro de un pasillo (armario y cross)
   const matchPosicion = useCallback(
     (pos: UbicacionItem) => {
       const coincideTipo = filtroTipo === "todos" || pos.tipo === filtroTipo;
@@ -1058,7 +1173,7 @@ function UbicacionesPage() {
       if (filtroTipo === "pasillo") {
         return coincideBusquedaPropia;
       }
-      if (["armario", "alto", "cross"].includes(filtroTipo)) {
+      if (["armario", "cross"].includes(filtroTipo)) {
         return posVisibles.length > 0;
       }
       return false;
@@ -1404,104 +1519,116 @@ function UbicacionesPage() {
   // ----------------------------------------------------
   // GESTIÓN DE PALETS EN RESERVA (SOLO EN RESERVA)
   // ----------------------------------------------------
-  const handleCrearNuevoPalet = async (idReservaEspecifica?: string) => {
-    // La ubicación SOLO puede ser en Reserva para evitar que el vendedor lo cree en otro lugar
-    const idReserva =
-      idReservaEspecifica ||
-      (ubicacionSeleccionada?.tipo === "reserva" ? ubicacionSeleccionada.id : null) ||
-      ubicaciones.find((u: any) => u.tipo === "reserva")?.id ||
-      "res-gen";
-    const ubiReserva = ubicaciones.find((u) => u.id === idReserva);
-    const nombreReserva = ubiReserva?.nombre || "Reserva (Almacén de Tienda)";
+  const handleCrearNuevoPalet = (idReservaEspecifica?: string) => {
+    const idReservaContextual =
+      idReservaEspecifica ??
+      (ubicacionSeleccionada?.tipo === "reserva" ? ubicacionSeleccionada.id : "");
+    const reservaReal = ubicacionesBD.find(
+      (ubicacion) => ubicacion.id === idReservaContextual && ubicacion.tipo === "reserva",
+    );
 
-    const siguienteNum =
-      (palets.length > 0 ? Math.max(...palets.map((p) => p.numero_palet)) : 0) + 1;
-    const padNum = String(siguienteNum).padStart(3, "0");
-    const hoy = new Date();
-    const diaMesAnio = `${String(hoy.getDate()).padStart(2, "0")}${String(hoy.getMonth() + 1).padStart(2, "0")}${hoy.getFullYear()}`;
-    const usuarioNombre = "Carlos Ruiz (Vendedor Pintura)";
-    const codBarras = `PAL-${padNum}-Vendedor-${diaMesAnio}`;
-
-    const nuevoPalet: PaletItem = {
-      id: `pal-${Date.now()}`,
-      id_reserva: idReserva,
-      numero_palet: siguienteNum,
-      codigo_barras: codBarras,
-      generado_por: usuarioNombre,
-      generado_en: new Date().toISOString(),
-      activo: true,
-      productos: [
-        {
-          id: `p-${Date.now()}`,
-          sku: "LAT-4001-WHT",
-          nombre: "Látex Extracubriente Blanco Mate 15L",
-          categoria: "Pinturas de Exterior",
-          cantidad: 24,
-          stock_minimo: 10,
-        },
-      ],
-    };
-
-    try {
-      await crearPaletBD({
-        id_reserva: idReserva,
-        numero_palet: siguienteNum,
-        codigo_barras: codBarras,
-        generado_por: usuarioNombre,
-      });
-      queryClient.invalidateQueries({ queryKey: ["palets"] });
-    } catch (err: any) {
-      console.warn("Aviso al crear palet en Supabase:", err.message);
-    }
-
-    setPalets((prev) => [nuevoPalet, ...prev]);
-    toast.success(`Palet #${padNum} creado en ${nombreReserva} (${codBarras})`, {
-      description:
-        "Ubicación fijada en Reserva. Etiqueta oficial lista para imprimir con Quién, Cuándo y Dónde.",
-    });
-
-    setPaletParaImprimir(nuevoPalet);
-    setModalEtiquetaPaletAbierto(true);
+    setIdReservaParaCrearPalet(reservaReal ? idReservaContextual : "");
+    setModalCrearPaletAbierto(true);
   };
 
-  // Reponer desde el palet hacia la tienda con REGLA DE AUTODESTRUCCIÓN
-  const handleReponerEnTienda = async (palet: PaletItem, prodId: string, cantAReponer: number) => {
-    const prodsActualizados = palet.productos
-      .map((p) => {
-        if (p.id === prodId) {
-          const rem = Math.max(0, p.cantidad - cantAReponer);
-          return { ...p, cantidad: rem };
-        }
-        return p;
-      })
-      .filter((p) => p.cantidad > 0);
+  const abrirReposicionPalet = (palet: PaletItem) => {
+    setPaletSeleccionadoParaGestion(palet);
+    setFiltroSeccionDestino("todas");
+    setFiltroTipoDestino("todos");
+    setUbicacionDestinoPalet("");
+    setCantidadesReposicion({});
+    setModalGestionPaletAbierto(true);
+  };
 
-    const totalRestante = prodsActualizados.reduce((acc, p) => acc + p.cantidad, 0);
+  const handleReponerSeleccionadas = async () => {
+    const palet = paletSeleccionadoParaGestion;
+    const productos = productosPaletQuery.data ?? [];
+    if (
+      !palet ||
+      !ubicacionDestinoPalet ||
+      !ubicacionesDestinoDisponibles.some((ubicacion) => ubicacion.id === ubicacionDestinoPalet)
+    ) {
+      toast.error("Selecciona una ubicación de destino.");
+      return;
+    }
 
-    if (totalRestante === 0) {
-      // ⚠️ REGLA DE ORO DE AUTODESTRUCCIÓN DEL PALET
-      setPalets((prev) => prev.filter((p) => p.id !== palet.id));
-      setModalGestionPaletAbierto(false);
-
-      try {
-        await darDeBajaPaletBD(palet.id);
-        queryClient.invalidateQueries({ queryKey: ["palets"] });
-      } catch (err: any) {
-        console.warn("Aviso al dar de baja palet en Supabase:", err.message);
-      }
-
-      toast.error(`🚨 ¡PALET #${String(palet.numero_palet).padStart(3, "0")} AUTODESTRUIDO!`, {
-        description: `Todos los artículos del palet [${palet.codigo_barras}] han sido traspasados a tienda. El palet se ha dado de baja automáticamente en Supabase.`,
-        duration: 6000,
-      });
-    } else {
-      setPalets((prev) =>
-        prev.map((p) => (p.id === palet.id ? { ...p, productos: prodsActualizados } : p)),
+    const seleccionadas = productos.filter(
+      (producto) => (cantidadesReposicion[producto.id_producto] ?? 0) > 0,
+    );
+    if (seleccionadas.length === 0) {
+      toast.error("Indica una cantidad para al menos un producto.");
+      return;
+    }
+    const cantidadInvalida = seleccionadas.find((producto) => {
+      const cantidad = cantidadesReposicion[producto.id_producto];
+      return (
+        !Number.isInteger(cantidad) ||
+        (cantidad ?? 0) <= 0 ||
+        (cantidad ?? 0) > producto.cantidad
       );
+    });
+    if (cantidadInvalida) {
+      toast.error(`La cantidad de "${cantidadInvalida.nombre}" no es válida.`);
+      return;
+    }
+
+    let completadas = 0;
+    let fallidas = 0;
+    for (const producto of seleccionadas) {
+      try {
+        await reponerProductoMutation.mutateAsync({
+          id_palet: palet.id,
+          id_producto: producto.id_producto,
+          id_ubicacion_destino: ubicacionDestinoPalet,
+          cantidad: cantidadesReposicion[producto.id_producto]!,
+          nombre_producto: producto.nombre ?? producto.id_producto,
+        });
+        completadas += 1;
+      } catch {
+        fallidas += 1;
+      }
+    }
+
+    if (completadas > 0) {
       toast.success(
-        `Mercancía repuesta en tienda. Quedan ${totalRestante} uds en el Palet #${palet.numero_palet}`,
+        `${completadas} ${completadas === 1 ? "producto repuesto" : "productos repuestos"}${
+          fallidas > 0 ? `; ${fallidas} con error` : ""
+        }.`,
       );
     }
+    if (fallidas > 0) return;
+
+    let productosRestantes: Awaited<ReturnType<typeof cargarProductosPalet>>;
+    try {
+      productosRestantes = await cargarProductosPalet(palet.id);
+    } catch (error) {
+      toast.error(
+        `No se pudo verificar el stock restante del palet: ${
+          error instanceof Error ? error.message : "Error desconocido"
+        }`,
+      );
+      return;
+    }
+
+    if (productosRestantes.length === 0) {
+      try {
+        await desactivarPalet(palet.id);
+        toast.info(`El palet ${palet.codigo_barras} quedó vacío y se dio de baja.`);
+      } catch (error) {
+        toast.error(
+          `El palet quedó vacío, pero no se pudo dar de baja: ${
+            error instanceof Error ? error.message : "Error desconocido"
+          }`,
+        );
+      }
+      await queryClient.invalidateQueries({ queryKey: ["palets"] });
+      await queryClient.invalidateQueries({
+        queryKey: paletsPorReservaQueryOptions(palet.id_reserva).queryKey,
+      });
+    }
+
+    setModalGestionPaletAbierto(false);
+    setPaletSeleccionadoParaGestion(null);
   };
 
   const handleGuardarUbicacion = async (e: React.FormEvent) => {
@@ -1527,7 +1654,7 @@ function UbicacionesPage() {
       tipo: formTipo,
       nivel: config.nivel,
       id_padre: config.nivel === 2 ? formPadre : null,
-      lateral: formLateral,
+      lateral: formLateral || null,
       piso: formPiso,
       capacidad_max: formCapMax,
       peso_max_kg: formPesoMax,
@@ -1548,7 +1675,7 @@ function UbicacionesPage() {
         tipo: formTipo,
         id_ubicacion_padre: config.nivel === 2 ? formPadre : null,
         seccion: formPadre,
-        posicion_lateral: formLateral,
+        posicion_lateral: formLateral || null,
         numero: formPiso,
       });
       queryClient.invalidateQueries({ queryKey: ["ubicacionesCompletas"] });
@@ -1730,7 +1857,6 @@ function UbicacionesPage() {
                   <option value="caja">Caja (Nivel 1)</option>
                   <option value="reserva">Reserva (Nivel 1)</option>
                   <option value="armario">Armario (Nivel 2)</option>
-                  <option value="alto">Alto (Nivel 2)</option>
                   <option value="cross">Cross (Nivel 2)</option>
                 </select>
               </div>
@@ -1778,11 +1904,6 @@ function UbicacionesPage() {
                   id: "armario",
                   label: "Armarios",
                   count: ubicaciones.filter((u) => u.tipo === "armario").length,
-                },
-                {
-                  id: "alto",
-                  label: "Altos",
-                  count: ubicaciones.filter((u) => u.tipo === "alto").length,
                 },
                 {
                   id: "caja",
@@ -2112,6 +2233,39 @@ function UbicacionesPage() {
                                   ? true
                                   : (expandidos[pas.id] ?? true);
                                 const posiciones = posicionesVisiblesDePasillo(pas.id);
+                                const armarios = posiciones.filter((pos) => pos.tipo === "armario");
+                                const gruposPosiciones: {
+                                  id: string;
+                                  lado?: string | null;
+                                  mostrarEtiqueta: boolean;
+                                  posiciones: UbicacionItem[];
+                                }[] = [
+                                  {
+                                    id: "derecha",
+                                    lado: "derecha",
+                                    mostrarEtiqueta: true,
+                                    posiciones: armarios.filter((pos) => pos.lateral === "derecha"),
+                                  },
+                                  {
+                                    id: "izquierda",
+                                    lado: "izquierda",
+                                    mostrarEtiqueta: true,
+                                    posiciones: armarios.filter((pos) => pos.lateral === "izquierda"),
+                                  },
+                                  {
+                                    id: "sin-lateralidad",
+                                    mostrarEtiqueta: true,
+                                    posiciones: armarios.filter(
+                                      (pos) =>
+                                        pos.lateral !== "derecha" && pos.lateral !== "izquierda",
+                                    ),
+                                  },
+                                  {
+                                    id: "cross",
+                                    mostrarEtiqueta: false,
+                                    posiciones: posiciones.filter((pos) => pos.tipo === "cross"),
+                                  },
+                                ].filter((grupo) => grupo.posiciones.length > 0);
 
                                 return (
                                   <div
@@ -2159,7 +2313,7 @@ function UbicacionesPage() {
                                       </Button>
                                     </div>
 
-                                    {/* POSICIONES DEL PASILLO (NIVEL 2: ARMARIOS, ALTOS, CROSS) */}
+                                    {/* POSICIONES DEL PASILLO (NIVEL 2: ARMARIOS Y CROSS) */}
                                     {pasAbierto && (
                                       <div className="p-2 sm:p-3 space-y-2 bg-white">
                                         {posiciones.length === 0 ? (
@@ -2167,69 +2321,101 @@ function UbicacionesPage() {
                                             Sin posiciones asignadas en este pasillo.
                                           </div>
                                         ) : (
-                                          posiciones.map((pos) => {
-                                            const config = CONFIG_JERARQUIA[pos.tipo];
-                                            const IconoPos = config.icon;
-
+                                          gruposPosiciones.map((grupo) => {
+                                            const lateral = getColorLateral(grupo.lado);
                                             return (
                                               <div
-                                                key={pos.id}
-                                                onClick={() => abrirPanelVendedor(pos)}
-                                                className="p-2.5 rounded-lg border border-slate-200/90 bg-slate-50/30 hover:bg-blue-50/50 hover:border-blue-400 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group shadow-2xs"
+                                                key={grupo.id}
+                                                className={
+                                                  grupo.mostrarEtiqueta
+                                                    ? `rounded-md border ${lateral.border} ${lateral.bg}`
+                                                    : "space-y-2"
+                                                }
                                               >
-                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                  <div className="w-4 h-4 flex items-center justify-center text-slate-400">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-500" />
-                                                  </div>
+                                                {grupo.mostrarEtiqueta && (
                                                   <div
-                                                    className={`p-1.5 rounded-md ${config.badgeClass}`}
+                                                    className={`px-2.5 py-1.5 text-[11px] font-bold ${lateral.color}`}
                                                   >
-                                                    <IconoPos className="w-3.5 h-3.5" />
+                                                    {lateral.icon}{" "}
+                                                    {grupo.lado
+                                                      ? `LADO ${lateral.label}`
+                                                      : lateral.label}
                                                   </div>
-                                                  <div className="min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                      <span className="font-semibold text-xs text-slate-900 group-hover:text-blue-700">
-                                                        {pos.nombre}
-                                                      </span>
-                                                      <span
-                                                        className={`px-1.5 py-0.2 text-[10px] font-medium rounded-full border ${config.badgeClass}`}
-                                                      >
-                                                        {config.label}
-                                                      </span>
-                                                      <span className="text-[10px] font-mono text-slate-400">
-                                                        [{pos.codigo}]
-                                                      </span>
-                                                    </div>
-                                                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                                                      {pos.subtitulo}
-                                                    </p>
-                                                  </div>
-                                                </div>
+                                                )}
+                                                <div
+                                                  className={
+                                                    grupo.mostrarEtiqueta
+                                                      ? "p-2 space-y-2"
+                                                      : "space-y-2"
+                                                  }
+                                                >
+                                                  {grupo.posiciones.map((pos) => {
+                                                    const config = CONFIG_JERARQUIA[pos.tipo];
+                                                    const IconoPos = config.icon;
 
-                                                <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      abrirPanelVendedor(pos);
-                                                    }}
-                                                    className="h-7 text-xs px-2.5 rounded-md border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 font-semibold"
-                                                  >
-                                                    Ver Productos & Stock
-                                                  </Button>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setUbicacionParaEliminar(pos);
-                                                      setDialogEliminarAbierto(true);
-                                                    }}
-                                                    className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
-                                                  >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                  </Button>
+                                                    return (
+                                                      <div
+                                                        key={pos.id}
+                                                        onClick={() => abrirPanelVendedor(pos)}
+                                                        className="p-2.5 rounded-lg border border-slate-200/90 bg-white/90 hover:bg-blue-50/50 hover:border-blue-400 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group shadow-2xs"
+                                                      >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                          <div className="w-4 h-4 flex items-center justify-center text-slate-400">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-500" />
+                                                          </div>
+                                                          <div
+                                                            className={`p-1.5 rounded-md ${config.badgeClass}`}
+                                                          >
+                                                            <IconoPos className="w-3.5 h-3.5" />
+                                                          </div>
+                                                          <div className="min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                              <span className="font-semibold text-xs text-slate-900 group-hover:text-blue-700">
+                                                                {pos.nombre}
+                                                              </span>
+                                                              <span
+                                                                className={`px-1.5 py-0.2 text-[10px] font-medium rounded-full border ${config.badgeClass}`}
+                                                              >
+                                                                {config.label}
+                                                              </span>
+                                                              <span className="text-[10px] font-mono text-slate-400">
+                                                                [{pos.codigo}]
+                                                              </span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                                              {pos.subtitulo}
+                                                            </p>
+                                                          </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              abrirPanelVendedor(pos);
+                                                            }}
+                                                            className="h-7 text-xs px-2.5 rounded-md border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 font-semibold"
+                                                          >
+                                                            Ver Productos & Stock
+                                                          </Button>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              setUbicacionParaEliminar(pos);
+                                                              setDialogEliminarAbierto(true);
+                                                            }}
+                                                            className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
+                                                          >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                          </Button>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
                                                 </div>
                                               </div>
                                             );
@@ -2346,9 +2532,16 @@ function UbicacionesPage() {
                                       >
                                         <div className="flex items-center justify-between">
                                           <div className="flex items-center gap-1.5">
-                                            <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs">
-                                              Palet #{String(palet.numero_palet).padStart(3, "0")}
-                                            </Badge>
+                                            <button
+                                              type="button"
+                                              onClick={() => abrirGestionPalet(palet)}
+                                              className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+                                            >
+                                              <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs">
+                                                Palet #
+                                                {String(palet.numero_palet).padStart(3, "0")}
+                                              </Badge>
+                                            </button>
                                             <span className="text-[10px] font-mono text-slate-500">
                                               [{palet.codigo_barras}]
                                             </span>
@@ -2381,7 +2574,7 @@ function UbicacionesPage() {
                                           </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
                                           <Button
                                             variant="outline"
                                             size="sm"
@@ -2395,11 +2588,16 @@ function UbicacionesPage() {
                                           </Button>
                                           <Button
                                             size="sm"
-                                            onClick={() => {
-                                              setPaletSeleccionadoParaGestion(palet);
-                                              setModalGestionPaletAbierto(true);
-                                            }}
-                                            className="flex-1 h-7 text-xs bg-slate-800 hover:bg-slate-900 text-white gap-1 font-medium"
+                                            variant="outline"
+                                            onClick={() => abrirGestionPalet(palet)}
+                                            className="flex-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
+                                          >
+                                            <Package className="w-3 h-3" /> Productos
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            onClick={() => abrirReposicionPalet(palet)}
+                                            className="flex-1 h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1 font-medium"
                                           >
                                             <RefreshCw className="w-3 h-3" /> Reponer en Tienda
                                           </Button>
@@ -2515,7 +2713,6 @@ function UbicacionesPage() {
                     className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="armario">Armario (Estantería media - Nivel 2)</option>
-                    <option value="alto">Alto (Altillo superior - Nivel 2)</option>
                     <option value="cross">Cross-docking (Tránsito - Nivel 2)</option>
                     <option value="caja">Caja (Independiente - Nivel 1)</option>
                     <option value="pasillo">Pasillo (Corredor - Nivel 1)</option>
@@ -2550,12 +2747,12 @@ function UbicacionesPage() {
                     </Label>
                     <select
                       value={formLateral}
-                      onChange={(e) => setFormLateral(e.target.value as "L" | "R" | "C")}
+                      onChange={(e) => setFormLateral(e.target.value)}
                       className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800"
                     >
-                      <option value="R">Derecha (R)</option>
-                      <option value="L">Izquierda (L)</option>
-                      <option value="C">Central (C)</option>
+                      <option value="derecha">Derecha</option>
+                      <option value="izquierda">Izquierda</option>
+                      <option value="">Sin lateralidad</option>
                     </select>
                   </div>
                   <div>
@@ -2569,7 +2766,7 @@ function UbicacionesPage() {
                     >
                       <option value={1}>Nivel 1 (Suelo)</option>
                       <option value={2}>Nivel 2 (Medio)</option>
-                      <option value={3}>Nivel 3 (Alto)</option>
+                      <option value={3}>Nivel 3 (Superior)</option>
                     </select>
                   </div>
                 </div>
@@ -2891,9 +3088,15 @@ function UbicacionesPage() {
                             >
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-2">
-                                  <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs px-2.5 py-0.5">
-                                    Palet #{String(palet.numero_palet).padStart(3, "0")}
-                                  </Badge>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirGestionPalet(palet)}
+                                    className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+                                  >
+                                    <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs px-2.5 py-0.5">
+                                      Palet #{String(palet.numero_palet).padStart(3, "0")}
+                                    </Badge>
+                                  </button>
                                   <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border">
                                     {palet.codigo_barras}
                                   </span>
@@ -2954,7 +3157,7 @@ function UbicacionesPage() {
                               </div>
 
                               {/* ACCIONES: IMPRIMIR ETIQUETA Y REPONER EN TIENDA */}
-                              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -2969,14 +3172,21 @@ function UbicacionesPage() {
                                 </Button>
 
                                 <Button
+                                  variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    setPaletSeleccionadoParaGestion(palet);
-                                    setModalGestionPaletAbierto(true);
-                                  }}
-                                  className="flex-1 h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white gap-1.5 font-bold shadow-2xs"
+                                  onClick={() => abrirGestionPalet(palet)}
+                                  className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
                                 >
-                                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+                                  <Package className="w-3.5 h-3.5 text-amber-700" />
+                                  Productos
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  onClick={() => abrirReposicionPalet(palet)}
+                                  className="flex-1 h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5 font-bold shadow-2xs"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
                                   Reponer en Tienda
                                 </Button>
                               </div>
@@ -2988,7 +3198,7 @@ function UbicacionesPage() {
                   </div>
                 </div>
               ) : (
-                /* GESTIÓN ORDINARIA DE ARMARIOS / ALTOS / CAJAS */
+                /* GESTIÓN ORDINARIA DE ARMARIOS / CAJAS */
                 <>
                   {/* LECTOR CON CÁMARA (SI ESTÁ ACTIVO) */}
                   {mostrarEscaner && (
@@ -3327,6 +3537,111 @@ function UbicacionesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog
+        open={modalCrearPaletAbierto}
+        onOpenChange={setModalCrearPaletAbierto}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
+              <Boxes className="h-5 w-5 text-amber-600" />
+              Crear Palet en Reserva
+            </DialogTitle>
+            <DialogDescription>
+              El código mostrado es orientativo. El definitivo lo asigna el servidor al crear el
+              palet, ya que puede haber creaciones concurrentes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-950">
+              <div className="font-semibold">Reserva</div>
+              <div className="mt-1">
+                {ubicacionesBD.find((ubicacion) => ubicacion.id === idReservaParaCrearPalet)
+                  ?.nombre || "Sin reserva real seleccionada"}
+              </div>
+            </div>
+
+            {cargandoSesion && (
+              <p className="text-sm text-slate-600">Cargando la sesión del usuario...</p>
+            )}
+            {!idReservaParaCrearPalet && (
+              <p className="text-sm text-rose-700">
+                No hay una reserva real seleccionada. Selecciona una reserva disponible para
+                continuar.
+              </p>
+            )}
+            {!cargandoSesion && !usuarioNombre && (
+              <p className="text-sm text-rose-700">
+                No se pudo obtener el nombre ni el correo del usuario autenticado.
+              </p>
+            )}
+
+            {cargandoPrevisualizacionPalet ? (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+                Calculando el código previsto...
+              </div>
+            ) : errorPrevisualizacionPalet ? (
+              <p className="text-sm text-rose-700">
+                No se pudo calcular la previsualización: {errorPrevisualizacionPalet}
+              </p>
+            ) : codigoPaletPrevisto ? (
+              <div className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">Código previsto</span>
+                <div>
+                  <Badge
+                    variant="outline"
+                    className="border-amber-300 bg-amber-50 font-mono text-amber-900"
+                  >
+                    {codigoPaletPrevisto}
+                  </Badge>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setModalCrearPaletAbierto(false)}
+              disabled={crearPaletMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() =>
+                crearPaletMutation.mutate({
+                  id_reserva: idReservaParaCrearPalet,
+                  usuario_nombre: usuarioNombre,
+                })
+              }
+              disabled={
+                cargandoSesion ||
+                !idReservaParaCrearPalet ||
+                !usuarioNombre ||
+                cargandoPrevisualizacionPalet ||
+                Boolean(errorPrevisualizacionPalet) ||
+                !codigoPaletPrevisto ||
+                crearPaletMutation.isPending
+              }
+              className="gap-2 bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {crearPaletMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Creando palet...
+                </>
+              ) : (
+                "Crear Palet"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ========================================================================= */}
       {/* 🏷️ MODAL DE ETIQUETA IMPRIMIBLE DE PALET (HOMOLOGADA) */}
       {/* ========================================================================= */}
@@ -3439,54 +3754,230 @@ function UbicacionesPage() {
         </DialogContent>
       </Dialog>
 
+      <ModalProductosPalet
+        palet={paletSeleccionadoParaProductos}
+        abierto={Boolean(paletSeleccionadoParaProductos)}
+        onOpenChange={(open) => {
+          if (!open) setPaletSeleccionadoParaProductos(null);
+        }}
+      />
+
       {/* ========================================================================= */}
       {/* 🔄 MODAL DE REPOSICIÓN EN TIENDA DESDE EL PALET (CON AUTODESTRUCCIÓN) */}
       {/* ========================================================================= */}
-      <Dialog open={modalGestionPaletAbierto} onOpenChange={setModalGestionPaletAbierto}>
-        <DialogContent className="max-w-lg p-6 bg-white">
+      <Dialog
+        open={modalGestionPaletAbierto}
+        onOpenChange={(open) => {
+          setModalGestionPaletAbierto(open);
+          if (!open) setPaletSeleccionadoParaGestion(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto bg-white p-6">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Warehouse className="w-5 h-5 text-amber-600" />
-              Reponer Mercancía a Tienda desde Palet #{paletSeleccionadoParaGestion?.numero_palet}
+              Reponer desde Palet #{paletSeleccionadoParaGestion?.numero_palet}
+              {paletSeleccionadoParaGestion && (
+                <Badge variant="outline" className="font-mono text-amber-900">
+                  {paletSeleccionadoParaGestion.codigo_barras}
+                </Badge>
+              )}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Traspasa la mercancía de este palet a las estanterías de tienda. Cuando el stock del
-              palet llegue a 0, se autodestruirá automáticamente.
+              Cada línea seleccionada se traslada en una transacción desde el palet a la ubicación
+              elegida. El stock se actualiza mediante movimientos y el trigger de base de datos.
             </DialogDescription>
           </DialogHeader>
 
           {paletSeleccionadoParaGestion && (
-            <div className="space-y-3 my-2">
-              <div className="divide-y border rounded-lg overflow-hidden bg-slate-50/50">
-                {paletSeleccionadoParaGestion.productos.map((prod) => (
-                  <div
-                    key={prod.id}
-                    className="p-3 flex items-center justify-between gap-3 text-xs"
+            <div className="my-2 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="filtro-seccion-destino">Filtrar por sección</Label>
+                  <Select
+                    value={filtroSeccionDestino}
+                    onValueChange={(value) => {
+                      setFiltroSeccionDestino(value);
+                      setUbicacionDestinoPalet("");
+                    }}
                   >
-                    <div>
-                      <div className="font-semibold text-slate-900">{prod.nombre}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        SKU: {prod.sku} • Cantidad en Palet: {prod.cantidad} uds
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        handleReponerEnTienda(paletSeleccionadoParaGestion, prod.id, prod.cantidad)
-                      }
-                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2.5"
-                    >
-                      Reponer Todo ({prod.cantidad} uds)
-                    </Button>
-                  </div>
-                ))}
+                    <SelectTrigger id="filtro-seccion-destino">
+                      <SelectValue placeholder="Todas las secciones" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas las secciones</SelectItem>
+                      {seccionesBD.map((seccion) => (
+                        <SelectItem key={seccion.id} value={seccion.id}>
+                          {seccion.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="filtro-tipo-destino">Filtrar por tipo</Label>
+                  <Select
+                    value={filtroTipoDestino}
+                    onValueChange={(value) => {
+                      setFiltroTipoDestino(value);
+                      setUbicacionDestinoPalet("");
+                    }}
+                  >
+                    <SelectTrigger id="filtro-tipo-destino">
+                      <SelectValue placeholder="Todos los tipos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos los tipos</SelectItem>
+                      <SelectItem value="pasillo">Pasillos</SelectItem>
+                      <SelectItem value="armario">Armarios</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="ubicacion-destino-palet">Ubicación de destino</Label>
+                <Select value={ubicacionDestinoPalet} onValueChange={setUbicacionDestinoPalet}>
+                  <SelectTrigger id="ubicacion-destino-palet">
+                    <SelectValue placeholder="Selecciona una ubicación de tienda" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ubicacionesDestinoDisponibles.map((ubicacion) => (
+                      <SelectItem key={ubicacion.id} value={ubicacion.id}>
+                        {ubicacion.nombre} · {ubicacion.tipo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {ubicacionesDestinoDisponibles.length === 0 && (
+                  <p className="text-xs text-rose-700">
+                    No hay ubicaciones activas para los filtros seleccionados.
+                  </p>
+                )}
+              </div>
+
+              {productosPaletQuery.isLoading ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-600">
+                  <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+                  Cargando productos del palet...
+                </div>
+              ) : productosPaletQuery.error ? (
+                <p className="rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                  No se pudieron cargar los productos:{" "}
+                  {productosPaletQuery.error instanceof Error
+                    ? productosPaletQuery.error.message
+                    : "Error desconocido"}
+                </p>
+              ) : productosPaletQuery.data?.length ? (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="bg-amber-50 text-xs font-semibold uppercase text-amber-950">
+                      <tr>
+                        <th className="p-3">Producto</th>
+                        <th className="p-3">SKU</th>
+                        <th className="p-3 text-right">Cantidad en palet</th>
+                        <th className="p-3 text-right">Cantidad a reponer</th>
+                        <th className="p-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {productosPaletQuery.data.map((producto) => (
+                        <tr key={producto.id_producto}>
+                          <td className="p-3 font-medium">
+                            {producto.nombre || "Producto sin nombre"}
+                          </td>
+                          <td className="p-3 font-mono">{producto.sku || "—"}</td>
+                          <td className="p-3 text-right">{producto.cantidad}</td>
+                          <td className="p-3 text-right">
+                            <Input
+                              aria-label={`Cantidad a reponer de ${producto.nombre ?? producto.id_producto}`}
+                              type="number"
+                              min={0}
+                              max={producto.cantidad}
+                              value={cantidadesReposicion[producto.id_producto] ?? 0}
+                              onChange={(event) =>
+                                setCantidadesReposicion((actual) => ({
+                                  ...actual,
+                                  [producto.id_producto]:
+                                    event.target.value === "" ? 0 : Number(event.target.value),
+                                }))
+                              }
+                              className="ml-auto w-24 text-right"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={reponerProductoMutation.isPending}
+                              onClick={() =>
+                                setCantidadesReposicion((actual) => ({
+                                  ...actual,
+                                  [producto.id_producto]: producto.cantidad,
+                                }))
+                              }
+                              className="border-amber-300 text-amber-900 hover:bg-amber-50"
+                            >
+                              Todo
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="rounded border border-dashed border-amber-300 bg-amber-50/50 p-6 text-center text-sm text-slate-600">
+                  Este palet no tiene productos disponibles para reponer.
+                </p>
+              )}
+
+              {productosPaletQuery.data && (
+                <p className="text-right text-sm font-semibold text-amber-950">
+                  Total disponible:{" "}
+                  {productosPaletQuery.data.reduce((total, producto) => total + producto.cantidad, 0)}{" "}
+                  unidades
+                </p>
+              )}
+              <p className="text-xs text-slate-500">
+                Usa 0 para excluir una línea. Cada cantidad debe ser igual o menor que las unidades
+                disponibles en el palet.
+              </p>
             </div>
           )}
 
-          <DialogFooter className="mt-4">
-            <Button variant="ghost" size="sm" onClick={() => setModalGestionPaletAbierto(false)}>
-              Cerrar
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={reponerProductoMutation.isPending}
+              onClick={() => setModalGestionPaletAbierto(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                !ubicacionDestinoPalet ||
+                !ubicacionesDestinoDisponibles.some(
+                  (ubicacion) => ubicacion.id === ubicacionDestinoPalet,
+                ) ||
+                !productosPaletQuery.data?.length ||
+                productosPaletQuery.isLoading ||
+                reponerProductoMutation.isPending
+              }
+              onClick={handleReponerSeleccionadas}
+              className="gap-2 bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {reponerProductoMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Reponiendo...
+                </>
+              ) : (
+                "Reponer seleccionadas"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

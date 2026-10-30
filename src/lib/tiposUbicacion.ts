@@ -2,18 +2,19 @@ import {
   Building2,
   ArrowLeftRight,
   Archive,
-  Layers,
   Shuffle,
   Package,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
 
-export type TipoUbicacion =
-  "seccion" | "pasillo" | "armario" | "alto" | "cross" | "caja" | "reserva";
+export type TipoUbicacion = "seccion" | "pasillo" | "armario" | "cross" | "caja" | "reserva";
 
 export interface ConfigTipoUbicacion {
   tipo: TipoUbicacion;
+  nivel: 0 | 1 | 2;
+  requierePadre: boolean;
+  tienePosicionLateral: boolean;
   label: string;
   icon: LucideIcon;
   textColor: string;
@@ -27,6 +28,9 @@ export interface ConfigTipoUbicacion {
 export const CONFIG_TIPOS: Record<TipoUbicacion, ConfigTipoUbicacion> = {
   seccion: {
     tipo: "seccion",
+    nivel: 0,
+    requierePadre: false,
+    tienePosicionLateral: false,
     label: "Sección",
     icon: Building2,
     textColor: "text-indigo-700",
@@ -38,6 +42,9 @@ export const CONFIG_TIPOS: Record<TipoUbicacion, ConfigTipoUbicacion> = {
   },
   pasillo: {
     tipo: "pasillo",
+    nivel: 1,
+    requierePadre: true,
+    tienePosicionLateral: false,
     label: "Pasillo",
     icon: ArrowLeftRight,
     textColor: "text-blue-700",
@@ -49,6 +56,9 @@ export const CONFIG_TIPOS: Record<TipoUbicacion, ConfigTipoUbicacion> = {
   },
   armario: {
     tipo: "armario",
+    nivel: 2,
+    requierePadre: true,
+    tienePosicionLateral: true,
     label: "Armario",
     icon: Archive,
     textColor: "text-emerald-700",
@@ -58,19 +68,11 @@ export const CONFIG_TIPOS: Record<TipoUbicacion, ConfigTipoUbicacion> = {
     iconBgClass: "bg-emerald-100 text-emerald-700 border-emerald-200",
     descripcion: "Módulo o gavetero a media altura",
   },
-  alto: {
-    tipo: "alto",
-    label: "Alto",
-    icon: Layers,
-    textColor: "text-amber-700",
-    bgColor: "bg-amber-50",
-    borderColor: "border-amber-200",
-    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
-    iconBgClass: "bg-amber-100 text-amber-700 border-amber-200",
-    descripcion: "Nivel superior de almacenaje / altillo",
-  },
   cross: {
     tipo: "cross",
+    nivel: 2,
+    requierePadre: true,
+    tienePosicionLateral: true,
     label: "Cross",
     icon: Shuffle,
     textColor: "text-purple-700",
@@ -82,6 +84,9 @@ export const CONFIG_TIPOS: Record<TipoUbicacion, ConfigTipoUbicacion> = {
   },
   caja: {
     tipo: "caja",
+    nivel: 1,
+    requierePadre: true,
+    tienePosicionLateral: false,
     label: "Caja",
     icon: Package,
     textColor: "text-rose-700",
@@ -93,6 +98,9 @@ export const CONFIG_TIPOS: Record<TipoUbicacion, ConfigTipoUbicacion> = {
   },
   reserva: {
     tipo: "reserva",
+    nivel: 1,
+    requierePadre: true,
+    tienePosicionLateral: false,
     label: "Reserva",
     icon: Warehouse,
     textColor: "text-slate-700",
@@ -108,4 +116,38 @@ export function getConfigTipo(tipo?: string | null): ConfigTipoUbicacion {
   if (!tipo) return CONFIG_TIPOS.pasillo;
   const key = tipo.toLowerCase().trim() as TipoUbicacion;
   return CONFIG_TIPOS[key] || CONFIG_TIPOS.pasillo;
+}
+
+export function getColorLateral(lado?: string | null): {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  icon: string;
+} {
+  if (lado === "derecha") {
+    return {
+      label: "DERECHA",
+      color: "text-green-800",
+      bg: "bg-green-50",
+      border: "border-green-200",
+      icon: "🟢",
+    };
+  }
+  if (lado === "izquierda") {
+    return {
+      label: "IZQUIERDA",
+      color: "text-blue-800",
+      bg: "bg-blue-50",
+      border: "border-blue-200",
+      icon: "🔵",
+    };
+  }
+  return {
+    label: "SIN LATERALIDAD",
+    color: "text-gray-800",
+    bg: "bg-gray-50",
+    border: "border-gray-200",
+    icon: "⚪",
+  };
 }

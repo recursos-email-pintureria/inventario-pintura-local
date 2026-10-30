@@ -212,8 +212,8 @@ export async function getStockPorUbicaciones(): Promise<Stock[]> {
       return [];
     }
     return (data ?? []).map((s: any) => ({
-      id_producto: s.id_producto ?? s.producto_id,
-      id_ubicacion: s.id_ubicacion ?? s.ubicacion_id,
+      id_producto: s.id_producto ?? s.id_producto,
+      id_ubicacion: s.id_ubicacion ?? s.id_ubicacion,
       cantidad: Number(s.cantidad || 0),
       actualizado_en: s.actualizado_en ?? s.updated_at ?? null,
       id_palet: s.id_palet ?? null,
@@ -291,9 +291,9 @@ export async function sincronizarEstructuraInicialSupabase(
     }
   }
 
-  // Crear después nivel 2 (Armarios, Altos, Cross)
+  // Crear después nivel 2 (Armarios y Cross)
   for (const u of ubicacionesIniciales.filter((x) =>
-    ["armario", "alto", "cross"].includes(x.tipo),
+    ["armario", "cross"].includes(x.tipo),
   )) {
     if (!mapaUbicaciones.has(u.nombre.toLowerCase())) {
       const secId = u.seccion_nombre ? mapaSecciones.get(u.seccion_nombre.toLowerCase()) : null;
@@ -583,9 +583,9 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
 
   // 3. Mapear usando los nombres REALES: id_producto, id_ubicacion, realizado_por, fecha_movimiento
   const filas: MovimientoDetallado[] = (movRes.data ?? []).map((m: any) => {
-    const p = prodMap.get(m.id_producto); // ✅ id_producto (no producto_id)
-    const u = ubiMap.get(m.id_ubicacion); // ✅ id_ubicacion (no ubicacion_id)
-    const per = m.realizado_por ? perMap.get(m.realizado_por) : undefined; // ✅ realizado_por (no usuario_id)
+    const p = prodMap.get(m.id_producto); // ✅ id_producto (no id_producto)
+    const u = ubiMap.get(m.id_ubicacion); // ✅ id_ubicacion (no id_ubicacion)
+    const per = m.realizado_por ? perMap.get(m.realizado_por) : undefined; // ✅ realizado_por (no realizado_por)
 
     return {
       id: m.id,
@@ -628,11 +628,12 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
  * 3. INSERT en `movimientos` → el trigger `actualizar_stock` actualiza el stock.
  */
 export async function crearMovimiento(input: {
-  producto_id: string;
-  ubicacion_id: string;
+  id_producto: string;
+  id_ubicacion: string;
   tipo: "entrada" | "salida" | "reposicion" | "ajuste";
   cantidad: number; // en `ajuste`: stock objetivo absoluto
   motivo?: string;
+  id_palet?: string;
 }): Promise<void> {
   let tipoFinal: typeof input.tipo = input.tipo;
   let cantidadFinal = Number(input.cantidad);
@@ -641,8 +642,8 @@ export async function crearMovimiento(input: {
     const { data: stockRow } = await supabase
       .from("stock")
       .select("cantidad")
-      .eq("producto_id", input.producto_id)
-      .eq("ubicacion_id", input.ubicacion_id)
+      .eq("id_producto", input.id_producto)
+      .eq("id_ubicacion", input.id_ubicacion)
       .maybeSingle();
 
     const actual = Number((stockRow as any)?.cantidad ?? 0);
@@ -666,18 +667,33 @@ export async function crearMovimiento(input: {
   const { data: userData } = await supabase.auth.getUser();
 
   const payload: Record<string, unknown> = {
-    producto_id: input.producto_id,
-    ubicacion_id: input.ubicacion_id,
+    id_producto: input.id_producto,
+    id_ubicacion: input.id_ubicacion,
     tipo: tipoFinal,
     cantidad: cantidadFinal,
     motivo: input.motivo?.trim() ? input.motivo.trim() : null,
-    usuario_id: userData.user?.id ?? null,
+    realizado_por: userData.user?.id ?? null,
+    ...(input.id_palet ? { id_palet: input.id_palet } : {}),
   };
 
-  // Insert con fallbacks tolerantes a columnas opcionales
+  // Insert compatible con ambos nombres de columnas presentes en los esquemas desplegados.
   let res = await supabase.from("movimientos").insert(payload);
-  if (res.error && /usuario_id/.test(res.error.message)) {
-    const { usuario_id, ...resto } = payload;
+  if (
+    res.error &&
+    /id_producto|id_ubicacion/.test(res.error.message) &&
+    /column|schema cache|does not exist/i.test(res.error.message)
+  ) {
+    const { id_producto, id_ubicacion, realizado_por, motivo, ...resto } = payload;
+    res = await supabase.from("movimientos").insert({
+      ...resto,
+      id_producto: id_producto,
+      id_ubicacion: id_ubicacion,
+      realizado_por: realizado_por,
+      notas: motivo,
+    });
+  }
+  if (res.error && /realizado_por/.test(res.error.message)) {
+    const { realizado_por, ...resto } = payload;
     res = await supabase.from("movimientos").insert(resto);
   }
   if (res.error && /motivo/.test(res.error.message)) {
@@ -731,7 +747,7 @@ export async function getTopUbicaciones(
     return ubicacionesArray.map((u) => ({
       nombre: u.nombre,
       stock_total: u.total,
-      unidad: u.tipo === "armario" || u.tipo === "alto" ? "unid" : "gal",
+      unidad: u.tipo === "armario" ? "unid" : "gal",
       porcentaje: Math.round((u.total / maxStock) * 100),
     }));
   } catch (err) {

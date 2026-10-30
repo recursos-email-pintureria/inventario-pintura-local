@@ -7,19 +7,23 @@ import {
   getSiguienteNumeroPalet,
 } from "@/lib/palets";
 
-const { from, rpc } = vi.hoisted(() => ({
+const { from, rpc, crearMovimiento } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
+  crearMovimiento: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
   supabase: { from, rpc },
 }));
 
+vi.mock("@/lib/inventario", () => ({ crearMovimiento }));
+
 describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
   beforeEach(() => {
     from.mockReset();
     rpc.mockReset();
+    crearMovimiento.mockReset();
   });
 
   describe("generarCodigoBarrasPalet", () => {
@@ -190,17 +194,7 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
       expect(gtMock).toHaveBeenCalledWith("cantidad", 0);
     });
 
-    it("guardarProductoEnPalet inserta nuevo registro si no existía", async () => {
-      const maybeSingleMock = vi.fn().mockResolvedValue({ data: null, error: null });
-      const eqProdMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
-      const eqPaletMock = vi.fn(() => ({ eq: eqProdMock }));
-      const insertMock = vi.fn().mockResolvedValue({ error: null });
-
-      from.mockReturnValue({
-        select: vi.fn(() => ({ eq: eqPaletMock })),
-        insert: insertMock,
-      });
-
+    it("guarda producto mediante movimiento de entrada asociado al palet", async () => {
       const { guardarProductoEnPalet } = await import("@/lib/palets");
       await guardarProductoEnPalet({
         id_palet: "palet-123",
@@ -209,59 +203,71 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
         cantidad: 5,
       });
 
-      expect(insertMock).toHaveBeenCalledWith({
-        id_palet: "palet-123",
-        id_ubicacion: "reserva-1",
+      expect(crearMovimiento).toHaveBeenCalledWith({
         id_producto: "prod-1",
+        id_ubicacion: "reserva-1",
+        id_palet: "palet-123",
+        tipo: "entrada",
         cantidad: 5,
+        motivo: "Entrada de producto en palet de reserva",
       });
     });
 
-    it("guardarProductoEnPalet incrementa cantidad si el producto ya existía", async () => {
-      const maybeSingleMock = vi.fn().mockResolvedValue({
-        data: { id_producto: "prod-1", cantidad: 10 },
-        error: null,
-      });
-      const eqProdSelectMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
-      const eqPaletSelectMock = vi.fn(() => ({ eq: eqProdSelectMock }));
-
-      const eqProdUpdateMock = vi.fn().mockResolvedValue({ error: null });
-      const eqPaletUpdateMock = vi.fn(() => ({ eq: eqProdUpdateMock }));
-      const updateMock = vi.fn(() => ({ eq: eqPaletUpdateMock }));
-
-      from.mockReturnValue({
-        select: vi.fn(() => ({ eq: eqPaletSelectMock })),
-        update: updateMock,
-      });
-
-      const { guardarProductoEnPalet } = await import("@/lib/palets");
-      await guardarProductoEnPalet({
+    it("ajusta cantidades de producto con un movimiento por la diferencia", async () => {
+      const { ajustarCantidadProductoEnPalet } = await import("@/lib/palets");
+      await ajustarCantidadProductoEnPalet({
         id_palet: "palet-123",
         id_reserva: "reserva-1",
         id_producto: "prod-1",
-        cantidad: 5,
+        cantidad_actual: 10,
+        cantidad: 15,
       });
 
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cantidad: 15,
-        }),
+      expect(crearMovimiento).toHaveBeenCalledWith(
+        expect.objectContaining({ tipo: "entrada", cantidad: 5, id_palet: "palet-123" }),
       );
     });
 
-    it("eliminarProductoDePalet borra el registro de stock", async () => {
-      const eqProdMock = vi.fn().mockResolvedValue({ error: null });
-      const eqPaletMock = vi.fn(() => ({ eq: eqProdMock }));
-      const deleteMock = vi.fn(() => ({ eq: eqPaletMock }));
-
-      from.mockReturnValue({ delete: deleteMock });
+    it("elimina producto mediante movimiento de salida del palet", async () => {
+      const maybeSingleMock = vi.fn().mockResolvedValue({
+        data: { id_ubicacion: "reserva-1", cantidad: 8 },
+        error: null,
+      });
+      const eqProductoMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
+      const eqPaletMock = vi.fn(() => ({ eq: eqProductoMock }));
+      from.mockReturnValue({ select: vi.fn(() => ({ eq: eqPaletMock })) });
 
       const { eliminarProductoDePalet } = await import("@/lib/palets");
       await eliminarProductoDePalet("palet-123", "prod-1");
 
-      expect(deleteMock).toHaveBeenCalled();
-      expect(eqPaletMock).toHaveBeenCalledWith("id_palet", "palet-123");
-      expect(eqProdMock).toHaveBeenCalledWith("id_producto", "prod-1");
+      expect(crearMovimiento).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id_producto: "prod-1",
+          id_ubicacion: "reserva-1",
+          id_palet: "palet-123",
+          tipo: "salida",
+          cantidad: 8,
+        }),
+      );
+    });
+
+    it("reponer producto usa la función transaccional de transferencia", async () => {
+      rpc.mockResolvedValue({ data: null, error: null });
+      const { reponerProductoDePalet } = await import("@/lib/palets");
+
+      await reponerProductoDePalet({
+        id_palet: "palet-123",
+        id_producto: "prod-1",
+        id_ubicacion_destino: "ubicacion-1",
+        cantidad: 4,
+      });
+
+      expect(rpc).toHaveBeenCalledWith("reponer_producto_palet", {
+        p_id_palet: "palet-123",
+        p_id_producto: "prod-1",
+        p_id_ubicacion_destino: "ubicacion-1",
+        p_cantidad: 4,
+      });
     });
   });
 });

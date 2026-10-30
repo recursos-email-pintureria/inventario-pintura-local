@@ -280,8 +280,8 @@ function MovimientosPage() {
     }
 
     mutationCrear.mutate({
-      producto_id: formProducto,
-      ubicacion_id: formUbicacion,
+      id_producto: formProducto,
+      id_ubicacion: formUbicacion,
       tipo: formTipo,
       cantidad: cant,
       motivo: formMotivo,
