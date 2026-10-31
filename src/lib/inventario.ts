@@ -192,12 +192,20 @@ export async function crearPaletBD(input: {
 }
 
 export async function darDeBajaPaletBD(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("palets")
     .update({ activo: false, fecha_baja: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
+  if (error?.code === "42501") {
+    throw new Error(`Permiso denegado (42501): ${error.message}`);
+  }
   if (error) throw error;
+  if (!data) {
+    throw new Error("No se pudo dar de baja el palet: no existe o no tienes permisos.");
+  }
 }
 
 // ============================================================================
@@ -639,14 +647,15 @@ export async function crearMovimiento(input: {
   let cantidadFinal = Number(input.cantidad);
 
   if (input.tipo === "ajuste") {
-    const { data: stockRow } = await supabase
+    const { data: stockRow, error: stockError } = await supabase
       .from("stock")
       .select("cantidad")
       .eq("id_producto", input.id_producto)
       .eq("id_ubicacion", input.id_ubicacion)
       .maybeSingle();
 
-    const actual = Number((stockRow as any)?.cantidad ?? 0);
+    if (stockError) throw stockError;
+    const actual = Number(stockRow?.cantidad ?? 0);
     const objetivo = Number(input.cantidad);
 
     if (objetivo === actual) {
@@ -664,43 +673,27 @@ export async function crearMovimiento(input: {
     throw new Error("La cantidad debe ser mayor que 0.");
   }
 
-  const { data: userData } = await supabase.auth.getUser();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!userData.user) throw new Error("Debes iniciar sesión para registrar el movimiento.");
 
   const payload: Record<string, unknown> = {
     id_producto: input.id_producto,
     id_ubicacion: input.id_ubicacion,
     tipo: tipoFinal,
     cantidad: cantidadFinal,
-    motivo: input.motivo?.trim() ? input.motivo.trim() : null,
-    realizado_por: userData.user?.id ?? null,
+    notas: input.motivo?.trim() ? input.motivo.trim() : null,
+    realizado_por: userData.user.id,
     ...(input.id_palet ? { id_palet: input.id_palet } : {}),
   };
 
-  // Insert compatible con ambos nombres de columnas presentes en los esquemas desplegados.
-  let res = await supabase.from("movimientos").insert(payload);
-  if (
-    res.error &&
-    /id_producto|id_ubicacion/.test(res.error.message) &&
-    /column|schema cache|does not exist/i.test(res.error.message)
-  ) {
-    const { id_producto, id_ubicacion, realizado_por, motivo, ...resto } = payload;
-    res = await supabase.from("movimientos").insert({
-      ...resto,
-      id_producto: id_producto,
-      id_ubicacion: id_ubicacion,
-      realizado_por: realizado_por,
-      notas: motivo,
-    });
+  const { error } = await supabase.from("movimientos").insert(payload);
+  if (error) {
+    if (error.code === "42501") {
+      throw new Error(`Permiso denegado (42501): ${error.message}`);
+    }
+    throw error;
   }
-  if (res.error && /realizado_por/.test(res.error.message)) {
-    const { realizado_por, ...resto } = payload;
-    res = await supabase.from("movimientos").insert(resto);
-  }
-  if (res.error && /motivo/.test(res.error.message)) {
-    const { motivo, ...resto } = payload;
-    res = await supabase.from("movimientos").insert(resto);
-  }
-  if (res.error) throw res.error;
 }
 
 export async function getTopUbicaciones(

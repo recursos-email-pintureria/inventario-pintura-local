@@ -119,7 +119,12 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
 
   describe("desactivarPalet", () => {
     it("aplica soft delete mediante UPDATE activo = FALSE", async () => {
-      const eqMock = vi.fn().mockResolvedValue({ error: null });
+      const maybeSingleMock = vi.fn().mockResolvedValue({
+        data: { id: "palet-uuid-123" },
+        error: null,
+      });
+      const selectMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
+      const eqMock = vi.fn(() => ({ select: selectMock }));
       const updateMock = vi.fn(() => ({ eq: eqMock }));
       from.mockReturnValue({ update: updateMock });
 
@@ -131,6 +136,19 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
         }),
       );
       expect(eqMock).toHaveBeenCalledWith("id", "palet-uuid-123");
+      expect(selectMock).toHaveBeenCalledWith("id");
+    });
+
+    it("reporta cuando RLS o el ID impiden actualizar el palet", async () => {
+      const maybeSingleMock = vi.fn().mockResolvedValue({ data: null, error: null });
+      const selectMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
+      const eqMock = vi.fn(() => ({ select: selectMock }));
+      const updateMock = vi.fn(() => ({ eq: eqMock }));
+      from.mockReturnValue({ update: updateMock });
+
+      await expect(desactivarPalet("palet-uuid-123")).rejects.toThrow(
+        "No se pudo dar de baja el palet: no existe o no tienes permisos.",
+      );
     });
   });
 
@@ -230,7 +248,7 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
 
     it("elimina producto mediante movimiento de salida del palet", async () => {
       const maybeSingleMock = vi.fn().mockResolvedValue({
-        data: { id_ubicacion: "reserva-1", cantidad: 8 },
+        data: { cantidad: 8 },
         error: null,
       });
       const eqProductoMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
@@ -238,7 +256,7 @@ describe("Sistema de Palets - Funciones de Biblioteca (Fase 5.2)", () => {
       from.mockReturnValue({ select: vi.fn(() => ({ eq: eqPaletMock })) });
 
       const { eliminarProductoDePalet } = await import("@/lib/palets");
-      await eliminarProductoDePalet("palet-123", "prod-1");
+      await eliminarProductoDePalet("palet-123", "prod-1", "reserva-1");
 
       expect(crearMovimiento).toHaveBeenCalledWith(
         expect.objectContaining({

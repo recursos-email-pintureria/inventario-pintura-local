@@ -8,6 +8,7 @@ export interface AddStockVariables {
   cantidad: number;
   realizado_por: string;
   id_palet?: string | null;
+  notas?: string | null;
 }
 
 export const useAddStock = () => {
@@ -18,6 +19,10 @@ export const useAddStock = () => {
       // 1. Validaciones básicas
       if (!variables.id_producto || !variables.id_ubicacion) {
         throw new Error("id_producto e id_ubicacion son obligatorios");
+      }
+
+      if (!variables.realizado_por) {
+        throw new Error("Se requiere el usuario autenticado para registrar el movimiento");
       }
 
       if (!Number.isInteger(variables.cantidad) || variables.cantidad <= 0) {
@@ -36,28 +41,25 @@ export const useAddStock = () => {
         cantidad: variables.cantidad,
         realizado_por: variables.realizado_por,
         ...(variables.id_palet ? { id_palet: variables.id_palet } : {}),
+        ...(variables.notas ? { notas: variables.notas } : {}),
       };
 
-      const { data, error } = await supabase
-        .from("movimientos")
-        .insert(movimientoData)
-        .select()
-        .single();
+      const { error } = await supabase.from("movimientos").insert(movimientoData);
 
       if (error) {
-        throw new Error(`Error al registrar movimiento: ${error.message}`);
+        const detalle =
+          error.code === "42501" ? `Permiso denegado (42501): ${error.message}` : error.message;
+        throw new Error(`Error al registrar movimiento: ${detalle}`);
       }
-
-      return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       // 3. Invalidar caché para forzar el re-fetch de los datos actualizados
       // Nota: Ajusta 'inventario' a la queryKey exacta que uses en tu app (ej: ['inventario', userId])
-      queryClient.invalidateQueries({ queryKey: ["inventario"] });
-      queryClient.invalidateQueries({ queryKey: ["movimientos"] });
-
-      // Si tienes una query específica por ubicación, descomenta la siguiente línea:
-      // queryClient.invalidateQueries({ queryKey: ['stock', variables.id_ubicacion] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+      ]);
     },
   });
 };

@@ -46,8 +46,6 @@ import {
   getProductos,
   crearUbicacionBD,
   desactivarUbicacionBD,
-  darDeBajaPaletBD,
-  crearMovimiento,
   sincronizarEstructuraInicialSupabase,
 } from "@/lib/inventario";
 import {
@@ -63,6 +61,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { getColorLateral } from "@/lib/tiposUbicacion";
 import { ModalProductosPalet } from "@/components/inventario/ModalProductosPalet";
+import { useAddStock } from "@/hooks/useAddStock";
 import {
   Sheet,
   SheetContent,
@@ -99,7 +98,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
 import Escaner from "@/components/inventario/Escaner";
 
 export const Route = createFileRoute("/_authenticated/ubicaciones")({
@@ -673,6 +671,7 @@ const UBICACIONES_INICIALES: UbicacionItem[] = [
 function UbicacionesPage() {
   // 🔌 Supabase + TanStack Query para datos en tiempo real
   const queryClient = useQueryClient();
+  const addStockMutation = useAddStock();
   const { user, loading: cargandoSesion } = useAuth();
   const usuarioNombre =
     [
@@ -957,6 +956,9 @@ function UbicacionesPage() {
           queryKey: paletsPorReservaQueryOptions(palet.id_reserva).queryKey,
         }),
         queryClient.invalidateQueries({ queryKey: ["palets"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
       ]);
 
       const paletCreado: PaletItem = { ...palet, productos: [] };
@@ -979,6 +981,8 @@ function UbicacionesPage() {
       reponerProductoDePalet(params),
     onSuccess: async (_data, params) => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
         queryClient.invalidateQueries({ queryKey: ["palet-productos", params.id_palet] }),
         queryClient.invalidateQueries({ queryKey: ["stock"] }),
         queryClient.invalidateQueries({ queryKey: ["palets"] }),
@@ -1327,28 +1331,30 @@ function UbicacionesPage() {
       toast.error("Selecciona un artículo del catálogo usando el buscador o el escáner");
       return;
     }
-    if (cantidadParaIncluir <= 0) {
-      toast.error("La cantidad debe ser mayor que cero");
+    if (!Number.isInteger(cantidadParaIncluir) || cantidadParaIncluir <= 0) {
+      toast.error("La cantidad debe ser un entero mayor que cero");
       return;
     }
 
-    // Registrar en Supabase vía movimientos (Regla de Oro nº 1)
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id ?? null;
+    if (!user) {
+      toast.error("Debes iniciar sesión para registrar el movimiento.");
+      return;
+    }
 
-      if (userId) {
-        await supabase.from("movimientos").insert({
-          id_producto: productoParaIncluir.id,
-          id_ubicacion: ubicacionSeleccionada.id,
-          tipo: "entrada",
-          cantidad: cantidadParaIncluir,
-          realizado_por: userId,
-          notas: `Inclusión desde panel del vendedor en ${ubicacionSeleccionada.nombre}`,
-        });
-      }
-    } catch {
-      // Si la BD no está disponible o offline, mantenemos la consistencia en el estado visual
+    try {
+      await addStockMutation.mutateAsync({
+        id_producto: productoParaIncluir.id,
+        id_ubicacion: ubicacionSeleccionada.id,
+        tipo: "entrada",
+        cantidad: cantidadParaIncluir,
+        realizado_por: user.id,
+        notas: `Inclusión desde panel del vendedor en ${ubicacionSeleccionada.nombre}`,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo registrar la entrada de stock.",
+      );
+      return;
     }
 
     // Actualizar estado local
@@ -1400,25 +1406,47 @@ function UbicacionesPage() {
   const ejecutarOperacionStock = async () => {
     if (!ubicacionSeleccionada || !productoEnOperacion) return;
 
+    if (!user) {
+      toast.error("Debes iniciar sesión para registrar el movimiento.");
+      return;
+    }
+
     const tipoMov =
-      tipoOperacion === "quitar" ? "salida" : tipoOperacion === "anadir" ? "reposicion" : "ajuste";
+      tipoOperacion === "quitar"
+        ? "salida"
+        : tipoOperacion === "anadir"
+          ? "entrada"
+          : cantidadOperacion === 0
+            ? "salida"
+            : "ajuste";
+    const cantidadMov =
+      tipoOperacion === "ajuste" && cantidadOperacion === 0
+        ? productoEnOperacion.cantidad
+        : cantidadOperacion;
+
+    if (!Number.isInteger(cantidadMov) || cantidadMov <= 0) {
+      toast.error("La cantidad debe ser un entero mayor que cero.");
+      return;
+    }
+    if (tipoMov === "salida" && cantidadMov > productoEnOperacion.cantidad) {
+      toast.error("No puedes retirar más unidades que las disponibles.");
+      return;
+    }
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id ?? null;
-
-      if (userId) {
-        await supabase.from("movimientos").insert({
-          id_producto: productoEnOperacion.id,
-          id_ubicacion: ubicacionSeleccionada.id,
-          tipo: tipoMov,
-          cantidad: cantidadOperacion,
-          realizado_por: userId,
-          notas: `${motivoOperacion} (${tipoOperacion})`,
-        });
-      }
-    } catch {
-      // Silencioso para fallback offline
+      await addStockMutation.mutateAsync({
+        id_producto: productoEnOperacion.id,
+        id_ubicacion: ubicacionSeleccionada.id,
+        tipo: tipoMov,
+        cantidad: cantidadMov,
+        realizado_por: user.id,
+        notas: `${motivoOperacion} (${tipoOperacion})`,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo registrar el movimiento de stock.",
+      );
+      return;
     }
 
     setUbicaciones((prev) =>
@@ -1621,10 +1649,15 @@ function UbicacionesPage() {
           }`,
         );
       }
-      await queryClient.invalidateQueries({ queryKey: ["palets"] });
-      await queryClient.invalidateQueries({
-        queryKey: paletsPorReservaQueryOptions(palet.id_reserva).queryKey,
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["palets"] }),
+        queryClient.invalidateQueries({
+          queryKey: paletsPorReservaQueryOptions(palet.id_reserva).queryKey,
+        }),
+      ]);
     }
 
     setModalGestionPaletAbierto(false);
@@ -3281,10 +3314,10 @@ function UbicacionesPage() {
                         <Button
                           size="sm"
                           onClick={handleIncluirProductoEnUbicacion}
-                          disabled={!productoParaIncluir}
+                          disabled={!productoParaIncluir || addStockMutation.isPending}
                           className="h-9 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
                         >
-                          Añadir
+                          {addStockMutation.isPending ? "Guardando..." : "Añadir"}
                         </Button>
                       </div>
 
@@ -3476,7 +3509,7 @@ function UbicacionesPage() {
               ) : tipoOperacion === "anadir" ? (
                 <>
                   <Plus className="w-5 h-5 text-emerald-600" />
-                  Confirmar Reposición de Stock
+                  Confirmar Entrada de Stock
                 </>
               ) : (
                 <>
@@ -3523,6 +3556,7 @@ function UbicacionesPage() {
             <AlertDialogCancel className="text-xs h-8">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={ejecutarOperacionStock}
+              disabled={addStockMutation.isPending}
               className={`text-xs h-8 text-white ${
                 tipoOperacion === "quitar"
                   ? "bg-rose-600 hover:bg-rose-700"
@@ -3531,7 +3565,7 @@ function UbicacionesPage() {
                     : "bg-amber-600 hover:bg-amber-700"
               }`}
             >
-              Confirmar y Registrar
+              {addStockMutation.isPending ? "Guardando..." : "Confirmar y Registrar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

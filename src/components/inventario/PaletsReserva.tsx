@@ -101,9 +101,13 @@ export function ModalCrearPalet({
 
       toast.success(`Palet ${nuevoPalet.codigo_barras} dado de alta con éxito`);
 
-      await queryClient.invalidateQueries({
-        queryKey: ["palets", reserva.id],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["palets", reserva.id] }),
+        queryClient.invalidateQueries({ queryKey: ["palets"] }),
+      ]);
 
       onPaletCreado?.(nuevoPalet);
       onOpenChange(false);

@@ -80,8 +80,8 @@ const TIPO_INFO: Record<
     texto: "text-amber-700",
   },
   reposicion: {
-    label: "Reposición",
-    signo: "+",
+    label: "Reposición (fija stock)",
+    signo: "=",
     badge: "bg-blue-50 text-blue-700 border-blue-200",
     texto: "text-blue-600",
   },
@@ -685,14 +685,16 @@ function MovimientosPage() {
                   <SelectContent>
                     <SelectItem value="entrada">Entrada (+ stock)</SelectItem>
                     <SelectItem value="salida">Salida (− stock)</SelectItem>
-                    <SelectItem value="reposicion">Reposición (+ stock)</SelectItem>
+                    <SelectItem value="reposicion">Reposición (fija el stock)</SelectItem>
                     <SelectItem value="ajuste">Ajuste (= stock absoluto)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  {formTipo === "ajuste" ? "Stock objetivo *" : "Cantidad *"}
+                  {formTipo === "ajuste" || formTipo === "reposicion"
+                    ? "Stock objetivo *"
+                    : "Cantidad *"}
                 </Label>
                 <Input
                   type="number"
@@ -701,7 +703,11 @@ function MovimientosPage() {
                   onChange={(e) =>
                     setFormCantidad(e.target.value === "" ? "" : Number(e.target.value))
                   }
-                  placeholder={formTipo === "ajuste" ? "Nuevo stock total" : "Ej: 10"}
+                  placeholder={
+                    formTipo === "ajuste" || formTipo === "reposicion"
+                      ? "Nuevo stock total"
+                      : "Ej: 10"
+                  }
                   className="h-9 text-xs"
                   required
                 />

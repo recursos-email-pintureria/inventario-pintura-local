@@ -26,7 +26,7 @@ const actividad7Dias = [
 const tipoMovimientoConfig = {
   entrada: { label: "Entrada", icon: <ArrowDownRight className="h-3 w-3" />, badge: "bg-emerald-100 text-emerald-800 border-emerald-200", cantidad: "text-emerald-700", prefijo: "+" },
   salida: { label: "Salida", icon: <ArrowUpRight className="h-3 w-3" />, badge: "bg-rose-100 text-rose-800 border-rose-200", cantidad: "text-rose-700", prefijo: "-" },
-  reposicion: { label: "Reposición", icon: <RefreshCw className="h-3 w-3" />, badge: "bg-blue-100 text-blue-800 border-blue-200", cantidad: "text-blue-700", prefijo: "+" },
+  reposicion: { label: "Reposición", icon: <RefreshCw className="h-3 w-3" />, badge: "bg-blue-100 text-blue-800 border-blue-200", cantidad: "text-blue-700", prefijo: "=" },
   ajuste: { label: "Ajuste", icon: <Edit3 className="h-3 w-3" />, badge: "bg-amber-100 text-amber-800 border-amber-200", cantidad: "text-amber-700", prefijo: "" },
 };
 

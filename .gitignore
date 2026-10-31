@@ -39,3 +39,6 @@ dist-ssr
 # Build outputs
 .vercel/output
 .vercel
+
+# Local AI tool configuration
+.augment/

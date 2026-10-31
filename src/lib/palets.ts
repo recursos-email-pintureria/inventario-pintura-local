@@ -164,7 +164,12 @@ export async function crearPalet(params: CrearPaletParams): Promise<Palet> {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "42501") {
+      throw new Error(`Permiso denegado (42501): ${error.message}`);
+    }
+    throw error;
+  }
   return data as Palet;
 }
 
@@ -175,12 +180,22 @@ export async function crearPalet(params: CrearPaletParams): Promise<Palet> {
 export async function desactivarPalet(id: string): Promise<void> {
   if (!id) throw new Error("ID de palet requerido.");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("palets")
     .update({ activo: false, actualizado_en: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "42501") {
+      throw new Error(`Permiso denegado (42501): ${error.message}`);
+    }
+    throw error;
+  }
+  if (!data) {
+    throw new Error("No se pudo dar de baja el palet: no existe o no tienes permisos.");
+  }
 }
 
 /**
@@ -228,7 +243,12 @@ export async function cargarProductosPalet(idPalet: string): Promise<ProductoEnP
     .eq("id_palet", idPalet)
     .gt("cantidad", 0);
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "42501") {
+      throw new Error(`Permiso denegado (42501): ${error.message}`);
+    }
+    throw error;
+  }
   return (data ?? []).map((item: any) => ({
     id_producto: item.id_producto,
     cantidad: item.cantidad,
@@ -288,20 +308,33 @@ export async function ajustarCantidadProductoEnPalet(
 /**
  * Retira la cantidad completa de un producto del palet mediante un movimiento de salida.
  */
-export async function eliminarProductoDePalet(idPalet: string, idProducto: string): Promise<void> {
+export async function eliminarProductoDePalet(
+  idPalet: string,
+  idProducto: string,
+  idReserva: string,
+): Promise<void> {
+  if (!idPalet || !idProducto || !idReserva) {
+    throw new Error("Se requieren palet, producto y reserva.");
+  }
+
   const { data: existente, error: errorConsulta } = await supabase
     .from("stock")
-    .select("id_ubicacion, cantidad")
+    .select("cantidad")
     .eq("id_palet", idPalet)
     .eq("id_producto", idProducto)
     .maybeSingle();
 
-  if (errorConsulta) throw errorConsulta;
+  if (errorConsulta) {
+    if (errorConsulta.code === "42501") {
+      throw new Error(`Permiso denegado (42501): ${errorConsulta.message}`);
+    }
+    throw errorConsulta;
+  }
   if (!existente || existente.cantidad <= 0) return;
 
   await crearMovimiento({
     id_producto: idProducto,
-    id_ubicacion: existente.id_ubicacion,
+    id_ubicacion: idReserva,
     id_palet: idPalet,
     tipo: "salida",
     cantidad: existente.cantidad,
@@ -312,9 +345,7 @@ export async function eliminarProductoDePalet(idPalet: string, idProducto: strin
 /**
  * Traslada mercancía del palet a una ubicación de tienda en una única transacción de servidor.
  */
-export async function reponerProductoDePalet(
-  params: ReponerProductoDePaletParams,
-): Promise<void> {
+export async function reponerProductoDePalet(params: ReponerProductoDePaletParams): Promise<void> {
   const { id_palet, id_producto, id_ubicacion_destino, cantidad } = params;
   if (!id_palet || !id_producto || !id_ubicacion_destino) {
     throw new Error("Se requieren palet, producto y ubicación de destino.");
@@ -330,7 +361,12 @@ export async function reponerProductoDePalet(
     p_cantidad: cantidad,
   });
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "42501") {
+      throw new Error(`Permiso denegado (42501): ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 /**

@@ -77,7 +77,7 @@ type ProductoPaletOperacion =
       cantidad_actual: number;
       cantidad: number;
     }
-  | { tipo: "eliminar"; id_palet: string; id_producto: string };
+  | { tipo: "eliminar"; id_palet: string; id_reserva: string; id_producto: string };
 
 interface ModalProductosPaletProps {
   palet: Palet | null;
@@ -208,10 +208,16 @@ export function ModalProductosPalet({
     mutationFn: async (operacion: ProductoPaletOperacion) => {
       if (operacion.tipo === "anadir") return guardarProductoEnPalet(operacion);
       if (operacion.tipo === "ajustar") return ajustarCantidadProductoEnPalet(operacion);
-      return eliminarProductoDePalet(operacion.id_palet, operacion.id_producto);
+      return eliminarProductoDePalet(
+        operacion.id_palet,
+        operacion.id_producto,
+        operacion.id_reserva,
+      );
     },
     onSuccess: async (_data, operacion) => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
         queryClient.invalidateQueries({ queryKey: ["palet-productos", operacion.id_palet] }),
         queryClient.invalidateQueries({ queryKey: ["stock"] }),
         queryClient.invalidateQueries({
@@ -293,8 +299,13 @@ export function ModalProductosPalet({
 
       toast.success(`Palet ${palet.codigo_barras} dado de baja correctamente.`);
 
-      await queryClient.invalidateQueries({ queryKey: ["palets", palet.id_reserva] });
-      await queryClient.invalidateQueries({ queryKey: ["palet-productos", palet.id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["inventario"] }),
+        queryClient.invalidateQueries({ queryKey: ["movimientos"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["palets", palet.id_reserva] }),
+        queryClient.invalidateQueries({ queryKey: ["palet-productos", palet.id] }),
+      ]);
 
       onPaletDesactivado?.(palet.id);
       setConfirmarBajaManual(false);
@@ -365,7 +376,16 @@ export function ModalProductosPalet({
         toast.success(`Cantidad actualizada a ${nuevaCant} uds`);
       }
 
-      const { data: restantes } = await refetchProductos();
+      const resultado = await refetchProductos();
+      if (resultado.isError) {
+        toast.error(
+          `No se pudo verificar el stock restante del palet: ${
+            resultado.error instanceof Error ? resultado.error.message : "Error desconocido"
+          }`,
+        );
+        return;
+      }
+      const restantes = resultado.data;
       const nuevoTotal = (restantes ?? []).reduce((acc, it) => acc + it.cantidad, 0);
 
       setEditandoItem(null);
@@ -384,11 +404,21 @@ export function ModalProductosPalet({
       await productoMutation.mutateAsync({
         tipo: "eliminar",
         id_palet: palet.id,
+        id_reserva: palet.id_reserva,
         id_producto: item.id_producto,
       });
 
       toast.info(`"${item.nombre}" retirado del palet`);
-      const { data: restantes } = await refetchProductos();
+      const resultado = await refetchProductos();
+      if (resultado.isError) {
+        toast.error(
+          `No se pudo verificar el stock restante del palet: ${
+            resultado.error instanceof Error ? resultado.error.message : "Error desconocido"
+          }`,
+        );
+        return;
+      }
+      const restantes = resultado.data;
       const nuevoTotal = (restantes ?? []).reduce((acc, it) => acc + it.cantidad, 0);
 
       if (nuevoTotal === 0) {
@@ -466,12 +496,14 @@ export function ModalProductosPalet({
                   size="sm"
                   variant="destructive"
                   onClick={() => setConfirmarBajaManual(true)}
-                  disabled={totalUnidades > 0}
+                  disabled={cargandoProductos || Boolean(errorProductos) || totalUnidades > 0}
                   className="h-8 text-xs font-semibold gap-1 bg-rose-700 hover:bg-rose-800 disabled:opacity-50 disabled:bg-rose-900/60"
                   title={
-                    totalUnidades > 0
-                      ? "Solo se puede dar de baja cuando el stock total sea 0"
-                      : "Dar de baja palet vacío"
+                    cargandoProductos || errorProductos
+                      ? "No se puede dar de baja hasta verificar el stock del palet"
+                      : totalUnidades > 0
+                        ? "Solo se puede dar de baja cuando el stock total sea 0"
+                        : "Dar de baja palet vacío"
                   }
                 >
                   <Trash2 className="w-3.5 h-3.5" />
