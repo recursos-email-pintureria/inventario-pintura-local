@@ -108,7 +108,7 @@ Cuando se INSERTA en `movimientos`:
 
 - `entrada`: stock + cantidad (recepción)
 - `salida`: stock - cantidad (venta, merma)
-- `reposicion`: stock + cantidad (repuesto de lineal)
+- `reposicion`: stock = cantidad (valor absoluto; repuesto de lineal, no suma)
 - `ajuste`: stock = cantidad (valor absoluto, corrección)
 
 ## 🎨 Convenciones de UI

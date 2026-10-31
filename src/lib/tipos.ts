@@ -19,7 +19,7 @@ export interface Producto {
   unidad: string;
   ubicacion: string | null;
   precio: number;
-  
+
   // ➕ PROPIEDADES AÑADIDAS PARA COMPATIBILIDAD CON GEMINI
   codigo_barras?: string | null;
   descripcion?: string | null;
@@ -83,8 +83,6 @@ export interface Stock {
   cantidad: number;
   actualizado_en?: string;
   id_palet?: string | null;
-  id_producto?: string;
-  id_ubicacion?: string;
 }
 
 export interface Seccion {
