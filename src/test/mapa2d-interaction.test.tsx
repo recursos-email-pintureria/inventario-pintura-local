@@ -57,12 +57,47 @@ describe("Mapa2DModal interactions", () => {
     const mapSvg = screen.getByRole("group", { name: "Mapa interactivo del almacén" });
     expect(mapSvg).toHaveClass("h-auto");
     expect(mapSvg.parentElement).toHaveClass("overflow-auto");
+    expect(mapSvg.parentElement).toHaveClass("min-h-[220px]");
+    expect(screen.getByRole("combobox", { name: "Filtrar vista del mapa" })).toHaveTextContent(
+      "Todo el almacén",
+    );
     fireEvent.click(screen.getByRole("button", { name: /Armario E651/ }));
 
     expect(await screen.findByText("Productos y stock actual")).toBeInTheDocument();
     expect(onSelectLocation).toHaveBeenCalledWith(location);
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: /Armario E651/ })).toBeInTheDocument();
+    });
+  });
+
+  it("restores the full warehouse view each time the map opens", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const props = {
+      onOpenChange: vi.fn(),
+      locations: [location],
+      productCatalog: [],
+      selectedLocationId: null,
+      onSelectLocation: vi.fn(),
+      onOpenManagement: vi.fn(),
+    };
+    const { rerender } = render(<Mapa2DModal open {...props} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Filtrar vista del mapa" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Solo pasillos" }));
+    expect(screen.getByRole("combobox", { name: "Filtrar vista del mapa" })).toHaveTextContent(
+      "Solo pasillos",
+    );
+
+    rerender(<Mapa2DModal open={false} {...props} />);
+    rerender(<Mapa2DModal open {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Filtrar vista del mapa" })).toHaveTextContent(
+        "Todo el almacén",
+      );
     });
   });
 });

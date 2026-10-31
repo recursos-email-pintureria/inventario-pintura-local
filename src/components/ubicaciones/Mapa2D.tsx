@@ -158,7 +158,7 @@ export function Mapa2D({
           fill={isSection ? "#3730a3" : textColor}
           pointerEvents="none"
         >
-          {(location.codigo || location.nombre).slice(0, Math.max(4, Math.floor((width - 30) / 6)))}
+          {(location.nombre || location.codigo).slice(0, Math.max(4, Math.floor((width - 30) / 6)))}
         </text>
         <foreignObject x={x + width - 21} y={y + 3} width="16" height="16" pointerEvents="none">
           <div className="flex h-4 w-4 items-center justify-center" style={{ color: textColor }}>
@@ -174,19 +174,29 @@ export function Mapa2D({
     );
   };
 
-  const renderChildRow = (children: MapaUbicacion[], section: MapaSeccionLayout, y: number) => {
-    const gap = 4;
-    const cellWidth = Math.min(
-      108,
-      (section.width - 24 - gap * Math.max(children.length - 1, 0)) / Math.max(children.length, 1),
-    );
-    return children.map((location, index) =>
-      renderNode(location, section.x + 12 + index * (cellWidth + gap), y, cellWidth, 34),
-    );
+  const renderChildRows = (
+    children: MapaUbicacion[],
+    rowCount: number,
+    section: MapaSeccionLayout,
+    aisleY: number,
+    above: boolean,
+  ) => {
+    return Array.from({ length: rowCount }, (_, row) => {
+      const rowChildren = children.slice(row * 5, (row + 1) * 5);
+      const cellWidth = 96;
+      const gap = 6;
+      const rowWidth = rowChildren.length * cellWidth + (rowChildren.length - 1) * gap;
+      const startX = section.x + (section.width - rowWidth) / 2;
+      const y = above ? aisleY - rowCount * 38 + row * 38 : aisleY + 38 + row * 38;
+
+      return rowChildren.map((location, index) =>
+        renderNode(location, startX + index * (cellWidth + gap), y, cellWidth, 34),
+      );
+    });
   };
 
   return (
-    <div className="h-full min-h-0 flex-1 overflow-auto rounded-lg border bg-slate-50">
+    <div className="h-full min-h-[220px] flex-1 overflow-auto rounded-lg border bg-slate-50">
       <svg
         ref={svgRef}
         viewBox={`0 0 1200 ${viewportHeight}`}
@@ -242,10 +252,17 @@ export function Mapa2D({
               )}
               {section.aisles.map((aisle) => (
                 <g key={aisle.location.id}>
-                  {view !== "pasillos" && renderChildRow(aisle.leftChildren, section, aisle.y - 38)}
-                  {renderNode(aisle.location, section.x + 12, aisle.y, section.width - 24, 38)}
                   {view !== "pasillos" &&
-                    renderChildRow(aisle.rightChildren, section, aisle.y + 42)}
+                    renderChildRows(aisle.leftChildren, aisle.leftRows, section, aisle.y, true)}
+                  {renderNode(
+                    aisle.location,
+                    section.x + (section.width - 320) / 2,
+                    aisle.y,
+                    320,
+                    32,
+                  )}
+                  {view !== "pasillos" &&
+                    renderChildRows(aisle.rightChildren, aisle.rightRows, section, aisle.y, false)}
                 </g>
               ))}
               {view !== "pasillos" &&
@@ -253,7 +270,8 @@ export function Mapa2D({
                   renderNode(
                     location,
                     section.x + 16 + (index % 5) * 106,
-                    section.y + 64 + section.aisles.length * 150 + Math.floor(index / 5) * 72,
+                    section.aisles.reduce((nextY, aisle) => nextY + aisle.height, section.y + 72) +
+                      Math.floor(index / 5) * 72,
                     96,
                     48,
                   ),

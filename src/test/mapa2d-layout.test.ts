@@ -92,4 +92,35 @@ describe("getMapa2DLayout", () => {
     expect(layout.sections[0]?.id).toBe(populatedSection.id);
     expect(layout.positions.has(child.id)).toBe(true);
   });
+
+  it("distribuye más de cinco armarios por lado en filas visibles dentro del pasillo", () => {
+    const section = location({ id: "sec-1", nombre: "Pintura", tipo: "seccion" });
+    const aisle = location({
+      id: "pas-1",
+      nombre: "Pasillo A1",
+      tipo: "pasillo",
+      padreId: section.id,
+    });
+    const children = Array.from({ length: 11 }, (_, index) =>
+      location({
+        id: `arm-${index}`,
+        nombre: `Armario ${index + 1}`,
+        tipo: "armario",
+        padreId: aisle.id,
+        lateral: index % 2 === 0 ? "izquierda" : "derecha",
+      }),
+    );
+
+    const layout = getMapa2DLayout([section, aisle, ...children]);
+    const positionedAisle = layout.sections[0]?.aisles[0];
+
+    expect(positionedAisle?.leftRows).toBe(2);
+    expect(positionedAisle?.rightRows).toBe(1);
+    expect(positionedAisle?.leftChildren).toHaveLength(6);
+    expect(positionedAisle?.rightChildren).toHaveLength(5);
+    expect(positionedAisle?.height).toBeGreaterThan(150);
+    expect(children.every((child) => layout.positions.has(child.id))).toBe(true);
+    expect(layout.positions.get(children[0]!.id)?.y).toBeLessThan(positionedAisle!.y);
+    expect(layout.positions.get(children[1]!.id)?.y).toBeGreaterThan(positionedAisle!.y);
+  });
 });

@@ -66,11 +66,19 @@ export function Mapa2DModal({
     detailLocation.tipo !== "seccion",
   );
   const selectMapLocation = map.selectLocation;
+  const setMapView = map.setVista;
+  const setSelectedSection = map.setSeccionSeleccionada;
 
   useEffect(() => {
     if (!open || !selectedLocationId) return;
     selectMapLocation(selectedLocationId);
   }, [open, selectedLocationId, selectMapLocation]);
+
+  useEffect(() => {
+    if (!open) return;
+    setMapView("todo");
+    setSelectedSection(null);
+  }, [open, setMapView, setSelectedSection]);
 
   const selectLocation = (location: MapaUbicacion, center = false) => {
     map.selectLocation(location.id);

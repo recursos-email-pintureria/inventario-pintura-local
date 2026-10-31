@@ -34,6 +34,9 @@ export interface MapaSeccionLayout {
   aisles: Array<{
     location: MapaUbicacion;
     y: number;
+    height: number;
+    leftRows: number;
+    rightRows: number;
     leftChildren: MapaUbicacion[];
     rightChildren: MapaUbicacion[];
   }>;
@@ -86,15 +89,35 @@ export function getMapa2DLayout(locations: MapaUbicacion[]) {
             (location.seccionId === sectionId && !location.padreId)),
       );
       const directRows = Math.ceil(directLocations.length / 5);
-      const height = Math.max(
-        190,
-        80 + aisleLayouts.length * 150 + (directRows > 0 ? directRows * 72 + 28 : 0),
-      );
       return {
         ...section,
-        aisles: aisleLayouts,
+        aisles: aisleLayouts.map((aisle) => {
+          const leftRows = Math.ceil(aisle.leftChildren.length / 5);
+          const rightRows = Math.ceil(aisle.rightChildren.length / 5);
+          return {
+            ...aisle,
+            y: 0,
+            leftRows,
+            rightRows,
+            height: leftRows * 38 + 38 + rightRows * 38 + 12,
+          };
+        }),
         directLocations,
-        height,
+        height: Math.max(
+          130,
+          80 +
+            aisleLayouts.reduce(
+              (total, aisle) =>
+                total +
+                Math.ceil(aisle.leftChildren.length / 5) * 38 +
+                38 +
+                Math.ceil(aisle.rightChildren.length / 5) * 38 +
+                12,
+              0,
+            ) +
+            directRows * 72 +
+            (directRows > 0 ? 28 : 0),
+        ),
       };
     })
     .sort(
@@ -124,31 +147,35 @@ export function getMapa2DLayout(locations: MapaUbicacion[]) {
 
       const x = 16 + column * (width + gapX);
       const y = rowY;
-      const aisleLayouts = data.aisles.map((aisle, index) => {
-        const aisleY = y + 64 + index * 150 + 44;
-        positions.set(aisle.location.id, { x: x + width / 2, y: aisleY + 18 });
+      let aisleCursorY = y + 64;
+      const aisleLayouts = data.aisles.map((aisle) => {
+        const aisleY = aisleCursorY + aisle.leftRows * 38 + 6;
+        const placeChildren = (children: MapaUbicacion[], rowCount: number, above: boolean) => {
+          for (let row = 0; row < rowCount; row += 1) {
+            const rowChildren = children.slice(row * 5, (row + 1) * 5);
+            const cellWidth = 96;
+            const gap = 6;
+            const rowWidth = rowChildren.length * cellWidth + (rowChildren.length - 1) * gap;
+            const startX = x + (width - rowWidth) / 2;
+            const childY = above ? aisleY - rowCount * 38 + row * 38 : aisleY + 38 + row * 38;
 
-        const placeChildren = (children: MapaUbicacion[], childY: number) => {
-          const gap = 4;
-          const cellWidth = Math.min(
-            108,
-            (width - 24 - gap * Math.max(children.length - 1, 0)) / Math.max(children.length, 1),
-          );
-          return children.map((child, childIndex) => {
-            const childX = x + 12 + childIndex * (cellWidth + gap);
-            positions.set(child.id, { x: childX + cellWidth / 2, y: childY + 18 });
-            return child;
-          });
+            rowChildren.forEach((child, childIndex) => {
+              const childX = startX + childIndex * (cellWidth + gap);
+              positions.set(child.id, { x: childX + cellWidth / 2, y: childY + 17 });
+            });
+          }
         };
 
-        placeChildren(aisle.leftChildren, aisleY - 38);
-        placeChildren(aisle.rightChildren, aisleY + 42);
+        positions.set(aisle.location.id, { x: x + width / 2, y: aisleY + 18 });
+        placeChildren(aisle.leftChildren, aisle.leftRows, true);
+        placeChildren(aisle.rightChildren, aisle.rightRows, false);
+        aisleCursorY += aisle.height;
         return { ...aisle, y: aisleY };
       });
 
       data.directLocations.forEach((location, index) => {
         const cellX = x + 16 + (index % 5) * 106;
-        const cellY = y + 64 + data.aisles.length * 150 + Math.floor(index / 5) * 72;
+        const cellY = aisleCursorY + 8 + Math.floor(index / 5) * 72;
         positions.set(location.id, { x: cellX + 48, y: cellY + 22 });
       });
       if (data.sectionLocation) {
