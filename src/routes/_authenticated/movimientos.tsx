@@ -481,7 +481,7 @@ function MovimientosPage() {
         </div>
 
         {/* TABLA */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white md:block">
           <Table>
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
@@ -584,6 +584,79 @@ function MovimientosPage() {
               )}
             </TableBody>
           </Table>
+        </div>
+        <div className="space-y-3 md:hidden">
+          {isLoading ? (
+            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+              Cargando movimientos...
+            </div>
+          ) : paginados.length === 0 ? (
+            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+              No hay movimientos con los filtros seleccionados.
+            </div>
+          ) : (
+            paginados.map((movement) => {
+              const info = TIPO_INFO[movement.tipo];
+              return (
+                <article key={movement.id} className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">
+                        {movement.producto?.nombre ?? "Producto eliminado"}
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                        {movement.producto?.sku ?? "—"}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className={`${info.badge} shrink-0 text-xs`}>
+                      {info.label}
+                    </Badge>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Fecha</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">
+                        {fmtFecha(movement.fecha)} · {fmtHora(movement.fecha)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Cantidad</dt>
+                      <dd className={`mt-0.5 font-semibold ${info.texto}`}>
+                        {info.signo}{movement.cantidad}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Ubicación</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">
+                        {movement.ubicacion?.codigo ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Usuario</dt>
+                      <dd className="mt-0.5 truncate font-medium text-foreground">
+                        {movement.usuario?.nombre ?? "—"}
+                      </dd>
+                    </div>
+                    {movement.motivo && (
+                      <div className="col-span-2">
+                        <dt className="text-xs text-muted-foreground">Motivo</dt>
+                        <dd className="mt-0.5 text-foreground">{movement.motivo}</dd>
+                      </div>
+                    )}
+                  </dl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setDetalle(movement)}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Ver detalle
+                  </Button>
+                </article>
+              );
+            })
+          )}
         </div>
 
         {/* PAGINACIÓN */}
@@ -699,6 +772,7 @@ function MovimientosPage() {
                 <Input
                   type="number"
                   min={0}
+                  inputMode="numeric"
                   value={formCantidad}
                   onChange={(e) =>
                     setFormCantidad(e.target.value === "" ? "" : Number(e.target.value))

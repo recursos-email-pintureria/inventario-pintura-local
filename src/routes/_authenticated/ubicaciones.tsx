@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   Database,
   Sparkles,
+  Map as MapIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -61,6 +62,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { getColorLateral } from "@/lib/tiposUbicacion";
 import { ModalProductosPalet } from "@/components/inventario/ModalProductosPalet";
+import { Mapa2DModal } from "@/components/ubicaciones/Mapa2DModal";
+import type { MapaUbicacion } from "@/components/ubicaciones/Mapa2D";
 import { useAddStock } from "@/hooks/useAddStock";
 import {
   Sheet,
@@ -839,6 +842,7 @@ function UbicacionesPage() {
   useEffect(() => setPalets(paletsCombinados), [paletsCombinados]);
 
   const [vista, setVista] = useState<"arbol" | "lista">("arbol");
+  const [mapa2DAbierto, setMapa2DAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
   const [sincronizando, setSincronizando] = useState(false);
@@ -861,6 +865,31 @@ function UbicacionesPage() {
   // ----------------------------------------------------
   const [sheetVendedorAbierto, setSheetVendedorAbierto] = useState(false);
   const [ubicacionSeleccionada, setUbicacionSeleccionada] = useState<UbicacionItem | null>(null);
+
+  const ubicacionesParaMapa = useMemo<MapaUbicacion[]>(
+    () =>
+      ubicaciones.map((location) => ({
+        id: location.id,
+        codigo: location.codigo,
+        nombre: location.nombre,
+        tipo: location.tipo,
+        padreId: location.id_padre ?? null,
+        seccionId: location.seccion_id ?? null,
+        lateral: location.lateral ?? null,
+        numero: location.piso ?? null,
+        activo: location.activo,
+        capacidadMax: location.capacidad_max ?? 100,
+        productos: location.productos.map((product) => ({
+          id: product.id,
+          sku: product.sku,
+          nombre: product.nombre,
+          categoria: product.categoria,
+          cantidad: product.cantidad,
+          stock_minimo: product.stock_minimo,
+        })),
+      })),
+    [ubicaciones],
+  );
 
   // Escáner con cámara dentro del panel del vendedor
   const [mostrarEscaner, setMostrarEscaner] = useState(false);
@@ -1836,6 +1865,16 @@ function UbicacionesPage() {
               </div>
             </div>
 
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMapa2DAbierto(true)}
+              className="self-start gap-2 md:self-auto"
+            >
+              <MapIcon className="h-4 w-4" />
+              Ver Mapa 2D
+            </Button>
+
             <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 p-1 rounded-lg border border-slate-200">
               <Button
                 variant={vista === "arbol" ? "default" : "ghost"}
@@ -2662,14 +2701,14 @@ function UbicacionesPage() {
                       return (
                         <div
                           key={item.id}
-                          className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 transition-colors"
+                          className="m-3 flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-slate-50/80 md:m-0 md:flex-row md:items-center md:justify-between md:rounded-none md:border-0"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`p-2 rounded-lg ${config.badgeClass}`}>
                               <Icono className="w-4 h-4" />
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-semibold text-sm text-slate-900">
                                   {item.nombre}
                                 </span>
@@ -2685,14 +2724,24 @@ function UbicacionesPage() {
                               <p className="text-xs text-slate-500 mt-0.5">
                                 {item.subtitulo || config.descripcion}
                               </p>
+                              <p className="mt-1 text-xs text-slate-600">
+                                Stock:{" "}
+                                <span className="font-semibold text-slate-900">
+                                  {item.productos.reduce((sum, product) => sum + product.cantidad, 0)} uds
+                                </span>
+                                {" · "}
+                                Productos:{" "}
+                                <span className="font-semibold text-slate-900">
+                                  {item.productos.length}
+                                </span>
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
-                              size="sm"
                               onClick={() => abrirPanelVendedor(item)}
-                              className="h-7 text-xs border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 font-semibold"
+                              className="w-full border-blue-200 bg-blue-50/50 text-xs font-semibold text-blue-700 hover:bg-blue-100 md:w-auto"
                             >
                               Gestionar Productos
                             </Button>
@@ -2859,9 +2908,14 @@ function UbicacionesPage() {
                 <span className="text-xs font-bold text-slate-900 tracking-wider">
                   MAPA NAVE A-NORTE
                 </span>
-                <span className="text-xs text-blue-600 font-semibold cursor-pointer hover:underline">
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={() => setMapa2DAbierto(true)}
+                  className="h-auto p-0 text-xs font-semibold text-blue-600 hover:underline"
+                >
                   Plano 2D
-                </span>
+                </Button>
               </div>
 
               <div className="grid grid-cols-4 gap-2 py-2">
@@ -2917,7 +2971,7 @@ function UbicacionesPage() {
       <Sheet open={sheetVendedorAbierto} onOpenChange={setSheetVendedorAbierto}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-xl md:max-w-2xl overflow-y-auto p-0 flex flex-col bg-white"
+          className="flex w-full flex-col overflow-y-auto bg-white p-0 sm:max-w-xl md:max-w-2xl max-md:inset-x-0 max-md:inset-y-auto max-md:top-auto max-md:bottom-0 max-md:h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl"
         >
           {ubicacionSeleccionada && (
             <div className="flex-1 flex flex-col">
@@ -4042,6 +4096,22 @@ function UbicacionesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Mapa2DModal
+        open={mapa2DAbierto}
+        onOpenChange={setMapa2DAbierto}
+        locations={ubicacionesParaMapa}
+        productCatalog={catalogoDisponible}
+        selectedLocationId={ubicacionSeleccionada?.id ?? null}
+        onSelectLocation={(mapLocation) => {
+          const location = ubicaciones.find((item) => item.id === mapLocation.id);
+          if (location) setUbicacionSeleccionada(location);
+        }}
+        onOpenManagement={(mapLocation) => {
+          const location = ubicaciones.find((item) => item.id === mapLocation.id);
+          if (location) abrirPanelVendedor(location);
+        }}
+      />
     </div>
   );
 }

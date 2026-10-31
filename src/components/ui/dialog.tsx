@@ -32,15 +32,30 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onFocusCapture, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg max-md:left-0 max-md:top-auto max-md:bottom-0 max-md:max-h-[90dvh] max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:overflow-y-auto max-md:rounded-b-none max-md:rounded-t-2xl max-md:px-4 max-md:pb-[calc(1rem+env(safe-area-inset-bottom))] max-md:pt-6",
         className,
       )}
+      onFocusCapture={(event) => {
+        onFocusCapture?.(event);
+        const target = event.target;
+        if (
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(max-width: 767px)").matches &&
+          target instanceof HTMLElement &&
+          target.matches("input, textarea, select") &&
+          typeof target.scrollIntoView === "function"
+        ) {
+          window.requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+          });
+        }
+      }}
       {...props}
     >
       {children}
@@ -60,7 +75,10 @@ DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    className={cn(
+      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 max-md:sticky max-md:bottom-0 max-md:z-10 max-md:border-t max-md:bg-background max-md:py-3",
+      className,
+    )}
     {...props}
   />
 );

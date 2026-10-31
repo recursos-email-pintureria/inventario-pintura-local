@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -241,6 +241,20 @@ function ProductosPage() {
   const [formAncho, setFormAncho] = useState<number | "">(0);
   const [formAlto, setFormAlto] = useState<number | "">(0);
   const [formPeso, setFormPeso] = useState<number | "">(0);
+  useEffect(() => {
+    let scannedCode: string | null = null;
+    try {
+      scannedCode = window.sessionStorage.getItem("inventario:codigo-busqueda");
+      window.sessionStorage.removeItem("inventario:codigo-busqueda");
+    } catch {
+      scannedCode = null;
+      toast.error("No se pudo recuperar el código escaneado");
+    }
+    if (scannedCode) {
+      setBusqueda(scannedCode);
+      setPaginaActual(1);
+    }
+  }, []);
 
   // ============================================================================
   // FILTRADO Y PAGINACIÓN
@@ -250,7 +264,10 @@ function ProductosPage() {
     return productos.filter((p) => {
       const q = busqueda.toLowerCase().trim();
       const coincideTexto =
-        !q || p.nombre.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
+        !q ||
+        p.nombre.toLowerCase().includes(q) ||
+        (p.sku || "").toLowerCase().includes(q) ||
+        (p.codigo_barras || "").toLowerCase().includes(q);
 
       const coincideCategoria =
         categoriaSeleccionada === "todas" || p.categoria === categoriaSeleccionada;
@@ -622,7 +639,7 @@ function ProductosPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+        <div className="hidden rounded-xl border border-gray-200 bg-white shadow-2xs md:block">
           <Table>
             <TableHeader className="bg-gray-50/80 border-b border-gray-200">
               <TableRow className="hover:bg-transparent">
@@ -815,6 +832,106 @@ function ProductosPage() {
             </TableBody>
           </Table>
         </div>
+        <div className="space-y-3 md:hidden">
+          {cargandoProductos ? (
+            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+              Cargando productos...
+            </div>
+          ) : productosPaginados.length === 0 ? (
+            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+              No se encontraron productos.
+            </div>
+          ) : (
+            productosPaginados.map((product) => {
+              const agotado = product.stock_actual === 0;
+              const bajo = product.stock_actual > 0 && product.stock_actual <= product.stock_minimo;
+              return (
+                <article key={product.id} className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={seleccionados.has(product.id)}
+                      onCheckedChange={() => toggleSeleccionarFila(product.id)}
+                      aria-label={`Seleccionar ${product.nombre}`}
+                      className="mt-1"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate font-semibold text-foreground">{product.nombre}</h2>
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                        SKU: {product.sku || "—"}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${
+                        agotado
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : bajo
+                            ? "border-amber-200 bg-amber-50 text-amber-800"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {agotado ? "Agotado" : bajo ? "Stock bajo" : "Normal"}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Categoría</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">
+                        {product.categoria || "Sin categoría"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Stock</dt>
+                      <dd className="mt-0.5 font-semibold text-foreground">
+                        {product.stock_actual} {product.unidad || "unid"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Ubicación</dt>
+                      <dd className="mt-0.5 truncate font-medium text-foreground">
+                        {product.ubicacion || "Sin asignar"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Precio</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">
+                        ${(product.precio || 0).toLocaleString("es-CL")}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="flex gap-2 border-t pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setProductoVer(product)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => abrirModalEditar(product)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setProductoADesactivar(product)}
+                      className="shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {product.activo ? "Desactivar" : "Activar"}
+                    </Button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* 5. FOOTER & PAGINACIÓN */}
@@ -917,6 +1034,10 @@ function ProductosPage() {
                     value={formSku}
                     onChange={(e) => setFormSku(e.target.value)}
                     placeholder="Ej: LAT-4001-WHT"
+                    inputMode="text"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="font-mono text-sm uppercase"
                     required
                   />
@@ -934,6 +1055,7 @@ function ProductosPage() {
                       value={formCodigoBarras}
                       onChange={(e) => setFormCodigoBarras(e.target.value)}
                       placeholder="Ej: 8435000000000"
+                      inputMode="numeric"
                       className="font-mono text-sm flex-1"
                     />
                     <Button
@@ -1113,6 +1235,10 @@ function ProductosPage() {
                     onChange={(e) => setFormSku(e.target.value.toUpperCase())}
                     className="font-mono text-sm uppercase"
                     placeholder="LAT-0000-00"
+                    inputMode="text"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                   />
                 </div>
@@ -1139,6 +1265,7 @@ function ProductosPage() {
                     value={formCodigoBarras}
                     onChange={(e) => setFormCodigoBarras(e.target.value)}
                     placeholder="Código de barras EAN o referencia"
+                    inputMode="numeric"
                     className="font-mono text-sm"
                   />
                 </div>

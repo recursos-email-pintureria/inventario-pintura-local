@@ -1,4 +1,5 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Package,
@@ -12,11 +13,23 @@ import {
   Moon,
   Monitor,
   Tags,
+  Menu,
+  ScanLine,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyProfile, cerrarSesion } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 import { type ThemePreference, useTheme } from "@/components/theme/theme-context";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { BarcodeScanner } from "@/components/ui/barcode-scanner";
+import { toast } from "sonner";
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -28,8 +41,12 @@ const menuItems = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { perfil, permisos, isPending, isAdmin, can } = useMyProfile();
   const { theme, setTheme } = useTheme();
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [perfilAbierto, setPerfilAbierto] = useState(false);
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
 
   if (isPending && !perfil) {
     return (
@@ -52,13 +69,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
   const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
   const themeLabel = theme === "light" ? "claro" : theme === "dark" ? "oscuro" : "del sistema";
+  const bottomItems = [
+    { to: "/", label: "Inicio", icon: LayoutDashboard },
+    { to: "/ubicaciones", label: "Ubicaciones", icon: MapPin },
+    { to: "/movimientos", label: "Movimientos", icon: ArrowRightLeft },
+  ];
+  const handleScan = (code: string) => {
+    try {
+      window.sessionStorage.setItem("inventario:codigo-busqueda", code);
+    } catch {
+      toast.error("No se pudo conservar el código escaneado para la búsqueda");
+      return;
+    }
+    void navigate({ to: "/productos" });
+    toast.success(`Buscando código ${code} en productos`);
+  };
+  const toggleTheme = () => setTheme(nextTheme);
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-dvh flex-col bg-background md:flex-row">
       {/* ========================================== */}
       {/* BARRA LATERAL (SIDEBAR)                    */}
       {/* ========================================== */}
-      <aside className="flex w-64 flex-col border-r bg-card">
+      <aside className="hidden w-64 shrink-0 flex-col border-r bg-card md:flex">
         {/* 🎯 LOGO Y VERSIÓN DE LA APP */}
         <div className="flex items-center gap-3 px-5 py-6 border-b border-border">
           <div className="bg-primary text-primary-foreground p-2.5 rounded-xl shadow-sm">
@@ -135,7 +168,191 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ========================================== */}
       {/* CONTENIDO PRINCIPAL                        */}
       {/* ========================================== */}
-      <main className="flex-1 overflow-auto bg-muted/30">{children}</main>
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b bg-card px-3 md:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Abrir menú de navegación"
+          onClick={() => setMenuAbierto(true)}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <div className="flex items-center gap-2 font-semibold">
+          <Boxes className="h-5 w-5 text-primary" />
+          <span>Inventario LM</span>
+          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-label="En línea" />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Abrir perfil de usuario"
+          onClick={() => setPerfilAbierto(true)}
+        >
+          <UserRound className="h-5 w-5" />
+        </Button>
+      </header>
+
+      <main className="min-h-0 flex-1 overflow-auto bg-muted/30 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+        {children}
+      </main>
+
+      <nav
+        aria-label="Navegación principal móvil"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-end border-t bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur md:hidden"
+      >
+        {bottomItems.slice(0, 2).map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-medium",
+                isActive ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              {item.label}
+            </Link>
+          );
+        })}
+        <Button
+          type="button"
+          aria-label="Abrir escáner de códigos"
+          onClick={() => setEscanerAbierto(true)}
+          className="mx-auto -mt-4 flex h-14 w-14 flex-col rounded-full border-4 border-background bg-primary p-0 text-[9px] text-primary-foreground shadow-lg"
+        >
+          <ScanLine className="h-5 w-5" aria-hidden="true" />
+          Escanear
+        </Button>
+        {bottomItems.slice(2).map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-medium",
+                isActive ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              {item.label}
+            </Link>
+          );
+        })}
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label="Ver más opciones"
+          onClick={() => setMenuAbierto(true)}
+          className="flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground"
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+          Menú
+        </Button>
+      </nav>
+
+      <Sheet open={menuAbierto} onOpenChange={setMenuAbierto}>
+        <SheetContent side="left" className="flex w-[min(20rem,85vw)] flex-col p-0">
+          <SheetHeader className="border-b px-5 py-5 text-left">
+            <SheetTitle className="flex items-center gap-2">
+              <Boxes className="h-5 w-5 text-primary" />
+              Inventario LM
+            </SheetTitle>
+            <SheetDescription>Navegación de la aplicación</SheetDescription>
+          </SheetHeader>
+          <nav aria-label="Todas las secciones" className="flex-1 space-y-1 overflow-y-auto p-3">
+            {items.map((item) => {
+              const isActive = location.pathname === item.to;
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMenuAbierto(false)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="space-y-2 border-t p-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full justify-start"
+              onClick={toggleTheme}
+              aria-label={`Tema ${themeLabel}. Cambiar al tema ${nextTheme}`}
+            >
+              <ThemeIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+              Tema: {themeLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 w-full justify-start text-destructive"
+              onClick={() => void cerrarSesion()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Cerrar sesión
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={perfilAbierto} onOpenChange={setPerfilAbierto}>
+        <SheetContent side="right" className="w-[min(20rem,85vw)]">
+          <SheetHeader className="text-left">
+            <SheetTitle>Mi cuenta</SheetTitle>
+            <SheetDescription>Perfil y preferencias de la sesión</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 flex items-center gap-3 rounded-lg border p-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+              {perfil?.nombre_completo?.charAt(0).toUpperCase() || "U"}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{perfil?.nombre_completo || "Usuario"}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {perfil?.correo || "Sin email"}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full justify-start"
+              onClick={toggleTheme}
+            >
+              <ThemeIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+              Tema: {themeLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 w-full justify-start text-destructive"
+              onClick={() => void cerrarSesion()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Cerrar sesión
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <BarcodeScanner open={escanerAbierto} onOpenChange={setEscanerAbierto} onScan={handleScan} />
     </div>
   );
 }
