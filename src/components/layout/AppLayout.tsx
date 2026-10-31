@@ -8,21 +8,28 @@ import {
   Boxes,
   Settings,
   Users,
+  Sun,
+  Moon,
+  Monitor,
+  Tags,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyProfile, cerrarSesion } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
+import { type ThemePreference, useTheme } from "@/components/theme/theme-context";
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/productos", label: "Productos", icon: Package },
   { to: "/ubicaciones", label: "Ubicaciones", icon: MapPin },
   { to: "/movimientos", label: "Movimientos", icon: ArrowRightLeft },
+  { to: "/categorias", label: "Categorías", icon: Tags },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { perfil, isPending, isAdmin, can } = useMyProfile();
+  const { perfil, permisos, isPending, isAdmin, can } = useMyProfile();
+  const { theme, setTheme } = useTheme();
 
   if (isPending && !perfil) {
     return (
@@ -37,7 +44,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     ...(isAdmin || can("puede_gestionar_usuarios")
       ? [{ to: "/usuarios", label: "Usuarios", icon: Users }]
       : []),
+    ...(permisos?.puede_gestionar_usuarios === true
+      ? [{ to: "/configuracion", label: "Configuración", icon: Settings }]
+      : []),
   ];
+  const nextTheme: ThemePreference =
+    theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  const themeLabel = theme === "light" ? "claro" : theme === "dark" ? "oscuro" : "del sistema";
 
   return (
     <div className="flex h-screen bg-background">
@@ -83,6 +97,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* PIE DE PÁGINA DEL SIDEBAR (USUARIO Y SALIR) */}
         <div className="border-t border-border p-4 space-y-3">
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground"
+            aria-label={`Tema ${themeLabel}. Cambiar al tema ${nextTheme === "light" ? "claro" : nextTheme === "dark" ? "oscuro" : "del sistema"}`}
+            onClick={() => setTheme(nextTheme)}
+          >
+            <ThemeIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+            Tema: {themeLabel}
+          </Button>
           <div className="flex items-center gap-3 px-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
               {perfil?.nombre_completo?.charAt(0).toUpperCase() || "U"}

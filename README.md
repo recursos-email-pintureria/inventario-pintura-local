@@ -14,7 +14,7 @@ Sistema profesional de gestión de inventario jerárquico para tienda de pintura
 
 | Capa | Tecnología | Enlace |
 | --- | --- | --- |
-| **Frontend** | React 18, TypeScript, TanStack Router, TanStack Query | [react.dev](https://react.dev) · [tanstack.com](https://tanstack.com) |
+| **Frontend** | React 19, TypeScript, TanStack Router, TanStack Query | [react.dev](https://react.dev) · [tanstack.com](https://tanstack.com) |
 | **UI/Estilos** | Tailwind CSS, Radix UI, Lucide React, shadcn/ui | [tailwindcss.com](https://tailwindcss.com) · [radix-ui.com](https://radix-ui.com) |
 | **Backend/BD** | Supabase (PostgreSQL con Row Level Security) | [supabase.com](https://supabase.com) |
 | **Despliegue** | Vercel (CI/CD automático desde `main`) | [vercel.com](https://vercel.com) |
@@ -80,6 +80,27 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 
 > ⚠️ **IMPORTANTE sobre `reposicion`:** NO suma. Si el stock actual es 5 y quieres que quede en 15, debes enviar `cantidad: 15` (no 10).
 > ⚠️ **IMPORTANTE sobre palets:** Para movimientos con `id_palet`, el trigger **SOLO** permite los tipos `entrada` y `salida`. La `id_ubicacion` debe coincidir con la `id_reserva` del palet.
+
+---
+
+## ⚙️ Configuración del sistema
+
+La ruta `/configuracion` ofrece ajustes generales, reglas de almacén, tintometría,
+lector de códigos y apariencia. Pueden acceder usuarios activos con
+`permisos_usuario.puede_gestionar_usuarios = true`.
+
+Antes de usar la página, ejecutar [`sql/configuracion_sistema.sql`](./sql/configuracion_sistema.sql)
+en el SQL Editor de Supabase. La tabla `configuracion_sistema` almacena cada ajuste como
+`clave`, `valor` JSONB y `categoria`, con identificador UUID y RLS: cualquier usuario
+autenticado puede leer, pero solo usuarios con `puede_gestionar_usuarios = true` pueden
+escribir o eliminar. La migración preserva los valores si encuentra el esquema anterior.
+La preferencia claro/oscuro/sistema se guarda en `localStorage` por navegador; no se
+comparte como ajuste global de la tienda.
+
+Los valores de bloqueo de despacho, stock negativo, alerta y lector quedan persistidos
+como configuración. No alteran por sí solos los triggers ni flujos operativos existentes;
+esos consumidores deben integrarse explícitamente antes de considerarlos reglas aplicadas.
+El stock continúa modificándose únicamente mediante `movimientos`.
 
 ---
 

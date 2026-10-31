@@ -1,961 +1,777 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Store,
-  Package,
   AlertTriangle,
-  Users,
-  Database,
-  Save,
+  Check,
+  LifeBuoy,
+  LoaderCircle,
+  Monitor,
+  Moon,
   RotateCcw,
-  Plus,
-  Pencil,
-  Trash2,
-  Download,
-  Upload,
-  CheckCircle2,
-  Globe,
+  Save,
+  Settings,
+  Sun,
+  User,
 } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useTheme } from "@/components/theme/theme-context";
+import { useAuth } from "@/contexts/AuthContext";
+import { useMyProfile } from "@/hooks/usePermissions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/lib/supabase";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+  DEFAULT_SYSTEM_SETTINGS,
+  getSystemSettings,
+  saveSystemSettings,
+  validateSystemSettings,
+  type SystemSettings,
+} from "@/lib/configuracion";
 
-// Imports de Supabase y TanStack Query
-import {
-  getCategorias,
-  crearCategoria,
-  actualizarCategoria,
-  desactivarCategoria,
-} from "@/lib/inventario";
-import type { Categoria } from "@/lib/tipos";
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  });
+
+type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export const Route = createFileRoute("/_authenticated/configuracion")({
+  beforeLoad: async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!userData.user) throw redirect({ to: "/login" });
+
+    const [{ data: profile, error: profileError }, { data: permissions, error: permissionsError }] =
+      await Promise.all([
+        supabase
+          .from("perfiles_usuario")
+          .select("rol, activo")
+          .eq("id", userData.user.id)
+          .maybeSingle(),
+        supabase
+          .from("permisos_usuario")
+          .select("puede_gestionar_usuarios")
+          .eq("id_usuario", userData.user.id)
+          .maybeSingle(),
+      ]);
+    if (profileError) throw profileError;
+    if (permissionsError) throw permissionsError;
+
+    const active = profile?.activo === true;
+    const allowed = active && permissions?.puede_gestionar_usuarios === true;
+    if (!allowed) throw redirect({ to: "/" });
+  },
   component: ConfiguracionPage,
 });
 
-// ============================================================================
-// TIPOS LOCALES (solo para Usuarios, ya que Categorías viene de @/lib/tipos)
-// ============================================================================
-interface Usuario {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: string;
-  activo: boolean;
-}
-
-// ============================================================================
-// DATOS MOCK (Solo Usuarios y Backup por ahora, Categorías es real)
-// ============================================================================
-const USUARIOS_INICIALES: Usuario[] = [
-  {
-    id: "u-1",
-    nombre: "Javier Martínez",
-    email: "javier@inventariolm.com",
-    rol: "Administrador",
-    activo: true,
-  },
-  {
-    id: "u-2",
-    nombre: "Elena Rodríguez",
-    email: "elena@inventariolm.com",
-    rol: "Operadora de Almacén",
-    activo: true,
-  },
-  {
-    id: "u-3",
-    nombre: "Carlos Domínguez",
-    email: "carlos@inventariolm.com",
-    rol: "Vendedor",
-    activo: true,
-  },
-  {
-    id: "u-4",
-    nombre: "Roberto Sánchez",
-    email: "roberto@inventariolm.com",
-    rol: "Mozo de Almacén",
-    activo: true,
-  },
-  { id: "u-5", nombre: "Ana López", email: "ana@inventariolm.com", rol: "Vendedor", activo: true },
-  {
-    id: "u-6",
-    nombre: "Miguel Torres",
-    email: "miguel@inventariolm.com",
-    rol: "Operador de Almacén",
-    activo: false,
-  },
-];
-
-// ============================================================================
-// COMPONENTE PRINCIPAL
-// ============================================================================
 function ConfiguracionPage() {
   const queryClient = useQueryClient();
-
-  // Estado de configuración general
-  const [nombreTienda, setNombreTienda] = useState("Pinturas LM - Sucursal Norte");
-  const [direccion, setDireccion] = useState("Polígono Industrial Las Palmeras, Nave 14B");
-  const [telefono, setTelefono] = useState("+34 912 345 678");
-  const [email, setEmail] = useState("admin@inventariolm.com");
-  const [zonaHoraria, setZonaHoraria] = useState("Europe/Madrid");
-  const [moneda, setMoneda] = useState("EUR");
-  const [idioma, setIdioma] = useState("es");
-
-  // Estado de alertas de stock
-  const [alertaStockBajo, setAlertaStockBajo] = useState(true);
-  const [umbralStockBajo, setUmbralStockBajo] = useState(20);
-  const [umbralStockCritico, setUmbralStockCritico] = useState(10);
-  const [emailAdmin, setEmailAdmin] = useState(true);
-  const [emailOperador, setEmailOperador] = useState(false);
-
-  // Estado de parámetros
-  const [stockMinimoDefecto, setStockMinimoDefecto] = useState(10);
-  const [unidadMedida, setUnidadMedida] = useState("gal");
-  const [permitirStockNegativo, setPermitirStockNegativo] = useState(false);
-  const [bloquearVentasStockBajo, setBloquearVentasStockBajo] = useState(false);
-  const [iva, setIva] = useState(21);
-
-  // Categorías (REAL con TanStack Query)
-  const { data: categorias = [], isLoading: cargandoCategorias } = useQuery<Categoria[]>({
-    queryKey: ["categorias"],
-    queryFn: getCategorias,
+  const { theme, setTheme } = useTheme();
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const settingsQuery = useQuery({
+    queryKey: ["configuracion-sistema"],
+    queryFn: getSystemSettings,
   });
 
-  const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false);
-  const [categoriaEditando, setCategoriaEditando] = useState<Categoria | null>(null);
-  const [formCatNombre, setFormCatNombre] = useState("");
-  const [formCatDescripcion, setFormCatDescripcion] = useState("");
+  useEffect(() => {
+    if (settingsQuery.data) setSettings(settingsQuery.data);
+  }, [settingsQuery.data]);
 
-  // Usuarios (Mock por ahora)
-  const [usuarios] = useState<Usuario[]>(USUARIOS_INICIALES);
-
-  // Backup
-  const [ultimoBackup] = useState("26/10/2026, 03:00");
-
-  // AlertDialog para eliminar categoría
-  const [categoriaAEliminar, setCategoriaAEliminar] = useState<Categoria | null>(null);
-  const [dialogEliminarAbierto, setDialogEliminarAbierto] = useState(false);
-
-  // ============================================================================
-  // MUTACIONES (Supabase)
-  // ============================================================================
-  const mutationCrear = useMutation({
-    mutationFn: ({ nombre, descripcion }: { nombre: string; descripcion: string }) =>
-      crearCategoria(nombre, descripcion),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categorias"] });
-      toast.success("Categoría creada correctamente");
+  const saveMutation = useMutation({
+    mutationFn: saveSystemSettings,
+    onSuccess: async (saved) => {
+      setSettings(saved);
+      await queryClient.invalidateQueries({ queryKey: ["configuracion-sistema"] });
+      toast.success("La configuración se guardó correctamente.");
     },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al crear la categoría");
+    onError: (error) => {
+      console.error("Error guardando configuración del sistema:", error);
+      toast.error(
+        error instanceof Error
+          ? `No se pudo guardar la configuración: ${error.message}`
+          : "No se pudo guardar la configuración. Verifica tus permisos e inténtalo de nuevo.",
+      );
     },
   });
 
-  const mutationActualizar = useMutation({
-    mutationFn: ({
-      id,
-      nombre,
-      descripcion,
-    }: {
-      id: string;
-      nombre: string;
-      descripcion: string;
-    }) => actualizarCategoria(id, { nombre, descripcion }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categorias"] });
-      toast.success("Categoría actualizada correctamente");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al actualizar la categoría");
-    },
-  });
+  if (settingsQuery.isPending) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center" role="status">
+        <LoaderCircle className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="sr-only">Cargando configuración</span>
+      </div>
+    );
+  }
+  if (settingsQuery.isError) {
+    return (
+      <Card className="mx-auto mt-8 max-w-2xl border-rose-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-rose-700">
+            <AlertTriangle className="h-5 w-5" /> No se pudo cargar la configuración
+          </CardTitle>
+          <CardDescription>
+            Comprueba que se haya aplicado la migración de configuración y que tu cuenta tenga
+            permisos de administración.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{settingsQuery.error.message}</p>
+          <Button className="mt-4" variant="outline" onClick={() => void settingsQuery.refetch()}>
+            Reintentar
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!settings) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center" role="status">
+        <LoaderCircle className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="sr-only">Preparando configuración</span>
+      </div>
+    );
+  }
 
-  const mutationEliminar = useMutation({
-    mutationFn: (id: string) => desactivarCategoria(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categorias"] });
-      toast.success("Categoría eliminada correctamente");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al eliminar la categoría");
-    },
-  });
+  const savedSettings = settings;
+  const update = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) =>
+    setSettings({ ...settings, [key]: value });
 
-  // ============================================================================
-  // HANDLERS
-  // ============================================================================
-  const handleGuardarCambios = () => {
-    toast.success("Configuración guardada correctamente (simulado)");
+  const handleSave = () => {
+    const validationError = validateSystemSettings(settings);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    saveMutation.mutate(settings);
   };
 
-  const handleRestaurarValores = () => {
-    setNombreTienda("Pinturas LM - Sucursal Norte");
-    setDireccion("Polígono Industrial Las Palmeras, Nave 14B");
-    setTelefono("+34 912 345 678");
-    setEmail("admin@inventariolm.com");
-    setUmbralStockBajo(20);
-    setUmbralStockCritico(10);
-    setStockMinimoDefecto(10);
-    setIva(21);
-    toast.info("Valores restaurados a los predeterminados");
+  const handleRestore = () => {
+    setSettings(DEFAULT_SYSTEM_SETTINGS);
+    saveMutation.mutate(DEFAULT_SYSTEM_SETTINGS);
   };
 
-  const handleCrearCategoria = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formCatNombre.trim()) {
-      toast.error("El nombre es obligatorio");
+  return (
+    <section
+      className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8"
+      aria-labelledby="settings-heading"
+    >
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <Settings className="h-6 w-6 text-indigo-600" aria-hidden="true" />
+            <h1 id="settings-heading" className="text-2xl font-bold tracking-tight">
+              Configuración del sistema
+            </h1>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Preferencias generales y reglas operativas de Inventario LM.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleRestore} disabled={saveMutation.isPending}>
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Restaurar valores por defecto
+          </Button>
+          <Button onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Guardar cambios
+          </Button>
+        </div>
+      </header>
+
+      <div
+        className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+        aria-live="polite"
+      >
+        <Badge variant="outline" className="gap-1">
+          <Check className="h-3 w-3" /> Persistencia en Supabase
+        </Badge>
+        {savedSettings.updated_at ? (
+          <span>
+            Último guardado:{" "}
+            <time dateTime={savedSettings.updated_at}>
+              {new Intl.DateTimeFormat("es-ES", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }).format(new Date(savedSettings.updated_at))}
+            </time>
+          </span>
+        ) : (
+          <span>Configuración inicial; guarda los cambios para persistirlos.</span>
+        )}
+      </div>
+
+      <Tabs defaultValue="general">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-5">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="stock">Almacén y stock</TabsTrigger>
+          <TabsTrigger value="dispositivos">Terminales</TabsTrigger>
+          <TabsTrigger value="apariencia">Apariencia</TabsTrigger>
+          <TabsTrigger value="cuenta" className="gap-1.5">
+            <User className="h-4 w-4" aria-hidden="true" />
+            Cuenta
+          </TabsTrigger>
+          <TabsTrigger value="ayuda" className="gap-1.5">
+            <LifeBuoy className="h-4 w-4" aria-hidden="true" />
+            Ayuda y Soporte
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración general</CardTitle>
+              <CardDescription>Datos de contacto y formato regional de la tienda.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-5 md:grid-cols-2">
+              <Field label="Nombre comercial" htmlFor="store-name">
+                <Input
+                  id="store-name"
+                  value={settings.store_name}
+                  onChange={(e) => update("store_name", e.target.value)}
+                />
+              </Field>
+              <Field label="Dirección física" htmlFor="store-address">
+                <Input
+                  id="store-address"
+                  value={settings.store_address}
+                  onChange={(e) => update("store_address", e.target.value)}
+                />
+              </Field>
+              <Field label="Email de contacto/reportes" htmlFor="store-email">
+                <Input
+                  id="store-email"
+                  type="email"
+                  value={settings.contact_email}
+                  onChange={(e) => update("contact_email", e.target.value)}
+                />
+              </Field>
+              <Field label="Zona horaria" htmlFor="timezone">
+                <Select
+                  value={settings.time_zone}
+                  onValueChange={(value) => update("time_zone", value)}
+                >
+                  <SelectTrigger id="timezone">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Europe/Madrid">Europa/Madrid</SelectItem>
+                    <SelectItem value="Atlantic/Canary">Atlántico/Canarias</SelectItem>
+                    <SelectItem value="America/Mexico_City">América/Ciudad de México</SelectItem>
+                    <SelectItem value="America/Bogota">América/Bogotá</SelectItem>
+                    <SelectItem value="America/Buenos_Aires">América/Buenos Aires</SelectItem>
+                    <SelectItem value="UTC">UTC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Moneda predeterminada" htmlFor="currency">
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) => update("currency", value)}
+                >
+                  <SelectTrigger id="currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR — Euro</SelectItem>
+                    <SelectItem value="USD">USD — Dólar estadounidense</SelectItem>
+                    <SelectItem value="MXN">MXN — Peso mexicano</SelectItem>
+                    <SelectItem value="COP">COP — Peso colombiano</SelectItem>
+                    <SelectItem value="ARS">ARS — Peso argentino</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="stock">
+          <Card>
+            <CardHeader>
+              <CardTitle>Reglas de almacén y stock</CardTitle>
+              <CardDescription>
+                Estas opciones documentan reglas operativas; las mutaciones de stock siguen
+                realizándose exclusivamente mediante movimientos y sus triggers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <SettingSwitch
+                id="critical-alert"
+                title="Alerta de stock crítico"
+                description="Activar avisos cuando el stock esté por debajo del umbral definido."
+                checked={settings.critical_stock_alert}
+                onCheckedChange={(checked) => update("critical_stock_alert", checked)}
+              />
+              <Field label="Umbral de alerta (%)" htmlFor="critical-threshold">
+                <Input
+                  id="critical-threshold"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={settings.critical_stock_threshold}
+                  onChange={(e) => update("critical_stock_threshold", Number(e.target.value))}
+                  className="max-w-40"
+                />
+              </Field>
+              <SettingSwitch
+                id="block-zero"
+                title="Bloquear despacho con stock cero"
+                description="Preferencia administrativa. La aplicación debe aplicar esta regla en el flujo de despacho."
+                checked={settings.block_dispatch_at_zero}
+                onCheckedChange={(checked) => update("block_dispatch_at_zero", checked)}
+              />
+              <SettingSwitch
+                id="negative-stock"
+                title="Permitir stock negativo"
+                description="No cambia los permisos RLS ni evita las validaciones del trigger de movimientos."
+                checked={settings.allow_negative_stock}
+                onCheckedChange={(checked) => update("allow_negative_stock", checked)}
+              />
+              <Field label="Stock mínimo por defecto" htmlFor="default-min-stock">
+                <Input
+                  id="default-min-stock"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={settings.default_minimum_stock}
+                  onChange={(e) => update("default_minimum_stock", Number(e.target.value))}
+                  className="max-w-40"
+                />
+              </Field>
+              <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                El stock real se consulta desde la tabla calculada <code>stock</code>. Esta pantalla
+                no escribe en ella.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="dispositivos">
+          <Card>
+            <CardHeader>
+              <CardTitle>Terminales y dispositivos</CardTitle>
+              <CardDescription>
+                Ajustes del lector de códigos. La aplicación todavía no dispone de un servicio de
+                presencia/heartbeat para inventariar terminales remotos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <SettingSwitch
+                id="scanner-enabled"
+                title="Habilitar lectura de códigos"
+                description="Permite a las pantallas compatibles iniciar el flujo de escaneo."
+                checked={settings.scanner_enabled}
+                onCheckedChange={(checked) => update("scanner_enabled", checked)}
+              />
+              <Field label="Formatos admitidos" htmlFor="scanner-formats">
+                <Select
+                  value={settings.scanner_format}
+                  onValueChange={(value) => update("scanner_format", value)}
+                >
+                  <SelectTrigger id="scanner-formats">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CODE_128">Code 128</SelectItem>
+                    <SelectItem value="EAN_13">EAN-13</SelectItem>
+                    <SelectItem value="QR_CODE">QR Code</SelectItem>
+                    <SelectItem value="ALL">Todos los formatos compatibles</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <div className="flex items-start gap-3 rounded-lg border p-4">
+                <Monitor className="mt-0.5 h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                <div>
+                  <p className="font-medium">Este navegador</p>
+                  <p className="text-sm text-muted-foreground">
+                    Terminal actual. No se muestran otros dispositivos porque no existe registro
+                    central de sesiones de terminal.
+                  </p>
+                </div>
+                <Badge variant="outline" className="ml-auto">
+                  Activo
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="apariencia">
+          <Card>
+            <CardHeader>
+              <CardTitle>Apariencia y tema</CardTitle>
+              <CardDescription>
+                El tema se aplica globalmente y se guarda en este navegador, de forma independiente
+                para cada usuario/dispositivo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <fieldset>
+                <legend className="mb-3 text-sm font-medium">Tema de la aplicación</legend>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <ThemeChoice
+                    value="light"
+                    current={theme}
+                    onSelect={setTheme}
+                    label="Claro"
+                    icon={<Sun className="h-5 w-5" />}
+                  />
+                  <ThemeChoice
+                    value="dark"
+                    current={theme}
+                    onSelect={setTheme}
+                    label="Oscuro"
+                    icon={<Moon className="h-5 w-5" />}
+                  />
+                  <ThemeChoice
+                    value="system"
+                    current={theme}
+                    onSelect={setTheme}
+                    label="Sistema"
+                    icon={<Monitor className="h-5 w-5" />}
+                  />
+                </div>
+              </fieldset>
+              <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                El tema se guarda automáticamente en este dispositivo; no requiere guardar los
+                ajustes del sistema.
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cuenta">
+          <CuentaTab />
+        </TabsContent>
+
+        <TabsContent value="ayuda">
+          <AyudaSoporteTab />
+        </TabsContent>
+      </Tabs>
+    </section>
+  );
+}
+
+function AyudaSoporteTab() {
+  const { user } = useAuth();
+  const { perfil } = useMyProfile();
+  const [report, setReport] = useState("");
+
+  const handleSubmitReport = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!report.trim()) {
+      toast.error("Describe brevemente la incidencia antes de enviarla.");
       return;
     }
 
-    if (categoriaEditando) {
-      mutationActualizar.mutate({
-        id: categoriaEditando.id,
-        nombre: formCatNombre,
-        descripcion: formCatDescripcion,
-      });
-    } else {
-      mutationCrear.mutate({
-        nombre: formCatNombre,
-        descripcion: formCatDescripcion,
-      });
-    }
-
-    setModalCategoriaAbierto(false);
-    setCategoriaEditando(null);
-    setFormCatNombre("");
-    setFormCatDescripcion("");
+    console.info("Reporte de incidencia para el administrador", {
+      descripcion: report.trim(),
+      usuario: user?.email ?? user?.id ?? "Usuario no disponible",
+      nombre: perfil?.nombre_completo ?? null,
+      fecha: new Date().toISOString(),
+    });
+    toast.success("Reporte enviado al administrador");
+    setReport("");
   };
 
-  const handleEliminarCategoria = () => {
-    if (!categoriaAEliminar) return;
-    mutationEliminar.mutate(categoriaAEliminar.id);
-    setDialogEliminarAbierto(false);
-    setCategoriaAEliminar(null);
-  };
-
-  const handleExportarBackup = () => {
-    const datos = {
-      tienda: { nombre: nombreTienda, direccion, telefono, email },
-      categorias,
-      usuarios,
-      exportado: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `backup_inventario_${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    toast.success("Backup exportado correctamente");
-  };
-
-  const abrirModalEditarCategoria = (cat: Categoria) => {
-    setCategoriaEditando(cat);
-    setFormCatNombre(cat.nombre);
-    setFormCatDescripcion(cat.descripcion || "");
-    setModalCategoriaAbierto(true);
-  };
-
-  const abrirModalNuevaCategoria = () => {
-    setCategoriaEditando(null);
-    setFormCatNombre("");
-    setFormCatDescripcion("");
-    setModalCategoriaAbierto(true);
-  };
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-16">
-      {/* HEADER */}
-      <div className="border-b bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-                <span>INVENTARIO LM</span>
-                <span>/</span>
-                <span>ADMINISTRACIÓN</span>
-                <span>/</span>
-                <span className="text-[#D24D09] font-semibold">CONFIGURACIÓN</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                  Configuración del Sistema
-                </h1>
-                <Badge
-                  variant="outline"
-                  className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                  Sincronizado
-                </Badge>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Ajustes globales de la sucursal, políticas de stock y copias de seguridad.
-              </p>
-            </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <LifeBuoy className="h-5 w-5" aria-hidden="true" />
+          Ayuda y Soporte
+        </CardTitle>
+        <CardDescription>
+          Contacta con el administrador o deja constancia de una incidencia para su seguimiento.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-8">
+        <section aria-labelledby="admin-contact-heading" className="space-y-3">
+          <h3 id="admin-contact-heading" className="text-base font-semibold">
+            Contacto del Administrador
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Para problemas técnicos, permisos o dudas sobre el inventario, contacta directamente con
+            el administrador del sistema.
+          </p>
+          <a
+            className="inline-flex min-h-10 items-center rounded-md border px-4 py-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href="mailto:admin@tuempresa.com?subject=Consulta%20sobre%20Inventario%20LM"
+          >
+            Soporte Técnico — admin@tuempresa.com
+          </a>
+        </section>
 
-            <div className="flex items-center gap-2.5 self-start md:self-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRestaurarValores}
-                className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
-              >
-                <RotateCcw className="w-4 h-4 text-slate-500" />
-                Restaurar Valores
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleGuardarCambios}
-                className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs font-semibold h-9 px-4 gap-1.5"
-              >
-                <Save className="w-4 h-4" />
-                Guardar Cambios
-              </Button>
+        <section aria-labelledby="report-issue-heading" className="space-y-3 border-t pt-6">
+          <h3 id="report-issue-heading" className="text-base font-semibold">
+            Reportar una incidencia rápida
+          </h3>
+          <form onSubmit={handleSubmitReport} className="max-w-2xl space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="support-report">Descripción de la incidencia</Label>
+              <Textarea
+                id="support-report"
+                value={report}
+                onChange={(event) => setReport(event.target.value)}
+                placeholder="Describe brevemente el problema o la pantalla donde ocurrió..."
+                rows={5}
+                maxLength={2000}
+                aria-describedby="support-report-note support-report-count"
+              />
+              <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                <p id="support-report-note">
+                  El reporte incluirá el usuario actual y la fecha para ayudar al administrador.
+                </p>
+                <p id="support-report-count" aria-live="polite">
+                  {report.length}/2000
+                </p>
+              </div>
             </div>
+            <Button type="submit">
+              <LifeBuoy className="mr-2 h-4 w-4" aria-hidden="true" />
+              Enviar reporte al administrador
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              El envío es una confirmación simulada por ahora; posteriormente se conectará a una
+              tabla de incidencias o a un servicio de correo.
+            </p>
+          </form>
+        </section>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CuentaTab() {
+  const { user } = useAuth();
+  const { perfil, isPending: profilePending } = useMyProfile();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const onSubmit = async ({ newPassword }: PasswordFormValues) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        console.error("Error actualizando contraseña:", error);
+        toast.error(error.message || "No se pudo actualizar la contraseña.");
+        return;
+      }
+
+      toast.success("Contraseña actualizada correctamente");
+      reset();
+    } catch (error) {
+      console.error("Error inesperado actualizando contraseña:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar la contraseña.");
+    }
+  };
+
+  const onInvalid = (formErrors: typeof errors) => {
+    const message = formErrors.newPassword?.message ?? formErrors.confirmPassword?.message;
+    if (message) toast.error(message);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-5 w-5" aria-hidden="true" />
+          Cuenta
+        </CardTitle>
+        <CardDescription>Consulta tus datos y actualiza la contraseña de acceso.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 rounded-lg border p-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Email</p>
+            <p className="break-all text-sm text-muted-foreground" aria-live="polite">
+              {user?.email || "No disponible"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Nombre</p>
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {profilePending ? "Cargando…" : perfil?.nombre_completo || "No disponible"}
+            </p>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        <Tabs defaultValue="general" className="space-y-6">
-          {/* TABS */}
-          <TabsList className="w-full justify-start h-auto bg-white border border-slate-200 p-1 rounded-lg overflow-x-auto flex-wrap gap-1">
-            <TabsTrigger value="general" className="gap-1.5 text-xs">
-              <Store className="w-3.5 h-3.5" /> General
-            </TabsTrigger>
-            <TabsTrigger value="categorias" className="gap-1.5 text-xs">
-              <Package className="w-3.5 h-3.5" /> Categorías
-            </TabsTrigger>
-            <TabsTrigger value="stock" className="gap-1.5 text-xs">
-              <AlertTriangle className="w-3.5 h-3.5" /> Stock y Alertas
-            </TabsTrigger>
-            <TabsTrigger value="usuarios" className="gap-1.5 text-xs">
-              <Users className="w-3.5 h-3.5" /> Usuarios
-            </TabsTrigger>
-            <TabsTrigger value="backup" className="gap-1.5 text-xs">
-              <Database className="w-3.5 h-3.5" /> Backup
-            </TabsTrigger>
-          </TabsList>
+        <form
+          className="max-w-xl space-y-5"
+          noValidate
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          aria-labelledby="change-password-heading"
+        >
+          <h3 id="change-password-heading" className="text-base font-semibold">
+            Cambiar contraseña
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            La contraseña actual es opcional; Supabase autoriza el cambio mediante tu sesión.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Contraseña actual (opcional)</Label>
+            <Input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              aria-invalid={Boolean(errors.currentPassword)}
+              aria-describedby={errors.currentPassword ? "current-password-error" : undefined}
+              {...register("currentPassword")}
+            />
+            {errors.currentPassword && (
+              <p id="current-password-error" className="text-sm text-destructive" role="alert">
+                {errors.currentPassword.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">Nueva contraseña</Label>
+            <Input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              aria-invalid={Boolean(errors.newPassword)}
+              aria-describedby={errors.newPassword ? "new-password-error" : undefined}
+              {...register("newPassword")}
+            />
+            {errors.newPassword && (
+              <p id="new-password-error" className="text-sm text-destructive" role="alert">
+                {errors.newPassword.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirmar nueva contraseña</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              autoComplete="new-password"
+              aria-invalid={Boolean(errors.confirmPassword)}
+              aria-describedby={errors.confirmPassword ? "confirm-password-error" : undefined}
+              {...register("confirmPassword")}
+            />
+            {errors.confirmPassword && (
+              <p id="confirm-password-error" className="text-sm text-destructive" role="alert">
+                {errors.confirmPassword.message}
+              </p>
+            )}
+          </div>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
+            {isSubmitting ? "Actualizando…" : "Cambiar contraseña"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
 
-          {/* TAB: GENERAL */}
-          <TabsContent value="general" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Store className="w-4 h-4 text-[#D24D09]" />
-                  Información de la Tienda
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Datos fiscales y de contacto para reportes y albaranes.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Nombre Comercial</Label>
-                    <Input
-                      value={nombreTienda}
-                      onChange={(e) => setNombreTienda(e.target.value)}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Teléfono</Label>
-                    <Input
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Dirección Física</Label>
-                  <Input
-                    value={direccion}
-                    onChange={(e) => setDireccion(e.target.value)}
-                    className="h-9 text-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Email</Label>
-                    <Input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      type="email"
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Zona Horaria</Label>
-                    <select
-                      value={zonaHoraria}
-                      onChange={(e) => setZonaHoraria(e.target.value)}
-                      className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5"
-                    >
-                      <option value="Europe/Madrid">Europe/Madrid (UTC+1)</option>
-                      <option value="Europe/London">Europe/London (UTC+0)</option>
-                      <option value="America/Mexico_City">America/Mexico City (UTC-6)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Moneda</Label>
-                    <select
-                      value={moneda}
-                      onChange={(e) => setMoneda(e.target.value)}
-                      className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5"
-                    >
-                      <option value="EUR">EUR (€) - Euro</option>
-                      <option value="USD">USD ($) - Dólar</option>
-                      <option value="MXN">MXN ($) - Peso Mexicano</option>
-                    </select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-[#D24D09]" />
-                  Preferencias de Visualización
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-800">Idioma</p>
-                      <p className="text-[10px] text-slate-500">Idioma de la interfaz</p>
-                    </div>
-                    <select
-                      value={idioma}
-                      onChange={(e) => setIdioma(e.target.value)}
-                      className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2"
-                    >
-                      <option value="es">Español</option>
-                      <option value="en">English</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-800">Formato de fecha</p>
-                      <p className="text-[10px] text-slate-500">Cómo se muestran las fechas</p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="bg-slate-100 text-slate-700 border-slate-200"
-                    >
-                      DD/MM/YYYY
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB: CATEGORÍAS (CONECTADO A SUPABASE) */}
-          <TabsContent value="categorias">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Package className="w-4 h-4 text-[#D24D09]" />
-                    Categorías de Productos
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Gestiona las categorías que aparecen en el catálogo.
-                  </CardDescription>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={abrirModalNuevaCategoria}
-                  className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Nueva Categoría
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">NOMBRE</TableHead>
-                      <TableHead className="text-xs">DESCRIPCIÓN</TableHead>
-                      <TableHead className="text-xs text-right">ESTADO</TableHead>
-                      <TableHead className="text-xs text-right">ACCIONES</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cargandoCategorias ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-slate-500">
-                          Cargando categorías desde la base de datos...
-                        </TableCell>
-                      </TableRow>
-                    ) : categorias.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-slate-500">
-                          No hay categorías registradas. Crea una nueva.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      categorias.map((cat) => (
-                        <TableRow key={cat.id}>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium"
-                            >
-                              {cat.nombre}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-600 max-w-[300px] truncate">
-                            {cat.descripcion || "—"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge
-                              variant="outline"
-                              className={
-                                cat.activo
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-xs"
-                                  : "bg-slate-100 text-slate-600 border-slate-200 text-xs"
-                              }
-                            >
-                              {cat.activo ? "Activa" : "Inactiva"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => abrirModalEditarCategoria(cat)}
-                                className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setCategoriaAEliminar(cat);
-                                  setDialogEliminarAbierto(true);
-                                }}
-                                className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB: STOCK Y ALERTAS */}
-          <TabsContent value="stock" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-[#D24D09]" />
-                  Límites de Stock y Alertas
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Reglas automáticas de bloqueo y reposición preventiva.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800">Alerta de Stock Bajo</p>
-                    <p className="text-[10px] text-slate-500">
-                      Notificar cuando un producto esté por debajo del mínimo
-                    </p>
-                  </div>
-                  <Switch checked={alertaStockBajo} onCheckedChange={setAlertaStockBajo} />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">
-                      Umbral Stock Bajo (%)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={umbralStockBajo}
-                      onChange={(e) => setUmbralStockBajo(Number(e.target.value))}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">
-                      Umbral Stock Crítico (%)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={umbralStockCritico}
-                      onChange={(e) => setUmbralStockCritico(Number(e.target.value))}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800">Email al Administrador</p>
-                    <p className="text-[10px] text-slate-500">Enviar alertas críticas por email</p>
-                  </div>
-                  <Switch checked={emailAdmin} onCheckedChange={setEmailAdmin} />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800">Email al Operador</p>
-                    <p className="text-[10px] text-slate-500">Notificar al operador de almacén</p>
-                  </div>
-                  <Switch checked={emailOperador} onCheckedChange={setEmailOperador} />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="w-4 h-4 text-[#D24D09]" />
-                  Parámetros de Stock
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">
-                      Stock Mínimo por Defecto
-                    </Label>
-                    <Input
-                      type="number"
-                      value={stockMinimoDefecto}
-                      onChange={(e) => setStockMinimoDefecto(Number(e.target.value))}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Unidad de Medida</Label>
-                    <select
-                      value={unidadMedida}
-                      onChange={(e) => setUnidadMedida(e.target.value)}
-                      className="w-full h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5"
-                    >
-                      <option value="gal">Galones (gal)</option>
-                      <option value="L">Litros (L)</option>
-                      <option value="unid">Unidades (unid)</option>
-                      <option value="Kg">Kilogramos (Kg)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">
-                      IVA por Defecto (%)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={iva}
-                      onChange={(e) => setIva(Number(e.target.value))}
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800">Permitir Stock Negativo</p>
-                    <p className="text-[10px] text-slate-500">
-                      Permitir ventas cuando el stock sea 0
-                    </p>
-                  </div>
-                  <Switch
-                    checked={permitirStockNegativo}
-                    onCheckedChange={setPermitirStockNegativo}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50/50">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800">
-                      Bloquear Ventas con Stock Bajo
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      Impedir ventas si está por debajo del mínimo
-                    </p>
-                  </div>
-                  <Switch
-                    checked={bloquearVentasStockBajo}
-                    onCheckedChange={setBloquearVentasStockBajo}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB: USUARIOS */}
-          <TabsContent value="usuarios">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#D24D09]" />
-                  Usuarios del Sistema
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Lista de usuarios registrados y sus roles.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">USUARIO</TableHead>
-                      <TableHead className="text-xs">EMAIL</TableHead>
-                      <TableHead className="text-xs">ROL</TableHead>
-                      <TableHead className="text-xs text-center">ESTADO</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {usuarios.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-[#D24D09]/10 text-[#D24D09] flex items-center justify-center text-xs font-bold">
-                              {u.nombre
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)}
-                            </div>
-                            <span className="text-xs font-semibold text-slate-800">{u.nombre}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-slate-600">{u.email}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className="bg-blue-50 text-blue-800 border-blue-200 text-xs"
-                          >
-                            {u.rol}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {u.activo ? (
-                            <Badge
-                              variant="outline"
-                              className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs"
-                            >
-                              Activo
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="bg-slate-100 text-slate-600 border-slate-200 text-xs"
-                            >
-                              Inactivo
-                            </Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB: BACKUP */}
-          <TabsContent value="backup" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Database className="w-4 h-4 text-[#D24D09]" />
-                  Copia de Seguridad
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Exporta e importa los datos del sistema.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50/50 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-emerald-900">
-                      Último backup local completo
-                    </p>
-                    <p className="text-[11px] text-emerald-700 mt-0.5">
-                      {ultimoBackup} • Exportado correctamente
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleExportarBackup}
-                    className="h-10 text-xs gap-1.5 border-slate-200"
-                  >
-                    <Download className="w-4 h-4" />
-                    Exportar Backup (JSON)
-                  </Button>
-                  <Button variant="outline" className="h-10 text-xs gap-1.5 border-slate-200">
-                    <Upload className="w-4 h-4" />
-                    Importar desde Archivo
-                  </Button>
-                </div>
-
-                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50/50 flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-amber-900">Zona de peligro</p>
-                    <p className="text-[11px] text-amber-700 mt-0.5">
-                      Las acciones irreversibles requieren confirmación adicional.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 h-7 text-xs border-rose-200 text-rose-700 hover:bg-rose-50"
-                    >
-                      <Trash2 className="w-3 h-3 mr-1" />
-                      Purgar datos de prueba
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* MODAL: NUEVA / EDITAR CATEGORÍA */}
-      <Dialog
-        open={modalCategoriaAbierto}
-        onOpenChange={(open) => {
-          if (!open) {
-            setModalCategoriaAbierto(false);
-            setCategoriaEditando(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">
-              {categoriaEditando ? "Editar Categoría" : "Nueva Categoría"}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              {categoriaEditando
-                ? "Modifica los datos de la categoría."
-                : "Crea una nueva categoría para el catálogo."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCrearCategoria} className="space-y-3.5">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Nombre *</Label>
-              <Input
-                value={formCatNombre}
-                onChange={(e) => setFormCatNombre(e.target.value)}
-                placeholder="Ej: Pinturas de Exterior"
-                className="h-9 text-xs"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Descripción</Label>
-              <Textarea
-                value={formCatDescripcion}
-                onChange={(e) => setFormCatDescripcion(e.target.value)}
-                placeholder="Descripción breve de la categoría"
-                className="text-xs"
-                rows={3}
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setModalCategoriaAbierto(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                size="sm"
-                className="bg-[#D24D09] hover:bg-[#b83f05] text-white text-xs"
-              >
-                {categoriaEditando ? "Guardar Cambios" : "Crear Categoría"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ALERT DIALOG: ELIMINAR CATEGORÍA */}
-      <AlertDialog open={dialogEliminarAbierto} onOpenChange={setDialogEliminarAbierto}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">¿Eliminar categoría?</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">
-              ¿Estás seguro de eliminar la categoría «<strong>{categoriaAEliminar?.nombre}</strong>
-              »? Los productos asociados quedarán sin categoría asignada.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEliminarCategoria}
-              className="bg-rose-600 hover:bg-rose-700 text-white text-xs"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
     </div>
+  );
+}
+
+function SettingSwitch({
+  id,
+  title,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="space-y-1">
+        <Label htmlFor={id}>{title}</Label>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
+function ThemeChoice({
+  value,
+  current,
+  onSelect,
+  label,
+  icon,
+}: {
+  value: "light" | "dark" | "system";
+  current: "light" | "dark" | "system";
+  onSelect: (theme: "light" | "dark" | "system") => void;
+  label: string;
+  icon: ReactNode;
+}) {
+  const selected = value === current;
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={() => onSelect(value)}
+      className={`flex min-h-20 items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent ${
+        selected
+          ? "border-indigo-600 bg-indigo-50 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100"
+          : ""
+      }`}
+    >
+      {icon}
+      <span className="font-medium">{label}</span>
+      {selected && <Check className="ml-auto h-4 w-4" aria-hidden="true" />}
+    </button>
   );
 }
