@@ -12,6 +12,7 @@ import {
   Settings,
   Sun,
   User,
+  Mail,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTheme } from "@/components/theme/theme-context";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEnviarEmail } from "@/hooks/useEnviarEmail";
 import { useMyProfile } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,6 +93,7 @@ function ConfiguracionPage() {
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<SystemSettings | null>(null);
+
   const settingsQuery = useQuery({
     queryKey: ["configuracion-sistema"],
     queryFn: getSystemSettings,
@@ -116,6 +119,8 @@ function ConfiguracionPage() {
       );
     },
   });
+
+  const testEmailMutation = useEnviarEmail();
 
   if (settingsQuery.isPending) {
     return (
@@ -472,33 +477,66 @@ function ConfiguracionPage() {
         </TabsContent>
 
         <TabsContent value="ayuda">
-          <AyudaSoporteTab />
+          <AyudaSoporteTab testEmailMutation={testEmailMutation} settings={savedSettings} />
         </TabsContent>
       </Tabs>
     </section>
   );
 }
 
-function AyudaSoporteTab() {
+function AyudaSoporteTab({
+  testEmailMutation,
+  settings,
+}: {
+  testEmailMutation: ReturnType<typeof useEnviarEmail>;
+  settings: SystemSettings;
+}) {
   const { user } = useAuth();
   const { perfil } = useMyProfile();
   const [report, setReport] = useState("");
+  const reportMutation = useEnviarEmail();
 
   const handleSubmitReport = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!report.trim()) {
+    const descripcion = report.trim();
+    if (!descripcion) {
       toast.error("Describe brevemente la incidencia antes de enviarla.");
       return;
     }
 
-    console.info("Reporte de incidencia para el administrador", {
-      descripcion: report.trim(),
-      usuario: user?.email ?? user?.id ?? "Usuario no disponible",
-      nombre: perfil?.nombre_completo ?? null,
-      fecha: new Date().toISOString(),
-    });
-    toast.success("Reporte enviado al administrador");
-    setReport("");
+    const destinatario = settings.contact_email.trim();
+    if (!destinatario) {
+      toast.error("No hay email de administrador configurado.");
+      return;
+    }
+
+    const fecha = new Date();
+    const fechaTexto = fecha.toLocaleString("es-ES");
+    const asuntoFecha = fecha.toLocaleDateString("es-ES");
+    const cuerpo = [
+      `Incidencia reportada por: ${user?.email ?? user?.id ?? "Usuario no disponible"}`,
+      `Nombre: ${perfil?.nombre_completo || "No disponible"}`,
+      `Fecha: ${fechaTexto}`,
+      "",
+      "Descripción:",
+      descripcion,
+    ].join("\n");
+
+    reportMutation.mutate(
+      {
+        destinatario,
+        asunto: `Incidencia reportada - ${asuntoFecha}`,
+        cuerpo,
+        tipo: "incidencia",
+      },
+      {
+        onSuccess: () => {
+          toast.success("Incidencia enviada al administrador.");
+          setReport("");
+        },
+        onError: (error) => toast.error(`No se pudo enviar la incidencia: ${error.message}`),
+      },
+    );
   };
 
   return (
@@ -513,6 +551,50 @@ function AyudaSoporteTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
+        {/* --- NUEVO: Sección de prueba de email --- */}
+        <section
+          aria-labelledby="test-email-heading"
+          className="space-y-3 rounded-lg border border-dashed p-4 bg-muted/30"
+        >
+          <h3 id="test-email-heading" className="text-base font-semibold flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            Prueba del sistema de notificaciones por email
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Se enviará un email de prueba a tu cuenta registrada (
+            {user?.email || "email no disponible"}).
+          </p>
+          <Button
+            variant="outline"
+            onClick={() =>
+              testEmailMutation.mutate(
+                {
+                  destinatario: user?.email ?? "",
+                  asunto: "Prueba de email desde Inventario LM",
+                  cuerpo:
+                    "¡Hola! Si estás leyendo esto, la Edge Function está funcionando correctamente con autenticación de sesión segura.",
+                },
+                {
+                  onSuccess: () =>
+                    toast.success(
+                      "Email de prueba enviado. Revisa tu bandeja de entrada (y Spam).",
+                    ),
+                  onError: (error) => toast.error(`Error al enviar: ${error.message}`),
+                },
+              )
+            }
+            disabled={testEmailMutation.isPending || !user?.email}
+          >
+            {testEmailMutation.isPending ? (
+              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="mr-2 h-4 w-4" />
+            )}
+            {testEmailMutation.isPending ? "Enviando..." : "Enviar email de prueba"}
+          </Button>
+        </section>
+        {/* ------------------------------------------- */}
+
         <section aria-labelledby="admin-contact-heading" className="space-y-3">
           <h3 id="admin-contact-heading" className="text-base font-semibold">
             Contacto del Administrador
@@ -521,12 +603,18 @@ function AyudaSoporteTab() {
             Para problemas técnicos, permisos o dudas sobre el inventario, contacta directamente con
             el administrador del sistema.
           </p>
-          <a
-            className="inline-flex min-h-10 items-center rounded-md border px-4 py-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href="mailto:admin@tuempresa.com?subject=Consulta%20sobre%20Inventario%20LM"
-          >
-            Soporte Técnico — admin@tuempresa.com
-          </a>
+          {settings.contact_email ? (
+            <a
+              className="inline-flex min-h-10 items-center rounded-md border px-4 py-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={`mailto:${settings.contact_email}?subject=Consulta%20sobre%20Inventario%20LM`}
+            >
+              Soporte Técnico — {settings.contact_email}
+            </a>
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              No configurado. Configura el email de contacto en la pestaña General.
+            </p>
+          )}
         </section>
 
         <section aria-labelledby="report-issue-heading" className="space-y-3 border-t pt-6">
@@ -547,21 +635,23 @@ function AyudaSoporteTab() {
               />
               <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                 <p id="support-report-note">
-                  El reporte incluirá el usuario actual y la fecha para ayudar al administrador.
+                  {settings.contact_email
+                    ? `El reporte se enviará por email al administrador (${settings.contact_email}).`
+                    : "No hay email de administrador configurado."}
                 </p>
                 <p id="support-report-count" aria-live="polite">
                   {report.length}/2000
                 </p>
               </div>
             </div>
-            <Button type="submit">
-              <LifeBuoy className="mr-2 h-4 w-4" aria-hidden="true" />
-              Enviar reporte al administrador
+            <Button type="submit" disabled={reportMutation.isPending || !settings.contact_email}>
+              {reportMutation.isPending ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <LifeBuoy className="mr-2 h-4 w-4" aria-hidden="true" />
+              )}
+              {reportMutation.isPending ? "Enviando..." : "Enviar reporte al administrador"}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              El envío es una confirmación simulada por ahora; posteriormente se conectará a una
-              tabla de incidencias o a un servicio de correo.
-            </p>
           </form>
         </section>
       </CardContent>

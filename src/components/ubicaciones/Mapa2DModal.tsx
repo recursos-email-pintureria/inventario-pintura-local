@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Home, Minus, Plus, Search } from "lucide-react";
+import {
+  Archive,
+  Box,
+  Building2,
+  Home,
+  Layers,
+  Minus,
+  Plus,
+  Search,
+  Shuffle,
+  Warehouse,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAddStock } from "@/hooks/useAddStock";
 import { useMapa2D } from "@/hooks/useMapa2D";
+import type { MapaVista } from "@/hooks/useMapa2D";
 import { useStockVisual } from "@/hooks/useStockVisual";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +49,35 @@ interface Mapa2DModalProps {
   onOpenManagement: (location: MapaUbicacion) => void;
 }
 
+function getLocationSearchResults(locations: MapaUbicacion[], searchText: string): MapaUbicacion[] {
+  const query = searchText.trim().toLocaleLowerCase();
+  if (!query) return [];
+
+  return locations
+    .filter(
+      (location) =>
+        location.codigo.toLocaleLowerCase().includes(query) ||
+        location.nombre.toLocaleLowerCase().includes(query),
+    )
+    .sort((first, second) => {
+      const firstExact =
+        first.codigo.toLocaleLowerCase() === query || first.nombre.toLocaleLowerCase() === query;
+      const secondExact =
+        second.codigo.toLocaleLowerCase() === query || second.nombre.toLocaleLowerCase() === query;
+      const firstStartsWith =
+        first.codigo.toLocaleLowerCase().startsWith(query) ||
+        first.nombre.toLocaleLowerCase().startsWith(query);
+      const secondStartsWith =
+        second.codigo.toLocaleLowerCase().startsWith(query) ||
+        second.nombre.toLocaleLowerCase().startsWith(query);
+      return (
+        Number(secondExact) - Number(firstExact) ||
+        Number(secondStartsWith) - Number(firstStartsWith)
+      );
+    })
+    .slice(0, 8);
+}
+
 export function Mapa2DModal({
   open,
   onOpenChange,
@@ -53,13 +94,20 @@ export function Mapa2DModal({
   const summaries = useStockVisual(locations);
   const layout = useMemo(() => getMapa2DLayout(locations), [locations]);
   const [detailLocationId, setDetailLocationId] = useState<string | null>(null);
+  const [centeredLocationId, setCenteredLocationId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
+  const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [productId, setProductId] = useState("");
   const [addQuantity, setAddQuantity] = useState("1");
   const [targetQuantity, setTargetQuantity] = useState("");
   const detailLocation = locations.find((location) => location.id === detailLocationId) ?? null;
   const detailSummary = detailLocation ? summaries.get(detailLocation.id) : undefined;
   const sections = locations.filter((location) => location.tipo === "seccion");
+  const searchResults = useMemo(
+    () => getLocationSearchResults(locations, debouncedSearchText),
+    [debouncedSearchText, locations],
+  );
   const canEditLocation = Boolean(
     detailLocation?.activo &&
     detailLocation.tipo !== "reserva" &&
@@ -78,13 +126,25 @@ export function Mapa2DModal({
     if (!open) return;
     setMapView("todo");
     setSelectedSection(null);
+    setSearchText("");
+    setDebouncedSearchText("");
+    setSearchSuggestionsOpen(false);
   }, [open, setMapView, setSelectedSection]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchText(searchText), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchText]);
 
   const selectLocation = (location: MapaUbicacion, center = false) => {
     map.selectLocation(location.id);
     onSelectLocation(location);
     setDetailLocationId(location.id);
+    setSearchText(location.codigo || location.nombre);
+    setDebouncedSearchText(location.codigo || location.nombre);
+    setSearchSuggestionsOpen(false);
     if (center) {
+      setCenteredLocationId(location.id);
       const position = layout.positions.get(location.id);
       if (position) map.centerOnLocation(location.id, position, layout.height, map.zoom);
     }
@@ -94,16 +154,7 @@ export function Mapa2DModal({
     event.preventDefault();
     const query = searchText.trim().toLocaleLowerCase();
     if (!query) return;
-    const location =
-      locations.find(
-        (item) =>
-          item.codigo.toLocaleLowerCase() === query || item.nombre.toLocaleLowerCase() === query,
-      ) ??
-      locations.find(
-        (item) =>
-          item.codigo.toLocaleLowerCase().includes(query) ||
-          item.nombre.toLocaleLowerCase().includes(query),
-      );
+    const location = getLocationSearchResults(locations, query)[0];
     if (!location) {
       toast.error("No se encontró esa ubicación");
       return;
@@ -196,35 +247,81 @@ export function Mapa2DModal({
           }}
         >
           <DialogHeader className="shrink-0 pr-8">
-            <DialogTitle>Mapa Completo del Almacén</DialogTitle>
+            <DialogTitle>Mapa 2D del almacén</DialogTitle>
             <DialogDescription>
-              Selecciona una ubicación para ver sus productos. Arrastra para desplazarte y usa la
-              rueda para acercar o alejar.
+              Vista general del almacén. Selecciona una ubicación para ver sus productos; arrastra
+              el plano o usa la rueda para acercar y alejar.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <Label htmlFor="mapa-busqueda" className="sr-only">
-                Buscar ubicación
-              </Label>
-              <Input
-                id="mapa-busqueda"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Buscar ubicación (ej. E651)"
-                className="w-full sm:w-56"
-              />
-              <Button type="submit" variant="outline" aria-label="Buscar ubicación">
-                <Search className="h-4 w-4" />
-              </Button>
-            </form>
+            <div className="relative">
+              <form onSubmit={handleSearch} className="flex gap-2">
+                <Label htmlFor="mapa-busqueda" className="sr-only">
+                  Buscar ubicación
+                </Label>
+                <Input
+                  id="mapa-busqueda"
+                  value={searchText}
+                  onFocus={() => setSearchSuggestionsOpen(true)}
+                  onChange={(event) => {
+                    setSearchText(event.target.value);
+                    setSearchSuggestionsOpen(true);
+                  }}
+                  placeholder="Buscar ubicación (ej. E651)"
+                  className="min-h-11 w-full text-base sm:w-64"
+                  autoComplete="off"
+                  role="combobox"
+                  aria-expanded={searchSuggestionsOpen && searchResults.length > 0}
+                  aria-controls="mapa-resultados-busqueda"
+                  aria-autocomplete="list"
+                />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  aria-label="Buscar ubicación"
+                  className="min-h-11 min-w-11"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </form>
+              {searchSuggestionsOpen && searchResults.length > 0 && (
+                <ul
+                  id="mapa-resultados-busqueda"
+                  role="listbox"
+                  aria-label="Ubicaciones encontradas"
+                  className="absolute left-0 top-full z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                >
+                  {searchResults.map((location) => (
+                    <li key={location.id} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={map.ubicacionSeleccionada === location.id}
+                        onClick={() => selectLocation(location, true)}
+                        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm px-3 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{location.nombre}</span>
+                          <span className="block truncate font-mono text-xs text-muted-foreground">
+                            {location.codigo}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs capitalize text-muted-foreground">
+                          {location.tipo}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <Select
                 value={map.vista}
                 onValueChange={(value) => {
-                  map.setVista(value as "todo" | "seccion" | "pasillos");
+                  map.setVista(value as MapaVista);
                   if (value === "seccion" && !map.seccionSeleccionada && sections[0]) {
                     map.setSeccionSeleccionada(sections[0].id);
                   }
@@ -280,6 +377,9 @@ export function Mapa2DModal({
             locations={locations}
             summaries={summaries}
             selectedLocationId={map.ubicacionSeleccionada ?? selectedLocationId}
+            centeredLocationId={centeredLocationId}
+            highlightedLocationId={searchResults[0]?.id ?? null}
+            hasSearchQuery={Boolean(debouncedSearchText.trim())}
             zoom={map.zoom}
             pan={map.pan}
             view={map.vista}
@@ -290,30 +390,50 @@ export function Mapa2DModal({
             onManage={handleManage}
           />
 
-          <div
-            className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
-            aria-label="Leyenda de stock"
-          >
-            <span className="font-medium text-foreground">Stock:</span>
-            <span className="flex items-center gap-1">
-              <i className="h-3 w-3 rounded-sm bg-emerald-200" />
-              Normal (&gt;20%)
-            </span>
-            <span className="flex items-center gap-1">
-              <i className="h-3 w-3 rounded-sm bg-amber-200" />
-              Medio (10–20%)
-            </span>
-            <span className="flex items-center gap-1">
-              <i className="h-3 w-3 rounded-sm bg-rose-200" />
-              Crítico (&lt;10%)
-            </span>
-            <span className="flex items-center gap-1">
-              <i className="h-3 w-3 rounded-sm bg-slate-300" />
-              Sin stock / inactivo
-            </span>
-            <span className="ml-auto">
-              Doble clic: abrir gestión completa · Capacidad predeterminada: 100 uds
-            </span>
+          <div className="shrink-0 space-y-2 border-t pt-2 text-xs text-muted-foreground">
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-1"
+              aria-label="Leyenda de tipos"
+            >
+              <span className="font-medium text-foreground">Tipos:</span>
+              <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                <Warehouse className="h-3.5 w-3.5" /> Reserva
+              </span>
+              <span className="flex items-center gap-1 text-purple-700 dark:text-purple-300">
+                <Shuffle className="h-3.5 w-3.5" /> Cross / tránsito
+              </span>
+              <span className="flex items-center gap-1 text-indigo-700 dark:text-indigo-300">
+                <Building2 className="h-3.5 w-3.5" /> Sección
+              </span>
+              <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
+                Pasillo + <Archive className="h-3.5 w-3.5 text-emerald-600" /> armarios
+              </span>
+              <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                <Layers className="h-3.5 w-3.5" /> Alto
+              </span>
+              <span className="flex items-center gap-1 text-rose-700 dark:text-rose-300">
+                <Box className="h-3.5 w-3.5" /> Caja
+              </span>
+            </div>
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-1"
+              aria-label="Leyenda de stock"
+            >
+              <span className="font-medium text-foreground">Stock:</span>
+              <span className="flex items-center gap-1">
+                <i className="h-3 w-3 rounded-sm bg-emerald-200" /> Normal (&gt;20%)
+              </span>
+              <span className="flex items-center gap-1">
+                <i className="h-3 w-3 rounded-sm bg-amber-200" /> Medio (10–20%)
+              </span>
+              <span className="flex items-center gap-1">
+                <i className="h-3 w-3 rounded-sm bg-rose-200" /> Crítico (&lt;10%)
+              </span>
+              <span className="flex items-center gap-1">
+                <i className="h-3 w-3 rounded-sm bg-slate-300" /> Sin stock / inactivo
+              </span>
+              <span className="ml-auto">Clic: detalle · Doble clic: gestión completa</span>
+            </div>
           </div>
         </DialogContent>
         <Dialog

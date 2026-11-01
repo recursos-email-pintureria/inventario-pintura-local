@@ -53,7 +53,7 @@ describe("Mapa2DModal interactions", () => {
       />,
     );
 
-    expect(await screen.findByText("Mapa Completo del Almacén")).toBeInTheDocument();
+    expect(await screen.findByText("Mapa 2D del almacén")).toBeInTheDocument();
     const mapSvg = screen.getByRole("group", { name: "Mapa interactivo del almacén" });
     expect(mapSvg).toHaveClass("h-auto");
     expect(mapSvg.parentElement).toHaveClass("overflow-auto");
@@ -61,7 +61,10 @@ describe("Mapa2DModal interactions", () => {
     expect(screen.getByRole("combobox", { name: "Filtrar vista del mapa" })).toHaveTextContent(
       "Todo el almacén",
     );
-    fireEvent.click(screen.getByRole("button", { name: /Armario E651/ }));
+    const mapNode = mapSvg.querySelector<SVGGElement>('[data-location-id="loc-e651"]');
+    expect(mapNode).not.toBeNull();
+    if (!mapNode) throw new Error("No se encontró el nodo de ubicación en el mapa");
+    fireEvent.click(mapNode);
 
     expect(await screen.findByText("Productos y stock actual")).toBeInTheDocument();
     expect(onSelectLocation).toHaveBeenCalledWith(location);
@@ -99,5 +102,68 @@ describe("Mapa2DModal interactions", () => {
         "Todo el almacén",
       );
     });
+  });
+
+  it("finds a location by its code and opens its detail from the suggestion", async () => {
+    render(
+      <Mapa2DModal
+        open
+        onOpenChange={vi.fn()}
+        locations={[location]}
+        productCatalog={[]}
+        selectedLocationId={null}
+        onSelectLocation={vi.fn()}
+        onOpenManagement={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar ubicación" }), {
+      target: { value: "E651" },
+    });
+
+    const result = await screen.findByRole("option", { name: /Armario E651/ });
+    fireEvent.click(result);
+
+    expect(await screen.findByText("Productos y stock actual")).toBeInTheDocument();
+    expect(document.querySelector('[data-location-id="loc-e651"]')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("shows a title matching the selected map section", async () => {
+    const section: MapaUbicacion = {
+      ...location,
+      id: "sec-pintura",
+      codigo: "PINT",
+      nombre: "Pintura",
+      tipo: "seccion",
+    };
+    const aisle: MapaUbicacion = {
+      ...location,
+      id: "pasillo-pintura",
+      codigo: "12",
+      nombre: "Pasillo 12",
+      tipo: "pasillo",
+      padreId: section.id,
+      seccionId: section.id,
+    };
+
+    render(
+      <Mapa2DModal
+        open
+        onOpenChange={vi.fn()}
+        locations={[section, aisle]}
+        productCatalog={[]}
+        selectedLocationId={null}
+        onSelectLocation={vi.fn()}
+        onOpenManagement={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Filtrar vista del mapa" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Por sección" }));
+
+    expect(await screen.findByText("MAPA SECCIÓN PINTURA")).toBeInTheDocument();
   });
 });
