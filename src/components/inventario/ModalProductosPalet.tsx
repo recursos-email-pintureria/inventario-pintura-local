@@ -457,6 +457,11 @@ export function ModalProductosPalet({
                     <span className="font-mono text-xs uppercase tracking-wider bg-amber-700/80 px-2 py-0.5 rounded text-amber-100 font-semibold">
                       Palet #{String(palet.numero_palet).padStart(3, "0")}
                     </span>
+                    {palet.posicion_en_reserva && palet.total_en_reserva && (
+                      <Badge className="bg-white/15 text-white border-amber-400/60 text-[10px] font-semibold">
+                        Palet {palet.posicion_en_reserva} de {palet.total_en_reserva}
+                      </Badge>
+                    )}
                     {totalUnidades === 0 && (
                       <Badge className="bg-amber-100 text-amber-900 border-none text-[10px] font-bold">
                         Stock 0

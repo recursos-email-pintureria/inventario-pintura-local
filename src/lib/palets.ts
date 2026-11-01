@@ -13,6 +13,8 @@ export interface Palet {
   creado_en: string;
   actualizado_en: string;
   reserva_nombre?: string;
+  posicion_en_reserva?: number;
+  total_en_reserva?: number;
 }
 
 export interface CrearPaletParams {

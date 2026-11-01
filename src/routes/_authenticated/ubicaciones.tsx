@@ -887,8 +887,32 @@ function UbicacionesPage() {
           cantidad: product.cantidad,
           stock_minimo: product.stock_minimo,
         })),
+        ...(location.tipo === "reserva"
+          ? {
+              palets: palets
+                .filter((pallet) => pallet.activo && pallet.id_reserva === location.id)
+                .map((pallet) => ({
+                  id: pallet.id,
+                  idReserva: pallet.id_reserva,
+                  numero: pallet.numero_palet,
+                  codigo: pallet.codigo_barras,
+                  stockTotal: pallet.productos.reduce(
+                    (total, product) => total + product.cantidad,
+                    0,
+                  ),
+                  productos: pallet.productos.map((product) => ({
+                    id: product.id,
+                    sku: product.sku,
+                    nombre: product.nombre,
+                    categoria: product.categoria,
+                    cantidad: product.cantidad,
+                    stock_minimo: product.stock_minimo,
+                  })),
+                })),
+            }
+          : {}),
       })),
-    [ubicaciones],
+    [ubicaciones, palets],
   );
 
   // Escáner con cámara dentro del panel del vendedor
@@ -1037,6 +1061,10 @@ function UbicacionesPage() {
       toast.error("Este palet no está disponible en los datos actuales de Supabase.");
       return;
     }
+    const paletsEnReserva = palets
+      .filter((item) => item.activo && item.id_reserva === registro.id_reserva)
+      .sort((first, second) => first.numero_palet - second.numero_palet);
+    const posicionEnReserva = paletsEnReserva.findIndex((item) => item.id === registro.id) + 1;
     setPaletSeleccionadoParaProductos({
       id: registro.id,
       id_reserva: registro.id_reserva,
@@ -1048,6 +1076,8 @@ function UbicacionesPage() {
       creado_en: registro.creado_en ?? "",
       actualizado_en: registro.actualizado_en ?? registro.creado_en ?? "",
       reserva_nombre: ubicacionesBD.find((ubicacion) => ubicacion.id === registro.id_reserva)?.nombre ?? "Sin reserva",
+      ...(posicionEnReserva ? { posicion_en_reserva: posicionEnReserva } : {}),
+      ...(paletsEnReserva.length ? { total_en_reserva: paletsEnReserva.length } : {}),
     });
   };
 
@@ -4110,6 +4140,14 @@ function UbicacionesPage() {
         onOpenManagement={(mapLocation) => {
           const location = ubicaciones.find((item) => item.id === mapLocation.id);
           if (location) abrirPanelVendedor(location);
+        }}
+        onManagePallet={(palletId) => {
+          const pallet = palets.find((item) => item.id === palletId);
+          if (pallet) {
+            abrirGestionPalet(pallet);
+          } else {
+            toast.error("Este palet ya no está activo en la reserva.");
+          }
         }}
       />
     </div>

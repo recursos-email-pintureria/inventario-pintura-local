@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { getMapa2DLayout, type MapaUbicacion } from "@/components/ubicaciones/mapa2d-layout";
+import {
+  getMapa2DLayout,
+  getMapaStockLevel,
+  getMapaTipoVisual,
+  type MapaUbicacion,
+} from "@/components/ubicaciones/mapa2d-layout";
 
 const location = (
-  fields: Pick<MapaUbicacion, "id" | "nombre" | "tipo"> & Partial<MapaUbicacion>,
+  fields: Pick<MapaUbicacion, "id" | "codigo" | "nombre" | "tipo"> & Partial<MapaUbicacion>,
 ): MapaUbicacion => ({
-  codigo: fields.id,
   padreId: null,
   seccionId: null,
   lateral: null,
@@ -15,202 +19,34 @@ const location = (
   ...fields,
 });
 
-describe("getMapa2DLayout", () => {
-  it("agrupa pasillos, reservas y cruces en sus zonas correspondientes", () => {
-    const locations = [
-      location({ id: "sec-1", nombre: "Pintura", tipo: "seccion" }),
-      location({
-        id: "pas-1",
-        nombre: "Pasillo A1",
-        tipo: "pasillo",
-        padreId: "sec-1",
-        seccionId: "sec-1",
-      }),
-      location({
-        id: "arm-1",
-        nombre: "Armario A1-01",
-        tipo: "armario",
-        padreId: "pas-1",
-        lateral: "izquierda",
-      }),
-      location({
-        id: "cross-1",
-        nombre: "Cross A1",
-        tipo: "cross",
-        padreId: "pas-1",
-      }),
-      location({
-        id: "res-1",
-        nombre: "Reserva",
-        tipo: "reserva",
-        padreId: "sec-1",
-        seccionId: "sec-1",
-      }),
-    ];
-
-    const layout = getMapa2DLayout(locations);
-
-    expect(layout.sections).toHaveLength(1);
-    expect(layout.sections[0]?.aisles[0]?.location.id).toBe("pas-1");
-    expect(layout.sections[0]?.aisles[0]?.leftChildren.map((item) => item.id)).toEqual(["arm-1"]);
-    expect(layout.sections[0]?.aisles[0]?.rightChildren).toEqual([]);
-    expect(layout.reserves.ubicaciones.map((item) => item.id)).toEqual(["res-1"]);
-    expect(layout.perimeter.ubicaciones.map((item) => item.id)).toEqual(["cross-1"]);
-    expect([...layout.positions.keys()]).toEqual(
-      expect.arrayContaining(locations.map((item) => item.id)),
-    );
-  });
-
-  it("mantiene ubicaciones sin sección en un grupo accesible", () => {
-    const standalone = location({ id: "caja-1", nombre: "Caja 1", tipo: "caja" });
-
-    const layout = getMapa2DLayout([standalone]);
-
-    expect(layout.boxes.ubicaciones.map((item) => item.id)).toContain(standalone.id);
-    expect(layout.positions.has(standalone.id)).toBe(true);
-  });
-
-  it("coloca primero la sección con más ubicaciones para que el mapa abra sobre el área ocupada", () => {
-    const emptySection = location({ id: "sec-empty", nombre: "Vacía", tipo: "seccion" });
-    const populatedSection = location({ id: "sec-stock", nombre: "Pintura", tipo: "seccion" });
-    const aisle = location({
-      id: "pasillo-stock",
-      nombre: "Pasillo A1",
-      tipo: "pasillo",
-      padreId: populatedSection.id,
-    });
-    const child = location({
-      id: "armario-stock",
-      nombre: "Armario E651",
+function armories(
+  from: number,
+  to: number,
+  aisle: MapaUbicacion,
+  side: "izquierda" | "derecha",
+): MapaUbicacion[] {
+  return Array.from({ length: to - from + 1 }, (_, index) => {
+    const code = `E${from + index}`;
+    return location({
+      id: code,
+      codigo: code,
+      nombre: `Armario ${code}`,
       tipo: "armario",
       padreId: aisle.id,
+      seccionId: aisle.seccionId,
+      lateral: side,
     });
-
-    const layout = getMapa2DLayout([emptySection, populatedSection, aisle, child]);
-
-    expect(layout.sections[0]?.id).toBe(populatedSection.id);
-    expect(layout.positions.has(child.id)).toBe(true);
   });
+}
 
-  it("mantiene cada lado del pasillo en una sola columna vertical ordenada por código", () => {
-    const section = location({ id: "sec-1", nombre: "Pintura", tipo: "seccion" });
-    const aisle = location({
-      id: "pas-1",
-      codigo: "12",
-      nombre: "Pasillo 12",
-      tipo: "pasillo",
-      padreId: section.id,
-    });
-    const rightChildren = Array.from({ length: 10 }, (_, index) =>
-      location({
-        id: `right-${index}`,
-        codigo: `E${651 + index}`,
-        nombre: `Armario E${651 + index}`,
-        tipo: "armario",
-        padreId: aisle.id,
-        lateral: "derecha",
-      }),
-    );
-    const leftChildren = Array.from({ length: 10 }, (_, index) =>
-      location({
-        id: `left-${index}`,
-        codigo: `E${661 + index}`,
-        nombre: `Armario E${661 + index}`,
-        tipo: "armario",
-        padreId: aisle.id,
-        lateral: "izquierda",
-      }),
-    );
-
-    const layout = getMapa2DLayout([section, aisle, ...rightChildren, ...leftChildren]);
-    const positionedAisle = layout.sections[0]?.aisles[0];
-
-    expect(positionedAisle?.leftChildren.map((child) => child.codigo)).toEqual(
-      leftChildren.map((child) => child.codigo),
-    );
-    expect(positionedAisle?.rightChildren.map((child) => child.codigo)).toEqual(
-      rightChildren.map((child) => child.codigo),
-    );
-    expect(positionedAisle?.childHeight).toBeGreaterThanOrEqual(25);
-    expect(positionedAisle?.childGap).toBe(2);
-    expect(rightChildren.every((child) => layout.positions.has(child.id))).toBe(true);
-    expect(leftChildren.every((child) => layout.positions.has(child.id))).toBe(true);
-    expect(layout.positions.get(rightChildren[0]!.id)?.y).toBeLessThan(
-      layout.positions.get(rightChildren[9]!.id)!.y,
-    );
-    expect(layout.positions.get(leftChildren[0]!.id)?.y).toBeLessThan(
-      layout.positions.get(leftChildren[9]!.id)!.y,
-    );
-    expect(positionedAisle?.leftX).toBeLessThan(positionedAisle!.x);
-    expect(positionedAisle?.rightX).toBeGreaterThan(positionedAisle!.x);
-  });
-
-  it("ordena pasillos físicamente del número mayor a la izquierda al menor a la derecha", () => {
-    const firstAisle = location({
-      id: "pasillo-12",
-      codigo: "12",
-      nombre: "Pasillo 12",
-      tipo: "pasillo",
-    });
-    const secondAisle = location({
-      id: "pasillo-20",
-      codigo: "20",
-      nombre: "Pasillo 20",
-      tipo: "pasillo",
-    });
-    const firstChild = location({
-      id: "armario-a",
-      nombre: "Armario A",
-      tipo: "armario",
-      padreId: firstAisle.id,
-      productos: [
-        {
-          id: "prod-a",
-          sku: "A",
-          nombre: "Producto A",
-          categoria: "",
-          cantidad: 1,
-          stock_minimo: 0,
-        },
-      ],
-    });
-    const secondChild = location({
-      id: "armario-b",
-      nombre: "Armario B",
-      tipo: "armario",
-      padreId: secondAisle.id,
-      productos: [
-        {
-          id: "prod-b",
-          sku: "B",
-          nombre: "Producto B",
-          categoria: "",
-          cantidad: 1,
-          stock_minimo: 0,
-        },
-        {
-          id: "prod-c",
-          sku: "C",
-          nombre: "Producto C",
-          categoria: "",
-          cantidad: 1,
-          stock_minimo: 0,
-        },
-      ],
-    });
-
-    const layout = getMapa2DLayout([firstAisle, secondAisle, firstChild, secondChild]);
-
-    expect(layout.sections[0]?.nombre).toBe("Otras ubicaciones");
-    expect(layout.sections[0]?.aisles[0]?.location.id).toBe(secondAisle.id);
-    expect(layout.sections[0]?.aisles[1]?.location.id).toBe(firstAisle.id);
-    expect(layout.positions.get(secondAisle.id)?.x).toBeLessThan(
-      layout.positions.get(firstAisle.id)!.x,
-    );
-  });
-
+describe("getMapa2DLayout", () => {
   it("coloca los pasillos 20, 18, 16, 14 y 12 de izquierda a derecha", () => {
-    const section = location({ id: "sec-pintura", nombre: "Pintura", tipo: "seccion" });
+    const section = location({
+      id: "sec-pintura",
+      codigo: "PINT",
+      nombre: "Pintura",
+      tipo: "seccion",
+    });
     const aisles = [12, 14, 16, 18, 20].map((number) =>
       location({
         id: `pasillo-${number}`,
@@ -221,44 +57,278 @@ describe("getMapa2DLayout", () => {
         seccionId: section.id,
       }),
     );
-    const layout = getMapa2DLayout([section, ...aisles]);
-    const sortedAisles = layout.sections[0]?.aisles ?? [];
 
-    expect(sortedAisles.map((item) => item.location.codigo)).toEqual([
+    const layout = getMapa2DLayout([section, ...aisles]);
+
+    expect(layout.aisles.map((item) => item.location.codigo)).toEqual([
       "20",
       "18",
       "16",
       "14",
       "12",
     ]);
-    expect(sortedAisles.map((item) => item.x)).toEqual(
-      [...sortedAisles.map((item) => item.x)].sort((first, second) => first - second),
+    expect(layout.aisles.map((item) => item.x)).toEqual(
+      [...layout.aisles.map((item) => item.x)].sort((first, second) => first - second),
     );
   });
 
-  it("coloca las ubicaciones perimetrales en una fila horizontal ordenada", () => {
-    const crossings = ["E744", "E741", "E743", "E742"].map((codigo) =>
+  it("posiciona armarios de los cinco pasillos según el plano exacto", () => {
+    const aisles = [12, 14, 16, 18, 20].map((number) =>
       location({
-        id: codigo,
-        codigo,
-        nombre: `Cross ${codigo}`,
-        tipo: "cross",
+        id: `pasillo-${number}`,
+        codigo: String(number),
+        nombre: `Pasillo ${number}`,
+        tipo: "pasillo",
       }),
     );
-    const layout = getMapa2DLayout(crossings);
+    const allArmories = [
+      ...armories(651, 658, aisles[0]!, "derecha"),
+      ...armories(659, 670, aisles[0]!, "izquierda"),
+      ...armories(671, 683, aisles[1]!, "derecha"),
+      ...armories(684, 697, aisles[1]!, "izquierda"),
+      ...armories(698, 710, aisles[2]!, "derecha"),
+      ...armories(711, 716, aisles[2]!, "izquierda"),
+      ...armories(717, 728, aisles[3]!, "derecha"),
+      ...armories(729, 734, aisles[3]!, "izquierda"),
+    ];
+    const layout = getMapa2DLayout([...aisles, ...allArmories]);
+    const layoutByAisle = new Map(
+      layout.aisles.map((aisle) => [Number(aisle.location.codigo), aisle]),
+    );
 
-    expect(layout.perimeter.ubicaciones.map((item) => item.codigo)).toEqual([
+    const aisleLocations: Array<[number, number, number, number, number]> = [
+      [12, 651, 658, 659, 670],
+      [14, 671, 683, 684, 697],
+      [16, 698, 710, 711, 716],
+      [18, 717, 728, 729, 734],
+    ];
+    for (const [aisleNo, rightFrom, rightTo, leftFrom, leftTo] of aisleLocations) {
+      const aisle = layoutByAisle.get(aisleNo);
+      expect(aisle?.rightChildren.map((item) => item.codigo)).toEqual(
+        Array.from({ length: rightTo - rightFrom + 1 }, (_, index) => `E${rightFrom + index}`),
+      );
+      expect(aisle?.leftChildren.map((item) => item.codigo)).toEqual(
+        Array.from({ length: leftTo - leftFrom + 1 }, (_, index) => `E${leftFrom + index}`),
+      );
+      expect(aisle?.armoryHeight).toBeGreaterThanOrEqual(25);
+      expect(aisle?.armoryGap).toBe(2);
+      expect(aisle?.leftX).toBeLessThan(aisle!.x);
+      expect(aisle?.rightX).toBeGreaterThan(aisle!.x);
+    }
+
+    const aisle12 = layoutByAisle.get(12)!;
+    expect(layout.positions.get(aisle12.rightChildren[0]!.id)!.y).toBeGreaterThan(
+      layout.positions.get(aisle12.rightChildren.at(-1)!.id)!.y,
+    );
+    expect(layout.positions.get(aisle12.leftChildren[0]!.id)!.y).toBeLessThan(
+      layout.positions.get(aisle12.leftChildren.at(-1)!.id)!.y,
+    );
+
+    for (const aisleNo of [14, 16, 18]) {
+      const aisle = layoutByAisle.get(aisleNo)!;
+      expect(layout.positions.get(aisle.rightChildren[0]!.id)!.y).toBeGreaterThan(
+        layout.positions.get(aisle.rightChildren.at(-1)!.id)!.y,
+      );
+      expect(layout.positions.get(aisle.leftChildren[0]!.id)!.y).toBeGreaterThan(
+        layout.positions.get(aisle.leftChildren.at(-1)!.id)!.y,
+      );
+    }
+  });
+
+  it("ordena el perimetral E735-E744 de derecha a izquierda y lo separa de pasillos", () => {
+    const locations = Array.from({ length: 10 }, (_, index) => {
+      const code = `E${735 + index}`;
+      return location({
+        id: code,
+        codigo: code,
+        nombre: `Armario ${code}`,
+        tipo: "armario",
+      });
+    }).reverse();
+    const layout = getMapa2DLayout(locations);
+
+    expect(layout.perimeterLocations.map((item) => item.codigo)).toEqual([
+      "E735",
+      "E736",
+      "E737",
+      "E738",
+      "E739",
+      "E740",
       "E741",
       "E742",
       "E743",
       "E744",
     ]);
-    const positions = crossings
-      .sort((first, second) => first.codigo.localeCompare(second.codigo, "es", { numeric: true }))
-      .map((item) => layout.positions.get(item.id)!);
-    expect(new Set(positions.map((position) => position.y)).size).toBe(1);
-    expect(positions.map((position) => position.x)).toEqual(
-      [...positions.map((position) => position.x)].sort((first, second) => first - second),
+    const xPositions = layout.perimeterLocations.map((item) => layout.positions.get(item.id)!.x);
+    expect(xPositions).toEqual([...xPositions].sort((first, second) => second - first));
+    expect(
+      new Set(layout.perimeterLocations.map((item) => layout.positions.get(item.id)!.y)),
+    ).toHaveProperty("size", 1);
+    expect(layout.aisles).toHaveLength(0);
+    expect(layout.reserves).toHaveLength(0);
+    expect(getMapaTipoVisual(locations[0]!)).toBe("perimetral");
+  });
+
+  it("mantiene visible la zona perimetral aunque no tenga ubicaciones hijas", () => {
+    const perimeter = location({
+      id: "pasillo-perimetral",
+      codigo: "PERIMETRAL-(HER",
+      nombre: "Perimetral (Herramientas)",
+      tipo: "pasillo",
+    });
+
+    const layout = getMapa2DLayout([perimeter]);
+
+    expect(layout.perimeterAisle?.id).toBe(perimeter.id);
+    expect(layout.aisles).toHaveLength(0);
+    expect(layout.perimeterLocations).toHaveLength(0);
+  });
+
+  it("ubica en el perimetral sus ubicaciones hijas E735-E744", () => {
+    const perimeter = location({
+      id: "pasillo-perimetral",
+      codigo: "PERIMETRAL",
+      nombre: "Perimetral (Herramientas)",
+      tipo: "pasillo",
+    });
+    const children = Array.from({ length: 10 }, (_, index) => {
+      const code = `E${735 + index}`;
+      return location({
+        id: code,
+        codigo: code,
+        nombre: `Armario ${code}`,
+        tipo: "armario",
+        padreId: perimeter.id,
+      });
+    });
+
+    const layout = getMapa2DLayout([perimeter, ...children]);
+
+    expect(layout.perimeterLocations.map((item) => item.codigo)).toEqual([
+      "E735",
+      "E736",
+      "E737",
+      "E738",
+      "E739",
+      "E740",
+      "E741",
+      "E742",
+      "E743",
+      "E744",
+    ]);
+  });
+
+  it("coloca cruces al inicio derecho y al final izquierdo de cada pasillo", () => {
+    const aisle = location({
+      id: "pas-12",
+      codigo: "12",
+      nombre: "Pasillo 12",
+      tipo: "pasillo",
+    });
+    const crosses = ["X01", "X02"].map((code) =>
+      location({
+        id: code,
+        codigo: code,
+        nombre: `Cross ${code}`,
+        tipo: "cross",
+        padreId: aisle.id,
+      }),
     );
+    const layout = getMapa2DLayout([aisle, ...crosses]);
+    const aisleLayout = layout.aisles[0]!;
+    const start = layout.positions.get(aisleLayout.startCrosses[0]!.id)!;
+    const end = layout.positions.get(aisleLayout.endCrosses[0]!.id)!;
+
+    expect(aisleLayout.startCrosses.map((item) => item.codigo)).toEqual(["X01"]);
+    expect(aisleLayout.endCrosses.map((item) => item.codigo)).toEqual(["X02"]);
+    expect(start.x).toBeGreaterThan(end.x);
+    expect(start.y).toBeLessThan(end.y);
+  });
+
+  it("cuenta productos únicos en el resumen del pasillo", () => {
+    const aisle = location({
+      id: "pasillo-12",
+      codigo: "12",
+      nombre: "Pasillo 12",
+      tipo: "pasillo",
+    });
+    const product = {
+      id: "prod-1",
+      sku: "SKU-1",
+      nombre: "Producto",
+      categoria: "Pintura",
+      cantidad: 3,
+      stock_minimo: 1,
+    };
+    const armory = location({
+      id: "E651",
+      codigo: "E651",
+      nombre: "Armario E651",
+      tipo: "armario",
+      padreId: aisle.id,
+      productos: [product],
+    });
+    const secondArmory = location({
+      id: "E652",
+      codigo: "E652",
+      nombre: "Armario E652",
+      tipo: "armario",
+      padreId: aisle.id,
+      productos: [{ ...product, cantidad: 5 }],
+    });
+
+    const layout = getMapa2DLayout([aisle, armory, secondArmory]);
+
+    expect(layout.aisles[0]?.cantidadProductos).toBe(1);
+    expect(layout.aisles[0]?.totalUnidades).toBe(8);
+  });
+
+  it("coloca la reserva debajo de los pasillos y palets dentro de su zona", () => {
+    const aisle = location({
+      id: "pas-12",
+      codigo: "12",
+      nombre: "Pasillo 12",
+      tipo: "pasillo",
+    });
+    const reserve = location({
+      id: "reserva",
+      codigo: "RES",
+      nombre: "Reserva",
+      tipo: "reserva",
+      palets: Array.from({ length: 4 }, (_, index) => ({
+        id: `palet-${index + 1}`,
+        idReserva: "reserva",
+        numero: index + 1,
+        codigo: `PAL-${index + 1}`,
+        stockTotal: 10,
+        productos: [],
+      })),
+    });
+    const layout = getMapa2DLayout([aisle, reserve]);
+
+    expect(layout.reserves[0]?.y).toBeGreaterThan(layout.aisles[0]!.y + layout.aisles[0]!.height);
+    for (const pallet of reserve.palets ?? []) {
+      const position = layout.positions.get(pallet.id);
+      expect(position?.x).toBeGreaterThan(layout.reserves[0]!.x);
+      expect(position?.x).toBeLessThan(layout.reserves[0]!.x + layout.reserves[0]!.width);
+      expect(position?.y).toBeGreaterThan(layout.reserves[0]!.y);
+      expect(position?.y).toBeLessThan(layout.reserves[0]!.y + layout.reserves[0]!.height);
+    }
+  });
+
+  it("calcula el nivel visual de stock de palets sin stock, bajo, medio y normal", () => {
+    const product = {
+      id: "prod-1",
+      sku: "SKU-1",
+      nombre: "Producto",
+      categoria: "Pintura",
+      cantidad: 0,
+      stock_minimo: 5,
+    };
+
+    expect(getMapaStockLevel([], 0)).toBe("vacio");
+    expect(getMapaStockLevel([{ ...product, cantidad: 4 }], 4)).toBe("critico");
+    expect(getMapaStockLevel([{ ...product, cantidad: 8 }], 8)).toBe("medio");
+    expect(getMapaStockLevel([{ ...product, cantidad: 20 }], 20)).toBe("normal");
   });
 });

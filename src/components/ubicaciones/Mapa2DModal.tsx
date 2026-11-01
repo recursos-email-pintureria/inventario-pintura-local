@@ -47,6 +47,7 @@ interface Mapa2DModalProps {
   selectedLocationId: string | null;
   onSelectLocation: (location: MapaUbicacion) => void;
   onOpenManagement: (location: MapaUbicacion) => void;
+  onManagePallet: (palletId: string) => void;
 }
 
 function getLocationSearchResults(locations: MapaUbicacion[], searchText: string): MapaUbicacion[] {
@@ -86,6 +87,7 @@ export function Mapa2DModal({
   selectedLocationId,
   onSelectLocation,
   onOpenManagement,
+  onManagePallet,
 }: Mapa2DModalProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -94,7 +96,6 @@ export function Mapa2DModal({
   const summaries = useStockVisual(locations);
   const layout = useMemo(() => getMapa2DLayout(locations), [locations]);
   const [detailLocationId, setDetailLocationId] = useState<string | null>(null);
-  const [centeredLocationId, setCenteredLocationId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
@@ -137,6 +138,10 @@ export function Mapa2DModal({
   }, [searchText]);
 
   const selectLocation = (location: MapaUbicacion, center = false) => {
+    if (center) {
+      map.setVista("todo");
+      map.setSeccionSeleccionada(null);
+    }
     map.selectLocation(location.id);
     onSelectLocation(location);
     setDetailLocationId(location.id);
@@ -144,9 +149,9 @@ export function Mapa2DModal({
     setDebouncedSearchText(location.codigo || location.nombre);
     setSearchSuggestionsOpen(false);
     if (center) {
-      setCenteredLocationId(location.id);
       const position = layout.positions.get(location.id);
-      if (position) map.centerOnLocation(location.id, position, layout.height, map.zoom);
+      if (position)
+        map.centerOnLocation(location.id, position, layout.width, layout.height, map.zoom);
     }
   };
 
@@ -229,6 +234,14 @@ export function Mapa2DModal({
     onOpenChange(false);
     setDetailLocationId(null);
     onOpenManagement(location);
+  };
+
+  const closeLocationDetail = () => {
+    setDetailLocationId(null);
+    setSearchText("");
+    setDebouncedSearchText("");
+    setSearchSuggestionsOpen(false);
+    map.selectLocation(null);
   };
 
   return (
@@ -356,9 +369,20 @@ export function Mapa2DModal({
               <Button variant="outline" size="icon" aria-label="Alejar mapa" onClick={map.zoomOut}>
                 <Minus className="h-4 w-4" />
               </Button>
-              <span className="min-w-12 text-center text-sm tabular-nums" aria-live="polite">
-                {Math.round(map.zoom * 100)}%
-              </span>
+              {[0.25, 0.5, 0.75, 1, 1.5, 2].map((zoom) => (
+                <Button
+                  key={zoom}
+                  type="button"
+                  size="sm"
+                  variant={map.zoom === zoom ? "default" : "outline"}
+                  aria-label={`Zoom ${Math.round(zoom * 100)}%`}
+                  aria-pressed={map.zoom === zoom}
+                  onClick={() => map.setZoom(zoom)}
+                  className="min-h-11 px-2 tabular-nums"
+                >
+                  {Math.round(zoom * 100)}%
+                </Button>
+              ))}
               <Button variant="outline" size="icon" aria-label="Acercar mapa" onClick={map.zoomIn}>
                 <Plus className="h-4 w-4" />
               </Button>
@@ -377,7 +401,6 @@ export function Mapa2DModal({
             locations={locations}
             summaries={summaries}
             selectedLocationId={map.ubicacionSeleccionada ?? selectedLocationId}
-            centeredLocationId={centeredLocationId}
             highlightedLocationId={searchResults[0]?.id ?? null}
             hasSearchQuery={Boolean(debouncedSearchText.trim())}
             zoom={map.zoom}
@@ -388,6 +411,10 @@ export function Mapa2DModal({
             onPanChange={map.setPan}
             onSelect={(location) => selectLocation(location)}
             onManage={handleManage}
+            onManagePallet={(palletId) => {
+              onOpenChange(false);
+              onManagePallet(palletId);
+            }}
           />
 
           <div className="shrink-0 space-y-2 border-t pt-2 text-xs text-muted-foreground">
@@ -439,7 +466,7 @@ export function Mapa2DModal({
         <Dialog
           open={Boolean(detailLocation)}
           onOpenChange={(isOpen) => {
-            if (!isOpen) setDetailLocationId(null);
+            if (!isOpen) closeLocationDetail();
           }}
         >
           <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">

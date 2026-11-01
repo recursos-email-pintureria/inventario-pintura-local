@@ -7,8 +7,8 @@ export interface MapaPosition {
 
 export type MapaVista = "todo" | "seccion" | "pasillos";
 
-const MIN_ZOOM = 0.4;
-const MAX_ZOOM = 2.5;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2;
 
 export function useMapa2D() {
   const [zoom, setZoom] = useState(1);
@@ -31,10 +31,16 @@ export function useMapa2D() {
   }, []);
 
   const centerOnLocation = useCallback(
-    (locationId: string, position: MapaPosition, canvasHeight: number, currentZoom: number) => {
+    (
+      locationId: string,
+      position: MapaPosition,
+      canvasWidth: number,
+      canvasHeight: number,
+      currentZoom: number,
+    ) => {
       setUbicacionSeleccionada(locationId);
       setPan({
-        x: (600 - position.x) * currentZoom,
+        x: (canvasWidth / 2 - position.x) * currentZoom,
         y: (canvasHeight / 2 - position.y) * currentZoom,
       });
     },

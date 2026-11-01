@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { PointerEvent, WheelEvent } from "react";
 import {
   Archive,
@@ -12,21 +12,21 @@ import {
 } from "lucide-react";
 import type { MapaVista } from "@/hooks/useMapa2D";
 import type { StockVisualSummary } from "@/hooks/useStockVisual";
-import type {
-  MapaGrupoLayout,
-  MapaPasilloLayout,
-  MapaSeccionLayout,
-  MapaTipoUbicacion,
-  MapaUbicacion,
+import {
+  getMapaStockLevel,
+  getMapaTipoVisual,
+  type Mapa2DLayout,
+  type MapaPalet,
+  type MapaTipoUbicacion,
+  type MapaUbicacion,
 } from "./mapa2d-layout";
 import { getMapa2DLayout } from "./mapa2d-layout";
-export type { MapaProducto, MapaTipoUbicacion, MapaUbicacion } from "./mapa2d-layout";
+export type { MapaPalet, MapaProducto, MapaTipoUbicacion, MapaUbicacion } from "./mapa2d-layout";
 
 interface Mapa2DProps {
   locations: MapaUbicacion[];
   summaries: Map<string, StockVisualSummary>;
   selectedLocationId: string | null;
-  centeredLocationId: string | null;
   highlightedLocationId: string | null;
   hasSearchQuery: boolean;
   zoom: number;
@@ -37,6 +37,7 @@ interface Mapa2DProps {
   onPanChange: (pan: { x: number; y: number }) => void;
   onSelect: (location: MapaUbicacion) => void;
   onManage: (location: MapaUbicacion) => void;
+  onManagePallet: (palletId: string) => void;
 }
 
 const TYPE_LABELS: Record<MapaTipoUbicacion, string> = {
@@ -47,22 +48,25 @@ const TYPE_LABELS: Record<MapaTipoUbicacion, string> = {
   alto: "Alto",
   caja: "Caja",
   cross: "Cross / tránsito",
+  perimetral: "Perimetral",
 };
 
-const GROUP_HEADER_HEIGHT = 42;
+const CONTENT_X = 32;
+const TITLE_Y = 26;
 
 const STOCK_CLASSES: Record<StockVisualSummary["nivel"], string> = {
   normal: "fill-emerald-100 stroke-emerald-500 dark:fill-emerald-950 dark:stroke-emerald-700",
   medio: "fill-amber-100 stroke-amber-500 dark:fill-amber-950 dark:stroke-amber-700",
   critico: "fill-rose-100 stroke-rose-500 dark:fill-rose-950 dark:stroke-rose-700",
-  vacio: "fill-slate-100 stroke-slate-400 dark:fill-slate-800 dark:stroke-slate-600",
-  inactivo: "fill-slate-200 stroke-slate-500 dark:fill-slate-700 dark:stroke-slate-500",
+  vacio: "fill-gray-100 stroke-gray-400 dark:fill-gray-800 dark:stroke-gray-600",
+  inactivo: "fill-gray-200 stroke-gray-500 dark:fill-gray-700 dark:stroke-gray-500",
 };
 
-const TYPE_CLASSES: Partial<Record<MapaTipoUbicacion, string>> = {
-  reserva: "fill-amber-100 stroke-amber-500 dark:fill-amber-950 dark:stroke-amber-700",
-  cross: "fill-purple-100 stroke-purple-500 dark:fill-purple-950 dark:stroke-purple-700",
-  caja: "fill-rose-100 stroke-rose-500 dark:fill-rose-950 dark:stroke-rose-700",
+const FIXED_TYPE_CLASSES: Partial<Record<MapaTipoUbicacion, string>> = {
+  pasillo: "fill-blue-50 stroke-blue-300 dark:fill-blue-950 dark:stroke-blue-700",
+  reserva: "fill-orange-50 stroke-orange-300 dark:fill-orange-950 dark:stroke-orange-700",
+  cross: "fill-purple-50 stroke-purple-300 dark:fill-purple-950 dark:stroke-purple-700",
+  perimetral: "fill-gray-50 stroke-gray-300 dark:fill-gray-800 dark:stroke-gray-600",
 };
 
 export function LocationIcon({ type }: { type: MapaTipoUbicacion }) {
@@ -78,42 +82,62 @@ export function LocationIcon({ type }: { type: MapaTipoUbicacion }) {
 }
 
 function truncateText(text: string, width: number, fontSize: number): string {
-  const maxCharacters = Math.max(4, Math.floor(width / (fontSize * 0.58)));
+  const maxCharacters = Math.max(3, Math.floor(width / (fontSize * 0.58)));
   if (text.length <= maxCharacters) return text;
   return `${text.slice(0, maxCharacters - 1).trimEnd()}…`;
 }
 
-function locationTooltip(
-  location: MapaUbicacion,
-  locationsById: Map<string, MapaUbicacion>,
-  summary: StockVisualSummary | undefined,
-) {
-  if (location.padreId && location.lateral) {
-    const parent = locationsById.get(location.padreId);
-    if (parent?.tipo === "pasillo") {
-      const side = location.lateral.toLocaleLowerCase() === "izquierda" ? "Izquierdo" : "Derecho";
-      const aisleName = parent.codigo || parent.nombre;
-      const aisleLabel = /^pasillo\b/i.test(aisleName) ? aisleName : `Pasillo ${aisleName}`;
-      return `${location.codigo || location.nombre} - Lado ${side} del ${aisleLabel}`;
-    }
-  }
-
-  const products = location.productos
-    .slice(0, 3)
-    .map((product) => `${product.nombre}: ${product.cantidad}`)
-    .join(", ");
-  return `${location.nombre} (${TYPE_LABELS[location.tipo]}) · ${summary?.total ?? 0} uds · ${summary?.productosCount ?? 0} productos${products ? ` · ${products}` : ""}`;
+function displayCode(location: MapaUbicacion): string {
+  return location.codigo || location.nombre;
 }
 
-function groupHeading(group: MapaGrupoLayout): string {
-  return `${group.nombre.toLocaleUpperCase()} (${group.ubicaciones.length} ${group.ubicaciones.length === 1 ? "ubicación" : "ubicaciones"}, ${group.cantidadProductos} productos)`;
+function groupBySection(
+  location: MapaUbicacion,
+  sectionId: string,
+  locationsById: Map<string, MapaUbicacion>,
+): boolean {
+  let current: MapaUbicacion | undefined = location;
+  const visited = new Set<string>();
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    if (current.tipo === "seccion") return current.id === sectionId;
+    if (current.seccionId) return current.seccionId === sectionId;
+    current = current.padreId ? locationsById.get(current.padreId) : undefined;
+  }
+  return true;
+}
+
+function getPalletColorClass(pallet: MapaPalet): string {
+  const level = getMapaStockLevel(pallet.productos, pallet.stockTotal);
+  if (level === "normal") return STOCK_CLASSES.normal;
+  if (level === "medio") return STOCK_CLASSES.medio;
+  if (level === "critico") return STOCK_CLASSES.critico;
+  return STOCK_CLASSES.vacio;
+}
+
+function palletTileSize(
+  layout: Mapa2DLayout,
+  location: MapaUbicacion,
+  reservation: (typeof layout.reserves)[number],
+): number {
+  const count = location.palets?.length ?? 0;
+  if (count === 0) return 0;
+  const columns = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / columns);
+  const gap = 2;
+  const reservationWidth = reservation.width - 40;
+  const reservationHeight = reservation.height - 52;
+  return Math.min(
+    Math.min(reservationWidth, reservationHeight) / Math.sqrt(count),
+    (reservationWidth - gap * (columns - 1)) / columns,
+    (reservationHeight - gap * (rows - 1)) / rows,
+  );
 }
 
 export function Mapa2D({
   locations,
   summaries,
   selectedLocationId,
-  centeredLocationId,
   highlightedLocationId,
   hasSearchQuery,
   zoom,
@@ -124,6 +148,7 @@ export function Mapa2D({
   onPanChange,
   onSelect,
   onManage,
+  onManagePallet,
 }: Mapa2DProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
@@ -133,20 +158,13 @@ export function Mapa2D({
     () => new Map(locations.map((location) => [location.id, location])),
     [locations],
   );
-  const visibleSections = layout.sections.filter(
-    (section) => view !== "seccion" || !sectionId || section.id === sectionId,
+  const visibleAisles = layout.aisles.filter(
+    (aisle) =>
+      view !== "seccion" || !sectionId || groupBySection(aisle.location, sectionId, locationsById),
   );
 
-  useEffect(() => {
-    if (!centeredLocationId) return;
-    const node = Array.from(
-      svgRef.current?.querySelectorAll<SVGGElement>("[data-location-id]") ?? [],
-    ).find((element) => element.dataset["locationId"] === centeredLocationId);
-    node?.scrollIntoView?.({ block: "center", inline: "center", behavior: "smooth" });
-  }, [centeredLocationId]);
-
   const startDrag = (event: PointerEvent<SVGSVGElement>) => {
-    if (event.button !== 0 || (event.target as Element).closest("[data-mapa-ubicacion]")) return;
+    if (event.button !== 0 || (event.target as Element).closest("[data-mapa-node]")) return;
     dragStart.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -176,58 +194,60 @@ export function Mapa2D({
     onZoom(event.deltaY < 0 ? 1 : -1);
   };
 
-  const renderNode = (
+  const renderLocation = (
     location: MapaUbicacion,
     x: number,
     y: number,
     width: number,
     height: number,
-    options: {
-      label?: string;
-      centered?: boolean;
-      aisle?: boolean;
-      productCount?: number;
-      totalUnits?: number;
-    } = {},
+    options: { label?: string; vertical?: boolean; perimeter?: boolean } = {},
   ) => {
+    const visualType = getMapaTipoVisual(location);
     const summary = summaries.get(location.id);
     const selected = selectedLocationId === location.id;
     const highlighted = highlightedLocationId === location.id;
     const dimmed = hasSearchQuery && !highlighted;
-    const fillClass = options.aisle
-      ? "fill-slate-100 stroke-slate-300 dark:fill-slate-700 dark:stroke-slate-500"
-      : (TYPE_CLASSES[location.tipo] ??
-        (summary
-          ? STOCK_CLASSES[summary.nivel]
-          : "fill-slate-100 stroke-slate-400 dark:fill-slate-800 dark:stroke-slate-600"));
-    const textClass =
-      location.tipo === "reserva"
-        ? "fill-amber-950 dark:fill-amber-100"
-        : location.tipo === "cross"
-          ? "fill-purple-950 dark:fill-purple-100"
-          : location.tipo === "caja"
-            ? "fill-rose-950 dark:fill-rose-100"
-            : options.aisle
-              ? "fill-slate-700 dark:fill-slate-100"
-              : summary
-                ? "fill-slate-900 dark:fill-slate-100"
-                : "fill-slate-700 dark:fill-slate-100";
-    const label = options.label ?? location.nombre;
-    const labelFontSize = options.aisle ? 15 : height < 42 ? 10 : 11;
-    const centered = options.centered || options.aisle;
-    const labelX = centered ? x + width / 2 : x + 8;
-    const title = locationTooltip(location, locationsById, summary);
+    const fillClass =
+      FIXED_TYPE_CLASSES[visualType] ??
+      (summary ? STOCK_CLASSES[summary.nivel] : STOCK_CLASSES.vacio);
+    const label = options.label ?? displayCode(location);
+    const fontSize = Math.min(12, Math.max(8, height * 0.36));
+    const aisle = layout.aisles.find(
+      (item) =>
+        item.leftChildren.some((child) => child.id === location.id) ||
+        item.rightChildren.some((child) => child.id === location.id),
+    );
+    const side = aisle?.leftChildren.some((child) => child.id === location.id)
+      ? "Izquierdo"
+      : aisle?.rightChildren.some((child) => child.id === location.id)
+        ? "Derecho"
+        : null;
+    const title =
+      aisle && side
+        ? `${displayCode(location)} - Lado ${side} del Pasillo ${aisle.location.codigo}`
+        : `${location.nombre} · ${TYPE_LABELS[visualType]} · ${summary?.total ?? 0} uds`;
+    const textColor =
+      visualType === "perimetral"
+        ? "fill-gray-800 dark:fill-gray-100"
+        : visualType === "pasillo"
+          ? "fill-blue-950 dark:fill-blue-100"
+          : visualType === "reserva"
+            ? "fill-orange-950 dark:fill-orange-100"
+            : visualType === "cross"
+              ? "fill-purple-950 dark:fill-purple-100"
+              : "fill-gray-900 dark:fill-gray-100";
 
     return (
       <g
         key={location.id}
-        data-mapa-ubicacion
+        data-mapa-node
         data-location-id={location.id}
         role="button"
         tabIndex={0}
-        style={{ pointerEvents: "all", opacity: dimmed ? 0.25 : 1 }}
-        aria-label={`${location.nombre}, ${TYPE_LABELS[location.tipo]}, ${summary?.total ?? 0} unidades`}
+        aria-label={`${location.nombre}, ${TYPE_LABELS[visualType]}, ${summary?.total ?? 0} unidades`}
         aria-pressed={selected}
+        style={{ opacity: dimmed ? 0.25 : 1, pointerEvents: "all" }}
+        className="cursor-pointer outline-none"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
@@ -243,7 +263,6 @@ export function Mapa2D({
             onSelect(location);
           }
         }}
-        className="cursor-pointer outline-none"
       >
         <title>{title}</title>
         <rect
@@ -251,107 +270,162 @@ export function Mapa2D({
           y={y}
           width={width}
           height={height}
-          rx={options.aisle ? 8 : 5}
-          className={`${fillClass} transition-[opacity,stroke-width] ${
+          rx={options.perimeter ? 3 : 4}
+          className={`${fillClass} ${
             selected || highlighted ? "stroke-amber-600 dark:stroke-amber-400" : ""
           }`}
-          strokeWidth={selected ? 3 : highlighted ? 2.5 : options.aisle ? 1.5 : 1}
-          strokeDasharray={selected ? "7 4" : undefined}
+          strokeWidth={selected ? 3 : highlighted ? 2 : 1}
         />
-        {options.aisle && height > width ? (
-          <>
-            <text
-              x={x + width / 2}
-              y={y + 13}
-              textAnchor="middle"
-              fontSize="8"
-              fontWeight="600"
-              className={textClass}
-              pointerEvents="none"
-            >
-              {options.productCount ?? summary?.productosCount ?? 0} prod.
-            </text>
-            <text
-              x={x + width / 2}
-              y={y + height - 7}
-              textAnchor="middle"
-              fontSize="8"
-              fontWeight="600"
-              className={textClass}
-              pointerEvents="none"
-            >
-              {options.totalUnits ?? summary?.total ?? 0} uds
-            </text>
-            <text
-              x={x + width / 2}
-              y={y + height / 2}
-              textAnchor="middle"
-              fontSize="11"
-              fontWeight="700"
-              className={textClass}
-              pointerEvents="none"
-              transform={`rotate(-90 ${x + width / 2} ${y + height / 2})`}
-            >
-              {truncateText(label, height - 36, 11)}
-            </text>
-          </>
-        ) : options.aisle ? (
-          <>
-            <text
-              x={labelX}
-              y={y + 29}
-              textAnchor="middle"
-              fontSize={labelFontSize}
-              fontWeight="600"
-              className={textClass}
-              pointerEvents="none"
-            >
-              {truncateText(label, width - 190, labelFontSize)}
-            </text>
-            <rect
-              x={x + width - 142}
-              y={y + 8}
-              width="126"
-              height="30"
-              rx="15"
-              className="fill-white stroke-slate-300 dark:fill-slate-800 dark:stroke-slate-500"
-            />
-            <text
-              x={x + width - 79}
-              y={y + 27}
-              textAnchor="middle"
-              fontSize="11"
-              fontWeight="600"
-              className="fill-slate-700 dark:fill-slate-100"
-              pointerEvents="none"
-            >
-              {options.productCount ?? summary?.productosCount ?? 0} prod. ·{" "}
-              {options.totalUnits ?? summary?.total ?? 0} uds
-            </text>
-          </>
+        {options.vertical ? (
+          <text
+            x={x + width / 2}
+            y={y + height / 2}
+            textAnchor="middle"
+            fontSize="12"
+            fontWeight="700"
+            className={textColor}
+            pointerEvents="none"
+            transform={`rotate(-90 ${x + width / 2} ${y + height / 2})`}
+          >
+            {truncateText(label, height - 24, 12)}
+          </text>
         ) : (
+          <text
+            x={x + width / 2}
+            y={y + height / 2 + fontSize / 3}
+            textAnchor="middle"
+            fontSize={fontSize}
+            fontWeight="700"
+            className={textColor}
+            pointerEvents="none"
+          >
+            {truncateText(label, width - 8, fontSize)}
+          </text>
+        )}
+      </g>
+    );
+  };
+
+  const renderCross = (cross: MapaUbicacion, x: number, y: number) => {
+    const highlighted = cross.id === highlightedLocationId;
+    const dimmed = hasSearchQuery && !highlighted;
+    return (
+      <g
+        key={cross.id}
+        data-mapa-node
+        data-location-id={cross.id}
+        role="button"
+        tabIndex={0}
+        aria-label={`Cross ${displayCode(cross)}`}
+        aria-pressed={selectedLocationId === cross.id}
+        style={{ opacity: dimmed ? 0.25 : 1, pointerEvents: "all" }}
+        className="cursor-pointer outline-none"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(cross);
+        }}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          onManage(cross);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect(cross);
+          }
+        }}
+      >
+        <title>{cross.nombre} · Cross al inicio/final del pasillo</title>
+        <rect
+          x={x - 14}
+          y={y - 14}
+          width="28"
+          height="28"
+          rx="6"
+          className={`fill-purple-50 stroke-purple-300 dark:fill-purple-950 dark:stroke-purple-700 ${
+            highlighted ? "stroke-amber-600 dark:stroke-amber-400" : ""
+          }`}
+        />
+        <foreignObject x={x - 9} y={y - 9} width="18" height="18" pointerEvents="none">
+          <div className="flex h-full w-full items-center justify-center text-purple-700 dark:text-purple-300">
+            <Shuffle className="h-4 w-4" aria-hidden="true" />
+          </div>
+        </foreignObject>
+      </g>
+    );
+  };
+
+  const renderPallet = (
+    pallet: MapaPalet,
+    x: number,
+    y: number,
+    size: number,
+    index: number,
+    total: number,
+  ) => {
+    const highlighted = pallet.id === highlightedLocationId;
+    const dimmed = hasSearchQuery && !highlighted;
+    const label = size >= 34 ? `P${pallet.numero}` : String(pallet.numero);
+    return (
+      <g
+        key={pallet.id}
+        data-mapa-node
+        data-pallet-id={pallet.id}
+        role="button"
+        tabIndex={0}
+        aria-label={`Palet ${pallet.numero} de ${total}, código ${pallet.codigo}, ${pallet.stockTotal} unidades`}
+        style={{ opacity: dimmed ? 0.25 : 1, pointerEvents: "all" }}
+        className="cursor-pointer outline-none"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onManagePallet(pallet.id);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onManagePallet(pallet.id);
+          }
+        }}
+      >
+        <title>
+          Palet {index + 1} de {total} · {pallet.codigo} · {pallet.stockTotal} unidades
+        </title>
+        <rect
+          x={x}
+          y={y}
+          width={size}
+          height={size}
+          rx="3"
+          className={`${getPalletColorClass(pallet)} ${
+            highlighted ? "stroke-amber-600 dark:stroke-amber-400" : ""
+          }`}
+          strokeWidth={highlighted ? 3 : 1}
+        />
+        {size >= 23 && (
           <>
             <text
-              x={labelX}
-              y={y + (height > 42 ? 21 : height / 2 + 4)}
-              textAnchor={centered ? "middle" : "start"}
-              fontSize={labelFontSize}
-              fontWeight="600"
-              className={textClass}
+              x={x + size / 2}
+              y={y + size / 2 - 2}
+              textAnchor="middle"
+              fontSize={Math.min(12, size * 0.32)}
+              fontWeight="700"
+              className="fill-gray-900 dark:fill-gray-100"
               pointerEvents="none"
             >
-              {truncateText(label, width - 16, labelFontSize)}
+              {label}
             </text>
-            {height > 42 && (
+            {size >= 54 && (
               <text
-                x={centered ? x + width / 2 : x + 8}
-                y={y + 37}
-                textAnchor={centered ? "middle" : "start"}
+                x={x + size / 2}
+                y={y + size / 2 + 13}
+                textAnchor="middle"
                 fontSize="9"
-                className={textClass}
+                className="fill-gray-700 dark:fill-gray-200"
                 pointerEvents="none"
               >
-                {summary?.productosCount ?? 0} prod. · {summary?.total ?? 0} uds
+                {pallet.stockTotal} uds
               </text>
             )}
           </>
@@ -360,205 +434,88 @@ export function Mapa2D({
     );
   };
 
-  const renderGroup = (group: MapaGrupoLayout, visible: boolean, perimeter = false) => {
-    const groupLocations =
-      view === "seccion" && sectionId
-        ? group.ubicaciones.filter((location) => {
-            let current: MapaUbicacion | undefined = location;
-            const visited = new Set<string>();
-            while (current && !visited.has(current.id)) {
-              visited.add(current.id);
-              if (current.tipo === "seccion") return current.id === sectionId;
-              if (current.seccionId) return current.seccionId === sectionId;
-              current = current.padreId ? locationsById.get(current.padreId) : undefined;
-            }
-            return true;
-          })
-        : group.ubicaciones;
-    if (!visible || (groupLocations.length === 0 && !perimeter)) return null;
-    const visibleGroup: MapaGrupoLayout = {
-      ...group,
-      ubicaciones: groupLocations,
-      cantidadProductos: groupLocations.reduce(
-        (total, location) => total + new Set(location.productos.map((product) => product.id)).size,
-        0,
-      ),
-      totalUnidades: groupLocations.reduce(
-        (total, location) =>
-          total + location.productos.reduce((sum, product) => sum + product.cantidad, 0),
-        0,
-      ),
-    };
-    const backgroundHeight = perimeter
-      ? visibleGroup.height - 4
-      : Math.max(78, GROUP_HEADER_HEIGHT + Math.ceil(groupLocations.length / 8) * 60 + 8);
-    const cols = Math.max(1, Math.min(8, visibleGroup.ubicaciones.length));
-    const rowWidth = cols * 112 + Math.max(0, cols - 1) * 12;
-    const startX = (layout.width - rowWidth) / 2;
+  const renderReservation = (reservation: (typeof layout.reserves)[number]) => {
+    const { location, x, y, width, height } = reservation;
+    const pallets = [...(location.palets ?? [])].sort(
+      (first, second) => first.numero - second.numero,
+    );
+    const columns = Math.ceil(Math.sqrt(pallets.length));
+    const gap = 2;
+    const size = palletTileSize(layout, location, reservation);
+    const gridWidth = pallets.length ? columns * size + gap * (columns - 1) : 0;
+    const rows = Math.ceil(pallets.length / Math.max(columns, 1));
+    const gridHeight = pallets.length ? rows * size + gap * (rows - 1) : 0;
+    const gridX = x + (width - gridWidth) / 2;
+    const gridY = y + 42 + (height - 52 - gridHeight) / 2;
+
     return (
-      <g key={visibleGroup.id}>
+      <g key={location.id}>
         <rect
-          x="16"
-          y={visibleGroup.y}
-          width={layout.width - 32}
-          height={backgroundHeight}
+          x={x}
+          y={y}
+          width={width}
+          height={height}
           rx="12"
-          className="fill-white/80 stroke-slate-200 dark:fill-slate-900/80 dark:stroke-slate-700"
+          className="fill-orange-50 stroke-orange-300 dark:fill-orange-950/50 dark:stroke-orange-700"
+          strokeWidth="2"
         />
         <text
-          x="32"
-          y={visibleGroup.y + 26}
-          fontSize="14"
+          x={x + 20}
+          y={y + 28}
+          fontSize="16"
           fontWeight="700"
-          className="fill-slate-700 dark:fill-slate-100"
+          className="fill-orange-900 dark:fill-orange-100"
         >
-          {groupHeading(visibleGroup)}
+          RESERVA · {location.nombre}
         </text>
-        <line
-          x1="32"
-          x2={layout.width - 32}
-          y1={visibleGroup.y + 36}
-          y2={visibleGroup.y + 36}
-          className="stroke-slate-200 dark:stroke-slate-700"
-        />
-        {perimeter && (
-          <>
-            <rect
-              x="32"
-              y={visibleGroup.y + GROUP_HEADER_HEIGHT + 4}
-              width={layout.width - 64}
-              height="18"
-              rx="9"
-              className="fill-slate-200 stroke-slate-400 dark:fill-slate-700 dark:stroke-slate-500"
-            />
-            <line
-              x1="44"
-              x2={layout.width - 44}
-              y1={visibleGroup.y + GROUP_HEADER_HEIGHT + 13}
-              y2={visibleGroup.y + GROUP_HEADER_HEIGHT + 13}
-              strokeDasharray="10 8"
-              className="stroke-slate-400 dark:stroke-slate-500"
-            />
-          </>
+        <text
+          x={x + width - 20}
+          y={y + 28}
+          textAnchor="end"
+          fontSize="12"
+          className="fill-orange-800 dark:fill-orange-200"
+        >
+          {pallets.length} {pallets.length === 1 ? "palet activo" : "palets activos"}
+        </text>
+        {pallets.length > 0 ? (
+          pallets.map((pallet, index) =>
+            renderPallet(
+              pallet,
+              gridX + (index % columns) * (size + gap),
+              gridY + Math.floor(index / columns) * (size + gap),
+              size,
+              index,
+              pallets.length,
+            ),
+          )
+        ) : (
+          <text
+            x={x + width / 2}
+            y={y + height / 2 + 10}
+            textAnchor="middle"
+            fontSize="14"
+            className="fill-orange-800 dark:fill-orange-200"
+          >
+            Reserva sin palets activos
+          </text>
         )}
-        {visibleGroup.ubicaciones.map((location, index) => {
-          if (perimeter) {
-            const nodeWidth = Math.min(
-              112,
-              (layout.width - 40 - 2 * Math.max(visibleGroup.ubicaciones.length - 1, 0)) /
-                Math.max(visibleGroup.ubicaciones.length, 1),
-            );
-            const rowWidth =
-              visibleGroup.ubicaciones.length * nodeWidth +
-              2 * Math.max(visibleGroup.ubicaciones.length - 1, 0);
-            const rowStartX = (layout.width - rowWidth) / 2;
-            return renderNode(
-              location,
-              rowStartX + index * (nodeWidth + 2),
-              visibleGroup.y + GROUP_HEADER_HEIGHT + 4,
-              nodeWidth,
-              48,
-              { centered: true },
-            );
-          }
-          const x = startX + (index % 8) * (112 + 12);
-          const y = visibleGroup.y + GROUP_HEADER_HEIGHT + Math.floor(index / 8) * 60;
-          return renderNode(location, x, y, 112, 48, { centered: true });
-        })}
       </g>
     );
   };
 
-  const renderSection = (section: MapaSeccionLayout) => (
-    <g key={section.id}>
-      <rect
-        x={section.x}
-        y={section.y}
-        width={section.width}
-        height={section.height}
-        rx="14"
-        className="fill-indigo-50/60 stroke-indigo-300 dark:fill-indigo-950/30 dark:stroke-indigo-700"
-        strokeDasharray="7 5"
-      />
-      {section.sectionLocation ? (
-        renderNode(section.sectionLocation, section.x + 12, section.y + 10, 560, 38, {
-          centered: false,
-        })
-      ) : (
-        <text
-          x={section.x + 18}
-          y={section.y + 34}
-          fontSize="15"
-          fontWeight="700"
-          className="fill-indigo-800 dark:fill-indigo-200"
-        >
-          {section.nombre}
-        </text>
-      )}
-      <text
-        x={section.x + section.width - 18}
-        y={section.y + 34}
-        textAnchor="end"
-        fontSize="11"
-        fontWeight="600"
-        className="fill-indigo-800 dark:fill-indigo-200"
-      >
-        {section.cantidadProductos} productos · {section.totalUnidades} uds
-      </text>
-      {section.aisles.map((aisle: MapaPasilloLayout) => (
-        <g key={aisle.location.id}>
-          {view !== "pasillos" &&
-            aisle.leftChildren.map((child, index) =>
-              renderNode(
-                child,
-                aisle.leftX,
-                aisle.y + index * (aisle.childHeight + aisle.childGap),
-                aisle.sideWidth,
-                aisle.childHeight,
-                { label: child.codigo || child.nombre, centered: true },
-              ),
-            )}
-          {renderNode(aisle.location, aisle.x, aisle.y, aisle.width, aisle.height, {
-            aisle: true,
-            productCount: aisle.cantidadProductos,
-            totalUnits: aisle.totalUnidades,
-          })}
-          {view !== "pasillos" &&
-            aisle.rightChildren.map((child, index) =>
-              renderNode(
-                child,
-                aisle.rightX,
-                aisle.y + index * (aisle.childHeight + aisle.childGap),
-                aisle.sideWidth,
-                aisle.childHeight,
-                { label: child.codigo || child.nombre, centered: true },
-              ),
-            )}
-        </g>
-      ))}
-    </g>
-  );
-
-  const sectionName = visibleSections.find((section) => section.id === sectionId)?.nombre;
   const mapTitle =
-    view === "seccion" && sectionName
-      ? `MAPA SECCIÓN ${sectionName.toLocaleUpperCase()}`
+    view === "seccion" && sectionId
+      ? `MAPA SECCIÓN ${(locationsById.get(sectionId)?.nombre ?? "").toLocaleUpperCase()}`
       : "MAPA GENERAL DEL ALMACÉN";
-  const aisleCount = visibleSections.reduce((total, section) => total + section.aisles.length, 0);
-  const aisleProductCount = visibleSections.reduce(
-    (total, section) => total + section.cantidadProductos,
-    0,
-  );
-  const showPerimeter = view !== "pasillos";
-  const showBoxes = view !== "pasillos";
+  const showPerimeterAndReserve = view !== "pasillos";
 
   return (
-    <div className="h-full min-h-[220px] flex-1 overflow-auto rounded-lg border bg-slate-50 dark:bg-slate-950">
+    <div className="h-full min-h-[220px] flex-1 overflow-auto rounded-lg border bg-gray-50 dark:bg-gray-950">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         preserveAspectRatio="xMidYMin meet"
-        className={`h-auto w-full ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+        className={`h-auto min-w-[1480px] w-full ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
         role="group"
         aria-label="Mapa interactivo del almacén"
         onPointerDown={startDrag}
@@ -572,7 +529,7 @@ export function Mapa2D({
             <path
               d="M 24 0 L 0 0 0 24"
               fill="none"
-              className="stroke-slate-200 dark:stroke-slate-800"
+              className="stroke-gray-200 dark:stroke-gray-800"
               strokeWidth="0.7"
             />
           </pattern>
@@ -580,7 +537,7 @@ export function Mapa2D({
         <rect
           width={layout.width}
           height={layout.height}
-          className="fill-slate-50 dark:fill-slate-950"
+          className="fill-gray-50 dark:fill-gray-950"
         />
         <rect width={layout.width} height={layout.height} fill="url(#mapa-grid)" />
         <g
@@ -588,44 +545,159 @@ export function Mapa2D({
         >
           <text
             x={layout.width / 2}
-            y="18"
+            y={TITLE_Y}
             textAnchor="middle"
-            fontSize="15"
+            fontSize="18"
             fontWeight="700"
             letterSpacing="1"
-            className="fill-slate-700 dark:fill-slate-100"
+            className="fill-gray-800 dark:fill-gray-100"
           >
             {mapTitle}
           </text>
-          {renderGroup(layout.perimeter, view !== "pasillos", true)}
-          {renderGroup(layout.reserves, view !== "pasillos")}
-          {renderGroup(layout.crossings, view !== "pasillos")}
-          {layout.aislesHeadingY !== null && visibleSections.length > 0 && (
-            <g>
-              <rect
-                x="16"
-                y={layout.aislesHeadingY}
-                width={layout.width - 32}
-                height="38"
-                rx="8"
-                className="fill-indigo-100/70 stroke-indigo-200 dark:fill-indigo-950/60 dark:stroke-indigo-800"
-              />
-              <text
-                x="32"
-                y={layout.aislesHeadingY + 25}
-                fontSize="14"
-                fontWeight="700"
-                className="fill-indigo-800 dark:fill-indigo-200"
-              >
-                PASILLOS ({aisleCount} {aisleCount === 1 ? "pasillo" : "pasillos"},{" "}
-                {aisleProductCount} productos)
-              </text>
-            </g>
+
+          {showPerimeterAndReserve &&
+            (layout.perimeterAisle || layout.perimeterLocations.length > 0) && (
+              <g>
+                <rect
+                  x={CONTENT_X}
+                  y={layout.perimeterY}
+                  width={layout.width - CONTENT_X * 2}
+                  height={layout.perimeterHeight}
+                  rx="10"
+                  className="fill-gray-50 stroke-gray-300 dark:fill-gray-900 dark:stroke-gray-700"
+                  strokeWidth="1.5"
+                />
+                <text
+                  x={CONTENT_X + 16}
+                  y={layout.perimeterY + 25}
+                  fontSize="14"
+                  fontWeight="700"
+                  className="fill-gray-800 dark:fill-gray-100"
+                >
+                  {layout.perimeterAisle?.nombre ?? "PERIMETRAL · ZONA TRANSVERSAL"}
+                </text>
+                {layout.perimeterLocations.length > 0 ? (
+                  layout.perimeterLocations.map((location, index) => {
+                    const gap = 2;
+                    const nodeWidth = Math.min(
+                      112,
+                      (layout.width -
+                        CONTENT_X * 2 -
+                        36 -
+                        gap * (layout.perimeterLocations.length - 1)) /
+                        layout.perimeterLocations.length,
+                    );
+                    const rowWidth =
+                      nodeWidth * layout.perimeterLocations.length +
+                      gap * (layout.perimeterLocations.length - 1);
+                    const startX = (layout.width - rowWidth) / 2;
+                    const column = layout.perimeterLocations.length - index - 1;
+                    return renderLocation(
+                      location,
+                      startX + column * (nodeWidth + gap),
+                      layout.perimeterY + 42,
+                      nodeWidth,
+                      36,
+                      { label: displayCode(location), perimeter: true },
+                    );
+                  })
+                ) : (
+                  <text
+                    x={layout.width / 2}
+                    y={layout.perimeterY + 64}
+                    textAnchor="middle"
+                    fontSize="12"
+                    className="fill-gray-600 dark:fill-gray-300"
+                  >
+                    Sin ubicaciones asociadas
+                  </text>
+                )}
+              </g>
+            )}
+
+          {visibleAisles.map((aisle) => {
+            const aisleName = aisle.location.nombre || `Pasillo ${aisle.location.codigo}`;
+            const crossYStart = layout.aislesY + 8;
+            const crossYEnd = aisle.y + aisle.height + 38;
+            return (
+              <g key={aisle.location.id}>
+                <rect
+                  x={aisle.x}
+                  y={aisle.y}
+                  width={aisle.width}
+                  height={aisle.height}
+                  rx="6"
+                  className="fill-blue-50 stroke-blue-300 dark:fill-blue-950 dark:stroke-blue-700"
+                  strokeWidth="1.5"
+                />
+                <text
+                  x={aisle.x + aisle.width / 2}
+                  y={aisle.y + aisle.height / 2}
+                  textAnchor="middle"
+                  fontSize="12"
+                  fontWeight="700"
+                  className="fill-blue-900 dark:fill-blue-100"
+                  transform={`rotate(-90 ${aisle.x + aisle.width / 2} ${aisle.y + aisle.height / 2})`}
+                >
+                  {truncateText(aisleName, aisle.height - 18, 12)}
+                </text>
+                <text
+                  x={aisle.x + aisle.width / 2}
+                  y={aisle.y + aisle.height - 6}
+                  textAnchor="middle"
+                  fontSize="9"
+                  className="fill-blue-900 dark:fill-blue-100"
+                >
+                  {aisle.cantidadProductos} prod.
+                </text>
+
+                {aisle.leftChildren.map((child) => {
+                  const position = layout.positions.get(child.id)!;
+                  return renderLocation(
+                    child,
+                    aisle.leftX,
+                    position.y - aisle.armoryHeight / 2,
+                    aisle.sideWidth,
+                    aisle.armoryHeight,
+                    { label: displayCode(child) },
+                  );
+                })}
+                {aisle.rightChildren.map((child) => {
+                  const position = layout.positions.get(child.id)!;
+                  return renderLocation(
+                    child,
+                    aisle.rightX,
+                    position.y - aisle.armoryHeight / 2,
+                    aisle.sideWidth,
+                    aisle.armoryHeight,
+                    { label: displayCode(child) },
+                  );
+                })}
+                {aisle.startCrosses.map((cross, index) => {
+                  const position = layout.positions.get(cross.id)!;
+                  return renderCross(cross, position.x, crossYStart + index * 22);
+                })}
+                {aisle.endCrosses.map((cross, index) => {
+                  const position = layout.positions.get(cross.id)!;
+                  return renderCross(cross, position.x, crossYEnd + index * 22);
+                })}
+              </g>
+            );
+          })}
+
+          {showPerimeterAndReserve && layout.reserves.map(renderReservation)}
+
+          {layout.aisles.length === 0 && layout.reserves.length === 0 && (
+            <text
+              x={layout.width / 2}
+              y={layout.height / 2}
+              textAnchor="middle"
+              fontSize="16"
+              className="fill-gray-600 dark:fill-gray-300"
+            >
+              No hay pasillos ni reservas para mostrar.
+            </text>
           )}
-          {visibleSections.map(renderSection)}
-          {renderGroup(layout.boxes, showBoxes)}
-          {renderGroup(layout.other, view !== "pasillos")}
-          {renderGroup(layout.unassigned, view !== "pasillos")}
         </g>
       </svg>
     </div>

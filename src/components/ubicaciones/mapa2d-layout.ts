@@ -1,5 +1,5 @@
 export type MapaTipoUbicacion =
-  "seccion" | "pasillo" | "reserva" | "armario" | "alto" | "caja" | "cross";
+  "seccion" | "pasillo" | "reserva" | "armario" | "alto" | "caja" | "cross" | "perimetral";
 
 export interface MapaProducto {
   id: string;
@@ -8,6 +8,16 @@ export interface MapaProducto {
   categoria: string;
   cantidad: number;
   stock_minimo: number;
+}
+
+export interface MapaPalet {
+  id: string;
+  idReserva: string;
+  numero: number;
+  codigo: string;
+  stockTotal: number;
+  capacidadMax?: number;
+  productos: MapaProducto[];
 }
 
 export interface MapaUbicacion {
@@ -22,16 +32,7 @@ export interface MapaUbicacion {
   activo: boolean;
   capacidadMax: number;
   productos: MapaProducto[];
-}
-
-export interface MapaGrupoLayout {
-  id: string;
-  nombre: string;
-  y: number;
-  height: number;
-  ubicaciones: MapaUbicacion[];
-  cantidadProductos: number;
-  totalUnidades: number;
+  palets?: MapaPalet[];
 }
 
 export interface MapaPasilloLayout {
@@ -40,60 +41,108 @@ export interface MapaPasilloLayout {
   y: number;
   width: number;
   height: number;
-  sideWidth: number;
-  childHeight: number;
-  childGap: number;
+  columnWidth: number;
   leftX: number;
   rightX: number;
+  sideWidth: number;
+  armoryHeight: number;
+  armoryGap: number;
   leftChildren: MapaUbicacion[];
   rightChildren: MapaUbicacion[];
+  startCrosses: MapaUbicacion[];
+  endCrosses: MapaUbicacion[];
   cantidadProductos: number;
   totalUnidades: number;
 }
 
-export interface MapaSeccionLayout {
-  id: string;
-  nombre: string;
+export interface MapaReservaLayout {
+  location: MapaUbicacion;
   x: number;
   y: number;
   width: number;
   height: number;
-  sectionLocation: MapaUbicacion | null;
-  aisles: MapaPasilloLayout[];
-  cantidadProductos: number;
-  totalUnidades: number;
 }
 
 export interface Mapa2DLayout {
   width: number;
   height: number;
-  reserves: MapaGrupoLayout;
-  crossings: MapaGrupoLayout;
-  sections: MapaSeccionLayout[];
-  perimeter: MapaGrupoLayout;
-  boxes: MapaGrupoLayout;
-  other: MapaGrupoLayout;
-  unassigned: MapaGrupoLayout;
-  aislesHeadingY: number | null;
+  perimeterAisle: MapaUbicacion | null;
+  perimeterY: number;
+  perimeterHeight: number;
+  perimeterLocations: MapaUbicacion[];
+  aislesY: number;
+  aislesHeight: number;
+  aisles: MapaPasilloLayout[];
+  reservesY: number;
+  reserves: MapaReservaLayout[];
   positions: Map<string, { x: number; y: number }>;
 }
 
-const CANVAS_WIDTH = 1200;
-const CONTENT_X = 20;
+const CANVAS_WIDTH = 1480;
+const CONTENT_X = 32;
 const CONTENT_WIDTH = CANVAS_WIDTH - CONTENT_X * 2;
-const GROUP_HEADER_HEIGHT = 42;
-const NODE_WIDTH = 112;
-const NODE_HEIGHT = 48;
-const NODE_GAP_X = 12;
-const NODE_GAP_Y = 12;
-const AISLE_WIDTH = 48;
-const AISLE_GAP = 6;
+const TITLE_Y = 26;
+const PERIMETER_Y = 74;
+const PERIMETER_HEIGHT = 96;
+const AISLES_Y = 228;
+const AISLE_WIDTH = 44;
+const AISLE_GAP = 8;
 const MIN_ARMORY_HEIGHT = 25;
 const ARMORY_GAP = 2;
-const DEFAULT_AISLE_HEIGHT = 300;
+const AISLE_HEADER_HEIGHT = 30;
+const MIN_AISLE_HEIGHT = 300;
+const RESERVATION_HEIGHT = 340;
+const RESERVATION_GAP = 20;
 
-function productsCount(location: MapaUbicacion): number {
-  return new Set(location.productos.map((product) => product.id)).size;
+const ARMORY_RANGES = [
+  { aisle: 12, from: 651, to: 658, side: "derecha" },
+  { aisle: 12, from: 659, to: 670, side: "izquierda" },
+  { aisle: 14, from: 671, to: 683, side: "derecha" },
+  { aisle: 14, from: 684, to: 697, side: "izquierda" },
+  { aisle: 16, from: 698, to: 710, side: "derecha" },
+  { aisle: 16, from: 711, to: 716, side: "izquierda" },
+  { aisle: 18, from: 717, to: 728, side: "derecha" },
+  { aisle: 18, from: 729, to: 734, side: "izquierda" },
+] as const;
+
+function locationCodeNumber(location: MapaUbicacion): number | null {
+  const match = (location.codigo || location.nombre).match(/E?(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function aisleNumber(location: MapaUbicacion): number | null {
+  const match =
+    location.nombre.match(/pasillo\D*(\d+)/i) ??
+    location.codigo.match(/(?:pasillo|p)?\D*(\d+)/i) ??
+    `${location.codigo} ${location.nombre}`.match(/\b(\d+)\b/);
+  return match ? Number(match[1]) : location.numero;
+}
+
+function specifiedArmoryPlacement(
+  location: MapaUbicacion,
+): { aisleNumber: number; side: "izquierda" | "derecha" } | null {
+  const code = locationCodeNumber(location);
+  if (code === null) return null;
+  const range = ARMORY_RANGES.find((item) => code >= item.from && code <= item.to);
+  return range ? { aisleNumber: range.aisle, side: range.side } : null;
+}
+
+function isPerimeterLocation(location: MapaUbicacion): boolean {
+  const code = locationCodeNumber(location);
+  return location.tipo === "perimetral" || (code !== null && code >= 735 && code <= 744);
+}
+
+function isPerimeterAisle(location: MapaUbicacion): boolean {
+  if (location.tipo !== "pasillo") return false;
+  const label = `${location.codigo} ${location.nombre}`.toLocaleLowerCase();
+  return label.includes("perimetral") || label.includes("perímetro");
+}
+
+function compareCodes(first: MapaUbicacion, second: MapaUbicacion): number {
+  return (first.codigo || first.nombre).localeCompare(second.codigo || second.nombre, "es", {
+    numeric: true,
+    sensitivity: "base",
+  });
 }
 
 function totalUnits(location: MapaUbicacion): number {
@@ -102,331 +151,249 @@ function totalUnits(location: MapaUbicacion): number {
 
 function aggregateLocations(locations: MapaUbicacion[]) {
   return {
-    cantidadProductos: locations.reduce((sum, location) => sum + productsCount(location), 0),
+    cantidadProductos: new Set(
+      locations.flatMap((location) => location.productos.map((product) => product.id)),
+    ).size,
     totalUnidades: locations.reduce((sum, location) => sum + totalUnits(location), 0),
   };
 }
 
-function byPopulation(first: MapaUbicacion, second: MapaUbicacion): number {
-  return (
-    productsCount(second) - productsCount(first) ||
-    totalUnits(second) - totalUnits(first) ||
-    first.nombre.localeCompare(second.nombre, "es")
-  );
-}
-
-function compareLocationCode(first: MapaUbicacion, second: MapaUbicacion): number {
-  return (first.codigo || first.nombre).localeCompare(second.codigo || second.nombre, "es", {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
-function compareAislesSpatially(first: MapaUbicacion, second: MapaUbicacion): number {
-  return compareLocationCode(second, first);
-}
-
-function aislePopulation(aisle: MapaUbicacion, children: MapaUbicacion[]) {
-  return aggregateLocations([aisle, ...children]);
-}
-
-function createGroup(
-  id: string,
-  nombre: string,
+function positionRow(
+  locations: MapaUbicacion[],
   y: number,
-  ubicaciones: MapaUbicacion[],
-  rowHeight = NODE_HEIGHT + NODE_GAP_Y,
-) {
-  const rows = Math.max(1, Math.ceil(ubicaciones.length / 8));
-  const height = GROUP_HEADER_HEIGHT + rows * rowHeight + 12;
-  const aggregate = aggregateLocations(ubicaciones);
-  return { id, nombre, y, height, ubicaciones, ...aggregate };
-}
-
-function positionGroup(
-  group: MapaGrupoLayout,
   positions: Map<string, { x: number; y: number }>,
-  rowOffset = 0,
+  rightToLeft = false,
 ) {
-  const columns = Math.max(1, Math.min(8, group.ubicaciones.length));
-  const rowWidth = columns * NODE_WIDTH + Math.max(0, columns - 1) * NODE_GAP_X;
+  if (locations.length === 0) return;
+  const gap = 2;
+  const nodeWidth = Math.min(
+    112,
+    (CONTENT_WIDTH - gap * (locations.length - 1)) / locations.length,
+  );
+  const rowWidth = locations.length * nodeWidth + gap * (locations.length - 1);
   const startX = (CANVAS_WIDTH - rowWidth) / 2;
-
-  group.ubicaciones.forEach((location, index) => {
-    const column = index % 8;
-    const row = Math.floor(index / 8);
+  locations.forEach((location, index) => {
+    const column = rightToLeft ? locations.length - index - 1 : index;
     positions.set(location.id, {
-      x: startX + column * (NODE_WIDTH + NODE_GAP_X) + NODE_WIDTH / 2,
-      y:
-        group.y +
-        GROUP_HEADER_HEIGHT +
-        rowOffset +
-        row * (NODE_HEIGHT + NODE_GAP_Y) +
-        NODE_HEIGHT / 2,
+      x: startX + column * (nodeWidth + gap) + nodeWidth / 2,
+      y,
     });
   });
+}
+
+function getAisleCrosses(
+  locations: MapaUbicacion[],
+  aisle: MapaUbicacion,
+): { start: MapaUbicacion[]; end: MapaUbicacion[] } {
+  const children = locations
+    .filter(
+      (location) =>
+        location.tipo === "cross" &&
+        location.padreId === aisle.id &&
+        !isPerimeterLocation(location),
+    )
+    .sort(compareCodes);
+  if (children.length < 2) return { start: children, end: [] };
+  return { start: [children[0]!], end: children.slice(1) };
 }
 
 export function getMapa2DLayout(locations: MapaUbicacion[]): Mapa2DLayout {
   const positions = new Map<string, { x: number; y: number }>();
   const byId = new Map(locations.map((location) => [location.id, location]));
-  const sections = locations.filter((location) => location.tipo === "seccion");
-  const aisles = locations.filter((location) => location.tipo === "pasillo");
-  const reserves = locations.filter((location) => location.tipo === "reserva");
-  const boxes = locations.filter((location) => location.tipo === "caja");
-  const crossings = locations.filter((location) => location.tipo === "cross");
-  const used = new Set<string>([
-    ...sections.map((location) => location.id),
-    ...aisles.map((location) => location.id),
-    ...reserves.map((location) => location.id),
-    ...boxes.map((location) => location.id),
-    ...crossings.map((location) => location.id),
-  ]);
-  let cursorY = 52;
-  const perimeterLocations = [...crossings].sort(compareLocationCode);
-  const perimeterGroup = createGroup(
-    "perimetral",
-    "Pasillo Perimetral · Zona de Tránsito",
-    cursorY,
-    perimeterLocations,
-    NODE_HEIGHT + NODE_GAP_Y,
+  const perimeterAisleIds = new Set(
+    locations.filter(isPerimeterAisle).map((location) => location.id),
   );
-  const perimeterHeight = GROUP_HEADER_HEIGHT + NODE_HEIGHT + 24;
-  const perimeterLayout = { ...perimeterGroup, height: perimeterHeight };
-  const perimeterGap = ARMORY_GAP;
-  const perimeterNodeWidth = Math.min(
-    NODE_WIDTH,
-    (CONTENT_WIDTH - perimeterGap * Math.max(perimeterLocations.length - 1, 0)) /
-      Math.max(perimeterLocations.length, 1),
-  );
-  const perimeterRowWidth =
-    perimeterLocations.length * perimeterNodeWidth +
-    Math.max(perimeterLocations.length - 1, 0) * perimeterGap;
-  const perimeterStartX = (CANVAS_WIDTH - perimeterRowWidth) / 2;
-  perimeterLocations.forEach((location, index) => {
-    positions.set(location.id, {
-      x: perimeterStartX + index * (perimeterNodeWidth + perimeterGap) + perimeterNodeWidth / 2,
-      y: cursorY + GROUP_HEADER_HEIGHT + NODE_HEIGHT / 2 + 4,
+  const perimeterAisle = locations.find((location) => perimeterAisleIds.has(location.id)) ?? null;
+  const aisles = locations
+    .filter((location) => location.tipo === "pasillo" && !perimeterAisleIds.has(location.id))
+    .sort((first, second) => {
+      const firstNumber = aisleNumber(first) ?? 0;
+      const secondNumber = aisleNumber(second) ?? 0;
+      return secondNumber - firstNumber || compareCodes(first, second);
+    });
+  const perimeterLocations = locations
+    .filter(
+      (location) =>
+        !perimeterAisleIds.has(location.id) &&
+        (isPerimeterLocation(location) ||
+          (location.padreId !== null && perimeterAisleIds.has(location.padreId))),
+    )
+    .sort(compareCodes);
+  positionRow(perimeterLocations, PERIMETER_Y + 62, positions, true);
+
+  const laneWidth = CONTENT_WIDTH / Math.max(aisles.length, 1);
+  const aisleLayouts: MapaPasilloLayout[] = [];
+
+  aisles.forEach((aisle, aisleIndex) => {
+    const aisleNo = aisleNumber(aisle);
+    const aisleChildren = locations.filter((location) => {
+      if (
+        (location.tipo !== "armario" && location.tipo !== "alto") ||
+        isPerimeterLocation(location)
+      )
+        return false;
+      const explicitPlacement = specifiedArmoryPlacement(location);
+      if (aisleNo !== null && explicitPlacement) return explicitPlacement.aisleNumber === aisleNo;
+      return location.padreId === aisle.id;
+    });
+    const leftChildren = aisleChildren
+      .filter((child) => {
+        const explicitPlacement = specifiedArmoryPlacement(child);
+        return explicitPlacement
+          ? explicitPlacement.side === "izquierda"
+          : child.lateral?.toLocaleLowerCase() === "izquierda";
+      })
+      .sort(compareCodes);
+    const rightChildren = aisleChildren
+      .filter((child) => !leftChildren.includes(child))
+      .sort(compareCodes);
+    const maxArmories = Math.max(leftChildren.length, rightChildren.length);
+    const armoryHeight = Math.max(
+      MIN_ARMORY_HEIGHT,
+      (MIN_AISLE_HEIGHT - ARMORY_GAP * Math.max(maxArmories - 1, 0)) / Math.max(maxArmories, 1),
+    );
+    const columnHeight = Math.max(
+      MIN_AISLE_HEIGHT,
+      maxArmories * MIN_ARMORY_HEIGHT + Math.max(maxArmories - 1, 0) * ARMORY_GAP,
+    );
+    const height = AISLE_HEADER_HEIGHT + columnHeight + 44;
+    const columnX = CONTENT_X + aisleIndex * laneWidth;
+    const sideWidth = Math.max(28, (laneWidth - AISLE_WIDTH - 2 * AISLE_GAP) / 2);
+    const x = columnX + (laneWidth - AISLE_WIDTH) / 2;
+    const y = AISLES_Y + AISLE_HEADER_HEIGHT;
+    const leftX = x - AISLE_GAP - sideWidth;
+    const rightX = x + AISLE_WIDTH + AISLE_GAP;
+    const centerY = y + columnHeight / 2;
+    const crosses = getAisleCrosses(locations, aisle);
+    const routeLocations = [aisle, ...leftChildren, ...rightChildren];
+    const aggregates = aggregateLocations(routeLocations);
+
+    positions.set(aisle.id, { x: x + AISLE_WIDTH / 2, y: centerY });
+
+    const setArmoryPositions = (
+      children: MapaUbicacion[],
+      childX: number,
+      bottomToTop: boolean,
+    ) => {
+      children.forEach((child, index) => {
+        const row = bottomToTop ? children.length - index - 1 : index;
+        positions.set(child.id, {
+          x: childX + sideWidth / 2,
+          y: y + row * (armoryHeight + ARMORY_GAP) + armoryHeight / 2,
+        });
+      });
+    };
+
+    const leftBottomToTop = aisleNo !== 12;
+    setArmoryPositions(leftChildren, leftX, leftBottomToTop);
+    setArmoryPositions(rightChildren, rightX, true);
+
+    const startY = AISLES_Y + 10;
+    const endY = y + columnHeight + 34;
+    crosses.start.forEach((cross, index) => {
+      positions.set(cross.id, { x: columnX + laneWidth - 36, y: startY + index * 22 });
+    });
+    crosses.end.forEach((cross, index) => {
+      positions.set(cross.id, { x: columnX + 36, y: endY + index * 22 });
+    });
+
+    aisleLayouts.push({
+      location: aisle,
+      x,
+      y,
+      width: AISLE_WIDTH,
+      height: columnHeight,
+      columnWidth: laneWidth,
+      leftX,
+      rightX,
+      sideWidth,
+      armoryHeight,
+      armoryGap: ARMORY_GAP,
+      leftChildren,
+      rightChildren,
+      startCrosses: crosses.start,
+      endCrosses: crosses.end,
+      ...aggregates,
     });
   });
-  cursorY += perimeterHeight + 16;
 
-  const reserveGroup = createGroup("reservas", "Reservas", cursorY, reserves);
-  if (reserves.length > 0) {
-    positionGroup(reserveGroup, positions);
-    cursorY += reserveGroup.height + 16;
-  }
-
-  const crossingGroup = createGroup("cross", "Cross / Tránsito", cursorY, []);
-
-  const sectionsById = new Map(sections.map((section) => [section.id, section]));
-  const sectionAisles = new Map<string, MapaUbicacion[]>();
-  const orphanAisles: MapaUbicacion[] = [];
-
-  for (const aisle of aisles) {
-    const sectionId =
-      aisle.seccionId ?? (aisle.padreId && sectionsById.has(aisle.padreId) ? aisle.padreId : null);
-    if (sectionId && sectionsById.has(sectionId)) {
-      const current = sectionAisles.get(sectionId) ?? [];
-      current.push(aisle);
-      sectionAisles.set(sectionId, current);
-    } else {
-      orphanAisles.push(aisle);
-    }
-  }
-
-  const aisleChildren = new Map<string, MapaUbicacion[]>();
-  for (const aisle of aisles) {
-    aisleChildren.set(
-      aisle.id,
-      locations.filter(
-        (location) =>
-          location.padreId === aisle.id &&
-          (location.tipo === "armario" || location.tipo === "alto"),
-      ),
-    );
-  }
-
-  const sectionLayouts: MapaSeccionLayout[] = [];
-  const sectionRoots: Array<{
-    id: string;
-    nombre: string;
-    sectionLocation: MapaUbicacion | null;
-    aisles: MapaUbicacion[];
-  }> = sections.map((section) => ({
-    id: section.id,
-    nombre: section.nombre,
-    sectionLocation: section,
-    aisles: sectionAisles.get(section.id) ?? [],
+  const aislesHeight = aisles.length
+    ? Math.max(...aisleLayouts.map((aisle) => aisle.y + aisle.height + 70)) - AISLES_Y
+    : 0;
+  const reserveLocations = locations.filter((location) => location.tipo === "reserva");
+  const reservationWidth =
+    (CONTENT_WIDTH - RESERVATION_GAP * Math.max(reserveLocations.length - 1, 0)) /
+    Math.max(reserveLocations.length, 1);
+  const reserves = reserveLocations.map((location, index) => ({
+    location,
+    x: CONTENT_X + index * (reservationWidth + RESERVATION_GAP),
+    y: AISLES_Y + aislesHeight + 16,
+    width: reservationWidth,
+    height: RESERVATION_HEIGHT,
   }));
-  if (orphanAisles.length > 0) {
-    sectionRoots.push({
-      id: "__sin_seccion__",
-      nombre: "Otras ubicaciones",
-      sectionLocation: null,
-      aisles: orphanAisles,
-    });
-  }
 
-  const orderedSections = sectionRoots
-    .map((root) => {
-      const sectionAisleList = [...root.aisles].sort(compareAislesSpatially);
-      const sectionLocations = sectionAisleList.flatMap((aisle) => [
-        aisle,
-        ...(aisleChildren.get(aisle.id) ?? []),
-      ]);
-      return {
-        ...root,
-        aisles: sectionAisleList,
-        ...aggregateLocations(sectionLocations),
-      };
-    })
-    .sort(
-      (first, second) =>
-        second.cantidadProductos - first.cantidadProductos ||
-        second.totalUnidades - first.totalUnidades ||
-        first.nombre.localeCompare(second.nombre, "es"),
+  reserves.forEach(({ location, x, y, width, height }) => {
+    positions.set(location.id, { x: x + width / 2, y: y + height / 2 });
+    const pallets = [...(location.palets ?? [])].sort(
+      (first, second) => first.numero - second.numero,
     );
-
-  const aislesHeadingY = orderedSections.length > 0 ? cursorY : null;
-  if (aislesHeadingY !== null) cursorY += GROUP_HEADER_HEIGHT + 12;
-
-  for (const {
-    id,
-    nombre,
-    sectionLocation,
-    aisles: sectionAisleList,
-    cantidadProductos,
-    totalUnidades: units,
-  } of orderedSections) {
-    const sectionY = cursorY;
-    const aisleY = sectionY + 68;
-    const aisleLayouts: MapaPasilloLayout[] = [];
-    const columnWidth =
-      sectionAisleList.length > 0
-        ? Math.min(
-            (CONTENT_WIDTH - AISLE_GAP * (sectionAisleList.length - 1)) / sectionAisleList.length,
-            260,
-          )
-        : CONTENT_WIDTH;
-    const sideWidth = Math.max(25, (columnWidth - AISLE_WIDTH - AISLE_GAP * 2) / 2);
-    const aisleXStart =
-      CONTENT_X + Math.max(0, (CONTENT_WIDTH - sectionAisleList.length * columnWidth) / 2);
-    let maxAisleHeight = DEFAULT_AISLE_HEIGHT;
-
-    sectionAisleList.forEach((aisle, index) => {
-      const children = aisleChildren.get(aisle.id) ?? [];
-      const leftChildren = children
-        .filter((child) => child.lateral?.toLocaleLowerCase() === "izquierda")
-        .sort(compareLocationCode);
-      const rightChildren = children
-        .filter((child) => child.lateral?.toLocaleLowerCase() !== "izquierda")
-        .sort(compareLocationCode);
-      const armoryCount = Math.max(leftChildren.length, rightChildren.length);
-      const height = Math.max(
-        DEFAULT_AISLE_HEIGHT,
-        armoryCount > 0
-          ? armoryCount * MIN_ARMORY_HEIGHT + (armoryCount - 1) * ARMORY_GAP
-          : DEFAULT_AISLE_HEIGHT,
-      );
-      maxAisleHeight = Math.max(maxAisleHeight, height);
-      const aisleX = aisleXStart + index * columnWidth + (columnWidth - AISLE_WIDTH) / 2;
-      const leftX = aisleX - AISLE_GAP - sideWidth;
-      const rightX = aisleX + AISLE_WIDTH + AISLE_GAP;
-      const childHeight = (height - ARMORY_GAP * (armoryCount - 1)) / Math.max(armoryCount, 1);
-      positions.set(aisle.id, { x: aisleX + AISLE_WIDTH / 2, y: aisleY + height / 2 });
-
-      const setChildPositions = (sideChildren: MapaUbicacion[], x: number) => {
-        sideChildren.forEach((child, childIndex) => {
-          positions.set(child.id, {
-            x: x + sideWidth / 2,
-            y: aisleY + childIndex * (childHeight + ARMORY_GAP) + childHeight / 2,
-          });
-        });
-      };
-      setChildPositions(leftChildren, leftX);
-      setChildPositions(rightChildren, rightX);
-      const aisleLocations = [aisle, ...children];
-      const aggregate = aggregateLocations(aisleLocations);
-      aisleLayouts.push({
-        location: aisle,
-        x: aisleX,
-        y: aisleY,
-        width: AISLE_WIDTH,
-        height,
-        sideWidth,
-        childHeight,
-        childGap: ARMORY_GAP,
-        leftX,
-        rightX,
-        leftChildren,
-        rightChildren,
-        ...aggregate,
+    if (pallets.length === 0) return;
+    const columns = Math.ceil(Math.sqrt(pallets.length));
+    const rows = Math.ceil(pallets.length / columns);
+    const gap = 2;
+    const availableWidth = width - 40;
+    const availableHeight = height - 52;
+    const palletSize = Math.min(
+      Math.min(availableWidth, availableHeight) / Math.sqrt(pallets.length),
+      (availableWidth - gap * (columns - 1)) / columns,
+      (availableHeight - gap * (rows - 1)) / rows,
+    );
+    const gridWidth = columns * palletSize + gap * (columns - 1);
+    const gridHeight = rows * palletSize + gap * (rows - 1);
+    const gridX = x + 20 + (width - 40 - gridWidth) / 2;
+    const gridY = y + 42 + (availableHeight - gridHeight) / 2;
+    pallets.forEach((pallet, index) => {
+      positions.set(pallet.id, {
+        x: gridX + (index % columns) * (palletSize + gap) + palletSize / 2,
+        y: gridY + Math.floor(index / columns) * (palletSize + gap) + palletSize / 2,
       });
     });
+  });
 
-    const sectionHeight = Math.max(108, 68 + maxAisleHeight + 20);
-    if (sectionLocation)
-      positions.set(sectionLocation.id, { x: CONTENT_X + 220, y: sectionY + 28 });
-    sectionLayouts.push({
-      id,
-      nombre,
-      x: CONTENT_X,
-      y: sectionY,
-      width: AISLE_WIDTH,
-      height: sectionHeight,
-      sectionLocation,
-      aisles: aisleLayouts,
-      cantidadProductos,
-      totalUnidades: units,
-    });
-    cursorY += sectionHeight + 18;
-  }
-
-  const orphanChildren = locations.filter(
-    (location) =>
-      !used.has(location.id) &&
-      location.tipo !== "seccion" &&
-      location.tipo !== "armario" &&
-      location.tipo !== "alto" &&
-      !aisles.some((aisle) => aisleChildren.get(aisle.id)?.includes(location)),
+  const reservesY = reserves[0]?.y ?? AISLES_Y + aislesHeight + 16;
+  const height = Math.max(
+    640,
+    ...reserves.map((reserve) => reserve.y + reserve.height + CONTENT_X),
+    AISLES_Y + aislesHeight + 100,
   );
-  const boxGroup = createGroup("cajas", "Cajas", cursorY, boxes.sort(byPopulation));
-  if (boxes.length > 0) {
-    positionGroup(boxGroup, positions);
-    cursorY += boxGroup.height + 16;
-  }
-
-  const otherGroup = createGroup("otras", "Otras ubicaciones", cursorY, orphanChildren);
-  if (orphanChildren.length > 0) {
-    positionGroup(otherGroup, positions);
-    cursorY += otherGroup.height + 16;
-  }
-
-  const assignedIds = new Set(positions.keys());
-  const unpositioned = locations.filter((location) => !assignedIds.has(location.id));
-  const unassignedGroup = createGroup(
-    "sin-ubicacion",
-    "Ubicaciones adicionales",
-    cursorY,
-    unpositioned,
-  );
-  if (unpositioned.length > 0) {
-    positionGroup(unassignedGroup, positions);
-    cursorY += unassignedGroup.height;
-  }
 
   return {
     width: CANVAS_WIDTH,
-    height: Math.max(600, cursorY + 20),
-    reserves: reserveGroup,
-    crossings: crossingGroup,
-    sections: sectionLayouts,
-    perimeter: perimeterLayout,
-    boxes: boxGroup,
-    other: otherGroup,
-    unassigned: unassignedGroup,
-    aislesHeadingY,
+    height,
+    perimeterAisle,
+    perimeterY: PERIMETER_Y,
+    perimeterHeight: PERIMETER_HEIGHT,
+    perimeterLocations,
+    aislesY: AISLES_Y,
+    aislesHeight,
+    aisles: aisleLayouts,
+    reservesY,
+    reserves,
     positions,
   };
+}
+
+export function getMapaTipoVisual(location: MapaUbicacion): MapaTipoUbicacion {
+  if (isPerimeterLocation(location)) return "perimetral";
+  return location.tipo;
+}
+
+export function getMapaStockLevel(
+  products: MapaProducto[],
+  total: number,
+): "normal" | "medio" | "critico" | "vacio" {
+  if (total <= 0) return "vacio";
+  if (products.some((product) => product.cantidad <= product.stock_minimo)) return "critico";
+  if (products.some((product) => product.cantidad <= product.stock_minimo * 2)) return "medio";
+  return "normal";
 }
