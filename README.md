@@ -4,7 +4,7 @@ Sistema profesional de gestión de inventario jerárquico para tienda de pintura
 
 **🌐 Aplicación en producción:** [https://inventario-pintura-local.vercel.app](https://inventario-pintura-local.vercel.app)
 **📦 Repositorio GitHub:** [https://github.com/recursos-email-pintureria/inventario-pintura-local](https://github.com/recursos-email-pintureria/inventario-pintura-local)
-**🏷️ Versión estable actual:** [v1.4.0-palets](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets)
+**🏷️ Versión estable actual:** [v1.4.0-palets](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets) *(Incluye mejoras de seguridad v1.3.0-reset-password)*
 **📋 Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
 **🗄️ Panel de Supabase:** [https://app.supabase.com](https://app.supabase.com)
 
@@ -136,6 +136,14 @@ El stock continúa modificándose únicamente mediante `movimientos`.
 - [x] Confirmaciones visuales (AlertDialog) para todas las acciones críticas
 - [x] Iconos y colores distintivos por tipo de ubicación
 
+### Fase 4.9: Seguridad de Sesión y Reset de Contraseñas (v1.3.0-reset-password)
+- [x] Edge Functions seguras (`reset-password-admin` y `completar-cambio-password`) sin exposición de `service_role`.
+- [x] Flujo de cambio de contraseña obligatorio que bloquea la app hasta su completado.
+- [x] Auditoría de estados parciales (éxito en DB + fallo en email).
+- [x] Corrección de bug crítico: bucle infinito y error 401 (`UNAUTHORIZED_LEGACY_JWT`) al cerrar sesión.
+- [x] Corrección de visibilidad de la pestaña de Configuración para administradores.
+- [x] Suite de tests ampliada y estabilizada (67 pruebas pasando).
+
 ### Fase 5: Sistema de Palets (v1.3.0)
 - [x] Tabla independiente `palets` vinculada a ubicaciones de tipo `reserva`
 - [x] Restricción de trigger: solo `entrada` y `salida` para movimientos de palets
@@ -164,13 +172,15 @@ El stock continúa modificándose únicamente mediante `movimientos`.
 | 3 | Lógica de reposición errónea en docs | Decía que sumaba, pero el trigger fija el valor | Corregido en README y Agent Skills |
 | 4 | Escáner de cámara no funcionaba | `div` casero bloqueado por `Dialog` padre de Radix | Envolver en `<Dialog>` oficial de Radix UI |
 | 5 | Mensaje genérico de permisos | `errorInventario()` no diferenciaba 42501/PGRST116 | Mensajes específicos según contexto |
+| 6 | Bucle infinito y error 401 al cerrar sesión | Llamada a Edge Function con JWT caducado durante el logout | Separación de responsabilidades: la función segura llama directo a Resend, y el `AuthContext` limpia el estado sin esperar respuestas de red bloqueantes. |
+| 7 | Pestaña de Configuración invisible para admins | Condición de permisos mal aplicada en el Sidebar tras refactorizaciones | Corregida la lógica de visibilidad en el componente de layout para evaluar correctamente `puede_gestionar_usuarios`. |
 
 ---
 
 ## 🏷️ Versiones y Recuperación de Emergencia
 
-**Versión Actual Estable:** `v1.4.0-palets`
-**Fecha:** 01/11/2026
+**Versión Actual Estable:** `v1.4.0-palets` *(Incluye parches de seguridad v1.3.0-reset-password)*
+**Fecha:** 03/11/2026
 **Estado:** ✅ Producción en Vercel
 **Tag:** [v1.4.0-palets](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets)
 
@@ -190,63 +200,3 @@ git push origin main --force
 git checkout v1.4.0-palets
 # Para volver al presente:
 git checkout main
-🔐 Seguridad y Credenciales
-Variables de entorno
-El archivo .env.example contiene las variables necesarias. Nunca subir .env al repositorio.
-VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_ANON_KEY=tu_clave_anonima_aqui
-Reglas de seguridad
-✅ La clave anon de Supabase es pública por diseño (segura en frontend).
-✅ RLS (Row Level Security) activo en todas las tablas.
-✅ Permisos granulares por usuario en permisos_usuario.
-✅ Protección contra auto-desprivilegio en gestión de usuarios.
-✅ NUNCA escribir directamente en tablas protegidas (stock) desde el cliente.
-🚀 Comandos Útiles
-# Desarrollo local
-npm run dev              # Iniciar servidor de desarrollo
-npm run build            # Compilar para producción
-npm test                 # Ejecutar tests (Vitest)
-npx tsc --noEmit         # Verificar tipos TypeScript
-
-# Git básico
-git status               # Estado del repositorio
-git log --oneline -5     # Últimos 5 commits
-git tag                  # Listar etiquetas
-
-# Despliegue
-git push origin main     # Vercel despliega automáticamente
-📋 Próximas Fases Planificadas
-Fase 8: Automatización de datos (Leroy Merlin)
-Script para extraer Ref/SKU y descripción desde web de Leroy Merlin
-Integración con el formulario de creación de productos
-Validación automática de códigos de barras
-Fase 9: Mejoras visuales adicionales
-Rediseño del Dashboard con KPIs con semáforo de colores
-Modo oscuro/claro
-Atajos de teclado para operaciones frecuentes
-Fase 10: Reportes y analítica avanzada
-Dashboard de rotación de stock
-Alertas automáticas de stock bajo por email
-👥 Contribución
-Este proyecto fue desarrollado para gestión interna. Si necesitas colaborar:
-Crea una rama desde main: git checkout -b feature/nueva-funcionalidad
-Haz commits descriptivos siguiendo el patrón: tipo: descripción corta
-feat: nueva funcionalidad
-fix: corrección de bug
-docs: cambios en documentación
-style: cambios de formato (sin afectar lógica)
-Abre un Pull Request describiendo los cambios.
-Licencia: Propietario. Uso interno para gestión de inventario de la tienda.
-Última actualización: 01/11/2026 · Versión v1.4.0-palets
-
-### 📋 Pasos para aplicar:
-1. Abre `README.md` en VS Code.
-2. Selecciona todo (`Ctrl + A`) y borra.
-3. Haz clic en **"Copy"** en la esquina superior derecha del bloque de arriba.
-4. Pega (`Ctrl + V`) y guarda (`Ctrl + S`).
-5. Ejecuta en la terminal:
-   ```powershell
-   git add README.md
-   git commit -m "docs: actualizar README a v1.4.0-palets, alineado con trigger real y Fase 6"
-   git push origin main
-   
