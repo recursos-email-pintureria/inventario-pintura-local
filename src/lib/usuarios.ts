@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { edgeFunctionErrorMessage, supabase } from "@/lib/supabase";
 import type { PerfilUsuario, PermisosUsuario } from "@/hooks/usePermissions";
 
 export type UsuarioConPermisos = PerfilUsuario & { permisos_usuario: PermisosUsuario | null };
@@ -19,4 +19,25 @@ export async function cargarUsuarios(): Promise<UsuarioConPermisos[]> {
     ...perfil,
     permisos_usuario: permisosPorUsuario.get(perfil.id) ?? null,
   }));
+}
+
+export async function resetearPasswordUsuario(
+  usuario: Pick<UsuarioConPermisos, "id" | "correo">,
+  forzarCambio: boolean,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke<{ success: boolean }>(
+    "reset-password-admin",
+    {
+      body: {
+        id_usuario: usuario.id,
+        email: usuario.correo,
+        forzar_cambio: forzarCambio,
+      },
+    },
+  );
+
+  if (error) throw new Error(await edgeFunctionErrorMessage(error));
+  if (data?.success !== true) {
+    throw new Error("El servidor no confirmó el restablecimiento de la contraseña.");
+  }
 }

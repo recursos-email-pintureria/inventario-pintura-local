@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
+import { KeyRound, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -38,7 +39,7 @@ import {
 import { PageHeader } from "@/components/layout/AppLayout";
 import { pageHead } from "@/lib/meta";
 import { supabase } from "@/lib/supabase";
-import { cargarUsuarios, type UsuarioConPermisos } from "@/lib/usuarios";
+import { cargarUsuarios, resetearPasswordUsuario, type UsuarioConPermisos } from "@/lib/usuarios";
 import { useMyProfile, type PermisosUsuario } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/_authenticated/usuarios")({
@@ -70,6 +71,8 @@ function Usuarios() {
     usuario: UsuarioConPermisos;
     motivos: string[];
   } | null>(null);
+  const [usuarioParaResetear, setUsuarioParaResetear] = useState<UsuarioConPermisos | null>(null);
+  const [forzarCambio, setForzarCambio] = useState(true);
 
   const {
     data: usuarios,
@@ -115,6 +118,25 @@ function Usuarios() {
     },
     onError: (error) => {
       toast.error("Error al guardar: " + (error as Error).message);
+    },
+  });
+
+  const resetear = useMutation({
+    mutationFn: ({
+      usuario,
+      forzarCambio: debeCambiar,
+    }: {
+      usuario: UsuarioConPermisos;
+      forzarCambio: boolean;
+    }) => resetearPasswordUsuario(usuario, debeCambiar),
+    onSuccess: async (_, variables) => {
+      toast.success(`Contraseña temporal enviada a ${variables.usuario.correo}`);
+      setUsuarioParaResetear(null);
+      await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      await queryClient.invalidateQueries({ queryKey: ["mi-perfil", variables.usuario.id] });
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
@@ -205,6 +227,17 @@ function Usuarios() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setForzarCambio(true);
+                        setUsuarioParaResetear(u);
+                      }}
+                    >
+                      <KeyRound className="mr-2 h-4 w-4" />
+                      Resetear contraseña
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="icon"
                       aria-label="Editar"
@@ -278,6 +311,49 @@ function Usuarios() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!usuarioParaResetear}
+        onOpenChange={(open) => {
+          if (!open && !resetear.isPending) setUsuarioParaResetear(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Resetear la contraseña?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generará una contraseña temporal y se enviará a{" "}
+              <strong className="text-foreground">{usuarioParaResetear?.correo}</strong>. La
+              contraseña actual dejará de funcionar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="forzar-cambio-password"
+              checked={forzarCambio}
+              onCheckedChange={(checked) => setForzarCambio(checked === true)}
+              disabled={resetear.isPending}
+            />
+            <Label htmlFor="forzar-cambio-password" className="font-normal">
+              Pedir que cambie la contraseña al iniciar sesión
+            </Label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetear.isPending}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={resetear.isPending}
+              onClick={() => {
+                if (usuarioParaResetear) {
+                  resetear.mutate({ usuario: usuarioParaResetear, forzarCambio });
+                }
+              }}
+            >
+              {resetear.isPending ? "Restableciendo…" : "Resetear y enviar email"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!confirmacionCritica}

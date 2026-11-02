@@ -5,7 +5,7 @@
  * "Recordar sesión": the session is stored in localStorage (survives browser
  * restarts) when remember=true, otherwise in sessionStorage (cleared on close).
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient, FunctionsHttpError } from "@supabase/supabase-js";
 
 // Usamos notación de corchetes para cumplir con TypeScript
 const SUPABASE_URL = import.meta.env["VITE_SUPABASE_URL"];
@@ -74,4 +74,26 @@ export function authErrorMessage(err: unknown): string {
   if (/fetch/i.test(msg)) return "No se pudo conectar con el servidor. Revisa tu conexión.";
 
   return msg || "Ha ocurrido un error inesperado.";
+}
+
+export async function edgeFunctionErrorMessage(error: unknown): Promise<string> {
+  const fallback =
+    error instanceof Error ? error.message : "La Edge Function devolvió un error inesperado.";
+  if (!(error instanceof FunctionsHttpError)) return fallback;
+
+  try {
+    const body: unknown = await error.context.clone().json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string"
+    ) {
+      return body.error;
+    }
+  } catch (parseError) {
+    console.error("No se pudo leer el detalle del error de la Edge Function.", parseError);
+  }
+
+  return fallback;
 }

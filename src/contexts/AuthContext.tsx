@@ -1,6 +1,7 @@
 /** Auth context: exposes the current session/user and auth actions. */
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { cerrarSesionLocal } from "@/lib/auth";
 import { supabase, setRememberSession } from "@/lib/supabase";
 
 interface AuthState {
@@ -47,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
     },
     async signOut() {
-      await supabase.auth.signOut();
+      await cerrarSesionLocal();
     },
     async resendVerification(email) {
       const { error } = await supabase.auth.resend({

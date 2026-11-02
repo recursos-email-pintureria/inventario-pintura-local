@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Package,
@@ -18,7 +19,8 @@ import {
   UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMyProfile, cerrarSesion } from "@/hooks/usePermissions";
+import { useMyProfile, cerrarSesion, puedeGestionarConfiguracion } from "@/hooks/usePermissions";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { type ThemePreference, useTheme } from "@/components/theme/theme-context";
 import {
@@ -29,6 +31,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
+import { CambioPasswordObligatorio } from "@/components/auth/CambioPasswordObligatorio";
 import { toast } from "sonner";
 
 const menuItems = [
@@ -42,11 +45,30 @@ const menuItems = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { perfil, permisos, isPending, isAdmin, can } = useMyProfile();
+  const queryClient = useQueryClient();
+  const { user, loading: cargandoSesion } = useAuth();
+  const {
+    perfil,
+    permisos,
+    isPending,
+    isError: errorPerfil,
+    refetch: recargarPerfil,
+    isAdmin,
+    can,
+  } = useMyProfile();
   const { theme, setTheme } = useTheme();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [perfilAbierto, setPerfilAbierto] = useState(false);
   const [escanerAbierto, setEscanerAbierto] = useState(false);
+
+  useEffect(() => {
+    if (cargandoSesion || user) return;
+
+    queryClient.clear();
+    void navigate({ to: "/login", replace: true });
+  }, [cargandoSesion, navigate, queryClient, user]);
+
+  if (!cargandoSesion && !user) return null;
 
   if (isPending && !perfil) {
     return (
@@ -56,12 +78,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (errorPerfil && !perfil) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-4">
+        <p className="text-sm text-destructive" role="alert">
+          No se pudo comprobar tu perfil. No se puede abrir la aplicación.
+        </p>
+        <Button variant="outline" onClick={() => recargarPerfil()}>
+          Reintentar
+        </Button>
+      </div>
+    );
+  }
+
+  if (perfil?.debe_cambiar_password) {
+    return <CambioPasswordObligatorio />;
+  }
+
   const items = [
     ...menuItems,
     ...(isAdmin || can("puede_gestionar_usuarios")
       ? [{ to: "/usuarios", label: "Usuarios", icon: Users }]
       : []),
-    ...(permisos?.puede_gestionar_usuarios === true
+    ...(puedeGestionarConfiguracion(perfil, permisos)
       ? [{ to: "/configuracion", label: "Configuración", icon: Settings }]
       : []),
   ];

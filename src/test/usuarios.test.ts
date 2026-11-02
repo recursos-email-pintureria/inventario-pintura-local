@@ -1,11 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cargarUsuarios } from "@/lib/usuarios";
+import { cargarUsuarios, resetearPasswordUsuario } from "@/lib/usuarios";
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
-vi.mock("@/lib/supabase", () => ({ supabase: { from } }));
+const { from, invoke, edgeFunctionErrorMessage } = vi.hoisted(() => ({
+  from: vi.fn(),
+  invoke: vi.fn(),
+  edgeFunctionErrorMessage: vi.fn(async (error: unknown) =>
+    error instanceof Error ? error.message : "Error inesperado",
+  ),
+}));
+vi.mock("@/lib/supabase", () => ({
+  edgeFunctionErrorMessage,
+  supabase: { from, functions: { invoke } },
+}));
 
 describe("Carga de usuarios sin relación directa entre tablas", () => {
-  beforeEach(() => from.mockReset());
+  beforeEach(() => {
+    from.mockReset();
+    invoke.mockReset();
+    edgeFunctionErrorMessage.mockClear();
+  });
 
   it("conserva el correo de Javier y asocia permisos por identificador", async () => {
     const perfil = {
@@ -48,5 +61,27 @@ describe("Carga de usuarios sin relación directa entre tablas", () => {
           : Promise.resolve({ data: [], error: null }),
     }));
     await expect(cargarUsuarios()).rejects.toThrow("Acceso denegado");
+  });
+
+  it("solicita el reset con identificador, email y opción de cambio obligatorio", async () => {
+    invoke.mockResolvedValue({ data: { success: true }, error: null });
+    const usuario = { id: "usuario-1", correo: "usuario@example.com" };
+
+    await expect(resetearPasswordUsuario(usuario, true)).resolves.toBeUndefined();
+    expect(invoke).toHaveBeenCalledWith("reset-password-admin", {
+      body: {
+        id_usuario: "usuario-1",
+        email: "usuario@example.com",
+        forzar_cambio: true,
+      },
+    });
+  });
+
+  it("no presenta un reset fallido como exitoso", async () => {
+    invoke.mockResolvedValue({ data: null, error: new Error("Email no enviado") });
+
+    await expect(
+      resetearPasswordUsuario({ id: "usuario-1", correo: "usuario@example.com" }, false),
+    ).rejects.toThrow("Email no enviado");
   });
 });

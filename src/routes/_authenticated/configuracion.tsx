@@ -22,7 +22,7 @@ import { z } from "zod";
 import { useTheme } from "@/components/theme/theme-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEnviarEmail } from "@/hooks/useEnviarEmail";
-import { useMyProfile } from "@/hooks/usePermissions";
+import { puedeGestionarConfiguracion, useMyProfile } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,8 +82,7 @@ export const Route = createFileRoute("/_authenticated/configuracion")({
     if (profileError) throw profileError;
     if (permissionsError) throw permissionsError;
 
-    const active = profile?.activo === true;
-    const allowed = active && permissions?.puede_gestionar_usuarios === true;
+    const allowed = puedeGestionarConfiguracion(profile, permissions);
     if (!allowed) throw redirect({ to: "/" });
   },
   component: ConfiguracionPage,

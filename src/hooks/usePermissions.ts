@@ -1,6 +1,7 @@
 /** Perfil, rol y permisos del usuario actual, leídos de la base de datos. */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { cerrarSesionLocal } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface PerfilUsuario {
@@ -9,6 +10,7 @@ export interface PerfilUsuario {
   correo: string;
   rol: "admin" | "vendedor" | "visualizador";
   activo: boolean;
+  debe_cambiar_password: boolean;
 }
 
 export interface PermisosUsuario {
@@ -25,9 +27,19 @@ export interface PermisosUsuario {
 
 export type Permiso = keyof Omit<PermisosUsuario, "id_usuario">;
 
-/** Cierra la sesión del usuario actual en Supabase. */
+/** Cierra solo la sesión actual, incluso si su JWT ya no es válido. */
 export async function cerrarSesion() {
-  await supabase.auth.signOut();
+  await cerrarSesionLocal();
+}
+
+export function puedeGestionarConfiguracion(
+  perfil: Pick<PerfilUsuario, "rol" | "activo"> | null,
+  permisos: Pick<PermisosUsuario, "puede_gestionar_usuarios"> | null,
+): boolean {
+  return (
+    perfil?.activo === true &&
+    (perfil.rol === "admin" || permisos?.puede_gestionar_usuarios === true)
+  );
 }
 
 export function useMyProfile() {
