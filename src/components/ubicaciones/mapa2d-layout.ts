@@ -1,3 +1,5 @@
+import type { Ubicacion } from "@/lib/tipos";
+
 export type MapaTipoUbicacion =
   "seccion" | "pasillo" | "reserva" | "armario" | "alto" | "caja" | "cross" | "perimetral";
 
@@ -78,12 +80,15 @@ export interface Mapa2DLayout {
   positions: Map<string, { x: number; y: number }>;
 }
 
-const CANVAS_WIDTH = 1480;
+export const TOTAL_ANCHO_MAPA = 1480;
+export const ALTURA_PERIMETRAL = 96;
+
+const CANVAS_WIDTH = TOTAL_ANCHO_MAPA;
 const CONTENT_X = 32;
 const CONTENT_WIDTH = CANVAS_WIDTH - CONTENT_X * 2;
 const TITLE_Y = 26;
 const PERIMETER_Y = 74;
-const PERIMETER_HEIGHT = 96;
+const PERIMETER_HEIGHT = ALTURA_PERIMETRAL;
 const AISLES_Y = 228;
 const AISLE_WIDTH = 44;
 const AISLE_GAP = 8;
@@ -133,6 +138,12 @@ function isPerimeterLocation(location: MapaUbicacion): boolean {
 }
 
 function isPerimeterAisle(location: MapaUbicacion): boolean {
+  if (
+    location.tipo?.toLowerCase() === "perimetral" ||
+    location.nombre?.toLowerCase() === "perimetral"
+  ) {
+    return true;
+  }
   if (location.tipo !== "pasillo") return false;
   const label = `${location.codigo} ${location.nombre}`.toLocaleLowerCase();
   return label.includes("perimetral") || label.includes("perímetro");
@@ -214,6 +225,7 @@ export function getMapa2DLayout(locations: MapaUbicacion[]): Mapa2DLayout {
   const perimeterLocations = locations
     .filter(
       (location) =>
+        location.activo === true &&
         !perimeterAisleIds.has(location.id) &&
         (isPerimeterLocation(location) ||
           (location.padreId !== null && perimeterAisleIds.has(location.padreId))),
@@ -396,4 +408,31 @@ export function getMapaStockLevel(
   if (products.some((product) => product.cantidad <= product.stock_minimo)) return "critico";
   if (products.some((product) => product.cantidad <= product.stock_minimo * 2)) return "medio";
   return "normal";
+}
+
+export function calcularLayoutPerimetral<T extends Ubicacion | MapaUbicacion = Ubicacion>(
+  ubicaciones: T[],
+) {
+  const perimetral = ubicaciones.find(
+    (u) => u.tipo?.toLowerCase() === "perimetral" || u.nombre?.toLowerCase() === "perimetral",
+  );
+
+  if (!perimetral) return null;
+
+  const hijos = ubicaciones.filter((u) => {
+    const parentId = "id_ubicacion_padre" in u ? u.id_ubicacion_padre : (u as MapaUbicacion).padreId;
+    return parentId === perimetral.id && u.activo === true;
+  });
+
+  const ubicacionesOrdenadas = [...hijos]
+    .sort((a, b) => {
+      return a.nombre.localeCompare(b.nombre, undefined, { numeric: true });
+    })
+    .reverse(); // Invertir para dibujar de derecha a izquierda en el plano
+
+  return {
+    padre: perimetral,
+    hijos: ubicacionesOrdenadas,
+    layout: { x: 0, y: 0, width: TOTAL_ANCHO_MAPA, height: ALTURA_PERIMETRAL },
+  };
 }

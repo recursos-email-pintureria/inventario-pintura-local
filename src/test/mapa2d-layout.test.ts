@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  calcularLayoutPerimetral,
   getMapa2DLayout,
   getMapaStockLevel,
   getMapaTipoVisual,
+  TOTAL_ANCHO_MAPA,
+  ALTURA_PERIMETRAL,
   type MapaUbicacion,
 } from "@/components/ubicaciones/mapa2d-layout";
 
@@ -330,5 +333,60 @@ describe("getMapa2DLayout", () => {
     expect(getMapaStockLevel([{ ...product, cantidad: 4 }], 4)).toBe("critico");
     expect(getMapaStockLevel([{ ...product, cantidad: 8 }], 8)).toBe("medio");
     expect(getMapaStockLevel([{ ...product, cantidad: 20 }], 20)).toBe("normal");
+  });
+
+  describe("calcularLayoutPerimetral", () => {
+    it("devuelve null si no existe perimetral", () => {
+      const result = calcularLayoutPerimetral([]);
+      expect(result).toBeNull();
+    });
+
+    it("encuentra el padre por tipo o nombre insensible a mayúsculas y filtra inactivos ordenando de derecha a izquierda", () => {
+      const perimetral = {
+        id: "peri-1",
+        nombre: "Perimetral",
+        tipo: "pasillo",
+        activo: true,
+      };
+      const hijos = [
+        { id: "h1", id_ubicacion_padre: "peri-1", nombre: "E735", tipo: "armario", activo: true },
+        { id: "h2", id_ubicacion_padre: "peri-1", nombre: "E738", tipo: "armario", activo: true },
+        { id: "h3", id_ubicacion_padre: "peri-1", nombre: "E736", tipo: "armario", activo: false }, // inactivo
+        { id: "h4", id_ubicacion_padre: "peri-1", nombre: "E744", tipo: "armario", activo: true },
+        { id: "h5", id_ubicacion_padre: "otro", nombre: "E700", tipo: "armario", activo: true },
+      ];
+
+      const resultado = calcularLayoutPerimetral([perimetral, ...hijos]);
+      expect(resultado).not.toBeNull();
+      expect(resultado?.padre.id).toBe("peri-1");
+      expect(resultado?.layout).toEqual({
+        x: 0,
+        y: 0,
+        width: TOTAL_ANCHO_MAPA,
+        height: ALTURA_PERIMETRAL,
+      });
+      // Inactivos excluidos y orden inverso (derecha a izquierda: E744, E738, E735)
+      expect(resultado?.hijos.map((h) => h.nombre)).toEqual(["E744", "E738", "E735"]);
+    });
+
+    it("encuentra el perimetral cuando tipo='perimetral'", () => {
+      const perimetral = {
+        id: "peri-tipo",
+        nombre: "Zona Externa",
+        tipo: "perimetral",
+        activo: true,
+      };
+      const hijo = {
+        id: "h1",
+        id_ubicacion_padre: "peri-tipo",
+        nombre: "E735",
+        tipo: "armario",
+        activo: true,
+      };
+
+      const resultado = calcularLayoutPerimetral([perimetral, hijo]);
+      expect(resultado?.padre.id).toBe("peri-tipo");
+      expect(resultado?.hijos).toHaveLength(1);
+    });
   });
 });

@@ -626,6 +626,57 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
   return filas.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 }
 
+export type TipoMovimiento = "entrada" | "salida" | "reposicion" | "ajuste";
+
+export interface DatosMovimiento {
+  id_producto: string;
+  id_ubicacion: string;
+  tipo: TipoMovimiento;
+  cantidad: number;
+  notas?: string | null;
+  id_palet?: string | null;
+}
+
+/**
+ * Registra un movimiento atómico en la tabla `movimientos`.
+ * El trigger de PostgreSQL `actualizar_stock` calcula y actualiza el stock automáticamente.
+ */
+export async function registrarMovimiento(d: DatosMovimiento): Promise<{ success: boolean }> {
+  // 1. Validar cantidad (la BD exige cantidad > 0 estrictamente)
+  if (d.cantidad <= 0) {
+    throw new Error("La cantidad debe ser mayor a 0.");
+  }
+
+  // 2. Verificar sesión ANTES del insert
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error("Sesión no válida. Inicie sesión para realizar movimientos.");
+  }
+
+  // 3. Insertar sin .select().single() para evitar errores 42501 de RLS
+  const { error } = await supabase.from("movimientos").insert({
+    id_producto: d.id_producto,
+    id_ubicacion: d.id_ubicacion,
+    tipo: d.tipo,
+    cantidad: d.cantidad,
+    notas: d.notas?.trim() || null,
+    realizado_por: session.user.id,
+    ...(d.id_palet && { id_palet: d.id_palet }),
+    // fecha_movimiento se omite intencionalmente para usar DEFAULT now() de PostgreSQL
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      throw new Error("No tiene permisos para realizar este movimiento.");
+    }
+    throw new Error(`Error de base de datos: ${error.message}`);
+  }
+
+  return { success: true };
+}
+
 /**
  * REGISTRO DE MOVIMIENTO — REGLA DE ORO
  * 1. Nunca toca `stock`.
@@ -633,17 +684,18 @@ export async function getMovimientos(): Promise<MovimientoDetallado[]> {
  *    - Si objetivo === stock actual → no se registra nada.
  *    - Si objetivo === 0 → se convierte en `salida` por el stock total
  *      (el trigger rechaza cantidad <= 0).
- * 3. INSERT en `movimientos` → el trigger `actualizar_stock` actualiza el stock.
+ * 3. Delega en `registrarMovimiento` para la inserción limpia en `movimientos`.
  */
 export async function crearMovimiento(input: {
   id_producto: string;
   id_ubicacion: string;
-  tipo: "entrada" | "salida" | "reposicion" | "ajuste";
+  tipo: TipoMovimiento;
   cantidad: number; // en `ajuste`: stock objetivo absoluto
-  motivo?: string;
-  id_palet?: string;
+  motivo?: string | null;
+  notas?: string | null;
+  id_palet?: string | null;
 }): Promise<void> {
-  let tipoFinal: typeof input.tipo = input.tipo;
+  let tipoFinal: TipoMovimiento = input.tipo;
   let cantidadFinal = Number(input.cantidad);
 
   if (input.tipo === "ajuste") {
@@ -669,31 +721,14 @@ export async function crearMovimiento(input: {
     }
   }
 
-  if (!(cantidadFinal > 0)) {
-    throw new Error("La cantidad debe ser mayor que 0.");
-  }
-
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) throw new Error("Debes iniciar sesión para registrar el movimiento.");
-
-  const payload: Record<string, unknown> = {
+  await registrarMovimiento({
     id_producto: input.id_producto,
     id_ubicacion: input.id_ubicacion,
     tipo: tipoFinal,
     cantidad: cantidadFinal,
-    notas: input.motivo?.trim() ? input.motivo.trim() : null,
-    realizado_por: userData.user.id,
-    ...(input.id_palet ? { id_palet: input.id_palet } : {}),
-  };
-
-  const { error } = await supabase.from("movimientos").insert(payload);
-  if (error) {
-    if (error.code === "42501") {
-      throw new Error(`Permiso denegado (42501): ${error.message}`);
-    }
-    throw error;
-  }
+    notas: input.notas?.trim() || input.motivo?.trim() || null,
+    id_palet: input.id_palet || null,
+  });
 }
 
 export async function getTopUbicaciones(
