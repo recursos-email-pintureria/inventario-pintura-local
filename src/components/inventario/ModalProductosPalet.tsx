@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ajustarCantidadProductoEnPalet,
@@ -28,7 +28,6 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   Boxes,
-  Barcode,
   Package,
   Calendar,
   User,
@@ -44,6 +43,12 @@ import {
   MapPin,
   Pencil,
 } from "lucide-react";
+import { EtiquetaPalet } from "@/components/inventario/EtiquetaPalet";
+import { ModalInformeInventario } from "@/components/inventario/ModalInformeInventario";
+import { useAuth } from "@/contexts/AuthContext";
+import { puedeExportarInventario, useMyProfile } from "@/hooks/usePermissions";
+import { usePrint } from "@/lib/print";
+import { crearInformePalet, type InformeInventario } from "@/lib/reportes";
 
 export interface ProductoPaletItem {
   id: string;
@@ -93,10 +98,16 @@ export function ModalProductosPalet({
   onPaletDesactivado,
 }: ModalProductosPaletProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { perfil } = useMyProfile();
+  const puedeExportar = puedeExportarInventario(perfil);
+  const imprimirEtiqueta = usePrint();
 
   // Estados de vista y gestión
-  const [modo, setModo] = useState<"lista" | "anadir" | "etiqueta" | "listado_impresion">("lista");
+  const [modo, setModo] = useState<"lista" | "anadir" | "etiqueta">("lista");
   const [busqueda, setBusqueda] = useState("");
+  const [modalInformeAbierto, setModalInformeAbierto] = useState(false);
+  const [informePalet, setInformePalet] = useState<InformeInventario | null>(null);
 
   // Estados para añadir/editar producto
   const [inputBusquedaCatalogo, setInputBusquedaCatalogo] = useState("");
@@ -113,73 +124,6 @@ export function ModalProductosPalet({
   const [confirmarBajaManual, setConfirmarBajaManual] = useState(false);
   const [confirmarAutodestruccion, setConfirmarAutodestruccion] = useState(false);
   const [ejecutandoBaja, setEjecutandoBaja] = useState(false);
-
-  // 🖨️ INYECTAR ESTILOS DE IMPRESIÓN AL MONTAR EL COMPONENTE
-  useEffect(() => {
-    const styleId = "print-styles-palet";
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement("style");
-      style.id = styleId;
-      style.textContent = `
-        @media print {
-          /* 1. Ocultar el overlay oscuro del modal (Radix UI) */
-          [data-radix-dialog-overlay],
-          div[style*="background-color: rgba(0, 0, 0, 0.8)"] {
-            display: none !important;
-          }
-
-          /* 2. Resetear el contenedor del modal para que no tenga posición fija */
-          [data-radix-dialog-content] {
-            position: static !important;
-            transform: none !important;
-            max-height: none !important;
-            max-width: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-            border: none !important;
-            background: transparent !important;
-            overflow: visible !important;
-          }
-
-          /* 3. Ocultar elementos de la UI que no deben imprimirse */
-          .no-print {
-            display: none !important;
-          }
-
-          /* 4. Asegurar que el área de impresión sea visible y tenga fondo blanco */
-          .print-area {
-            display: block !important;
-            background: white !important;
-            padding: 20px !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            border: 1px solid #e5e7eb !important;
-          }
-
-          /* 5. Forzar impresión de colores de fondo */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* 6. Configuración de la página */
-          @page {
-            margin: 1cm;
-            size: auto;
-          }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    return () => {
-      const existingStyle = document.getElementById(styleId);
-      if (existingStyle) {
-        document.head.removeChild(existingStyle);
-      }
-    };
-  }, []);
 
   // Consulta reactiva de productos dentro del palet
   const {
@@ -203,6 +147,44 @@ export function ModalProductosPalet({
     nombre: item.nombre ?? "Producto sin nombre",
     cantidad: item.cantidad,
   }));
+
+  const informeActual = useMemo(() => {
+    if (!palet) return null;
+    const nombreMetadata = user?.user_metadata?.["full_name"];
+    const generadoPor =
+      (typeof nombreMetadata === "string" && nombreMetadata.trim()) ||
+      user?.email ||
+      palet.generado_por ||
+      "Usuario";
+
+    return crearInformePalet(
+      {
+        id: palet.id,
+        numero_palet: palet.numero_palet,
+        codigo_barras: palet.codigo_barras,
+        generado_por: palet.generado_por,
+        generado_en: palet.generado_en,
+        productos: productos.map((producto) => ({
+          sku: producto.sku,
+          nombre: producto.nombre,
+          categoria: "",
+          cantidad: producto.cantidad,
+          stock_minimo: 0,
+        })),
+      },
+      { generadoPor, seccion: palet.reserva_nombre || "Reserva" },
+    );
+  }, [palet, productos, user]);
+
+  const abrirInformePalet = () => {
+    if (!puedeExportar) {
+      toast.error("No tienes permisos para exportar inventario.");
+      return;
+    }
+    if (!informeActual) return;
+    setInformePalet(informeActual);
+    setModalInformeAbierto(true);
+  };
 
   const productoMutation = useMutation({
     mutationFn: async (operacion: ProductoPaletOperacion) => {
@@ -429,10 +411,6 @@ export function ModalProductosPalet({
     }
   }
 
-  function lanzarImpresion() {
-    window.print();
-  }
-
   if (!palet) return null;
 
   const fechaFormateada = new Date(palet.generado_en).toLocaleDateString("es-ES", {
@@ -444,7 +422,7 @@ export function ModalProductosPalet({
   return (
     <>
       <Dialog open={abierto} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="print-target max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
           {/* CABECERA PRINCIPAL DEL PALET (Se oculta al imprimir) */}
           <div className="bg-amber-600 text-white p-5 rounded-t-lg no-print">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -475,27 +453,31 @@ export function ModalProductosPalet({
               </div>
 
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setModo("etiqueta")}
-                  className="bg-white text-amber-900 hover:bg-amber-50 h-8 text-xs font-semibold gap-1 shadow-2xs"
-                  title="Generar e imprimir etiqueta"
-                >
-                  <Barcode className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Imprimir etiqueta</span>
-                </Button>
+                {puedeExportar && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setModo("etiqueta")}
+                      className="bg-white text-amber-900 hover:bg-amber-50 h-8 text-xs font-semibold gap-1 shadow-2xs"
+                      title="Generar e imprimir etiqueta"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Imprimir etiqueta</span>
+                    </Button>
 
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setModo("listado_impresion")}
-                  className="bg-white text-amber-900 hover:bg-amber-50 h-8 text-xs font-semibold gap-1 shadow-2xs"
-                  title="Imprimir albarán / desglose"
-                >
-                  <Printer className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Imprimir listado</span>
-                </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={abrirInformePalet}
+                      className="bg-white text-amber-900 hover:bg-amber-50 h-8 text-xs font-semibold gap-1 shadow-2xs"
+                      title="Generar informe del palet"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Informe / Exportar</span>
+                    </Button>
+                  </>
+                )}
 
                 <Button
                   size="sm"
@@ -859,7 +841,7 @@ export function ModalProductosPalet({
                   </Button>
                   <Button
                     size="sm"
-                    onClick={lanzarImpresion}
+                    onClick={imprimirEtiqueta}
                     className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5"
                   >
                     <Printer className="w-3.5 h-3.5" />
@@ -867,153 +849,21 @@ export function ModalProductosPalet({
                   </Button>
                 </div>
 
-                {/* Área de impresión de etiqueta */}
-                <div className="print-area p-6 border-2 border-dashed border-gray-400 bg-white rounded-lg text-center space-y-4 max-w-md mx-auto shadow-sm">
-                  <div className="border-b-2 border-gray-800 pb-2 flex justify-between items-center text-left">
-                    <div>
-                      <div className="font-extrabold text-sm uppercase tracking-wider text-gray-900">
-                        ETIQUETA DE PALET
-                      </div>
-                      <div className="text-[10px] text-gray-500 font-mono">
-                        SISTEMA DE INVENTARIO
-                      </div>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="font-mono text-xs font-bold border-gray-400"
-                    >
-                      #{String(palet.numero_palet).padStart(3, "0")}
-                    </Badge>
-                  </div>
-
-                  <div className="py-4 space-y-2">
-                    <div className="flex justify-center text-gray-900">
-                      <Barcode className="w-48 h-16" />
-                    </div>
-                    <div className="font-mono text-xl sm:text-2xl font-black tracking-widest text-gray-900">
-                      {palet.codigo_barras}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-left bg-gray-50 p-3 rounded border border-gray-200 text-xs">
-                    <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
-                        Reserva:
-                      </span>
-                      <span className="font-bold text-gray-900">
-                        {palet.reserva_nombre || "Zona Reserva"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
-                        Generado por:
-                      </span>
-                      <span className="font-bold text-gray-900">{palet.generado_por}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
-                        Fecha:
-                      </span>
-                      <span className="font-medium text-gray-700">{fechaFormateada}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-semibold">
-                        Contenido:
-                      </span>
-                      <span className="font-bold text-gray-900">
-                        {totalLineas} ref. / {totalUnidades} uds
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* VISTA 4: LISTADO IMPRIMIBLE */}
-            {modo === "listado_impresion" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center no-print">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setModo("lista")}
-                    className="h-7 px-2 text-xs text-gray-600"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-                    <span>Volver</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={lanzarImpresion}
-                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Imprimir desglose A4</span>
-                  </Button>
-                </div>
-
-                {/* Área de impresión de listado */}
-                <div className="print-area p-6 border border-gray-300 bg-white rounded-lg space-y-4 max-w-2xl mx-auto shadow-sm">
-                  <div className="border-b-2 border-gray-800 pb-3 flex justify-between items-start">
-                    <div>
-                      <div className="text-xs uppercase font-bold text-gray-500">INVENTARIO</div>
-                      <h3 className="text-lg font-bold text-gray-900">
-                        Desglose de Mercancía en Palet
-                      </h3>
-                      <div className="font-mono text-sm font-semibold text-amber-900">
-                        {palet.codigo_barras}
-                      </div>
-                    </div>
-                    <div className="text-right text-xs text-gray-600">
-                      <div>Fecha: {fechaFormateada}</div>
-                      <div>Reserva: {palet.reserva_nombre || "Reserva"}</div>
-                      <div>Generado por: {palet.generado_por}</div>
-                    </div>
-                  </div>
-
-                  <table className="w-full text-left text-xs border border-gray-200 border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200 text-[10px] uppercase">
-                        <th className="py-1.5 px-2">Código</th>
-                        <th className="py-1.5 px-2">SKU</th>
-                        <th className="py-1.5 px-2">Producto</th>
-                        <th className="py-1.5 px-2 text-right">Cantidad</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {productos.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="py-4 text-center text-gray-400 italic">
-                            Sin mercancía registrada
-                          </td>
-                        </tr>
-                      ) : (
-                        productos.map((prod) => (
-                          <tr key={prod.id_producto}>
-                            <td className="py-1.5 px-2 font-mono text-gray-600">
-                              {prod.codigo_barras || "-"}
-                            </td>
-                            <td className="py-1.5 px-2 font-mono font-medium text-gray-800">
-                              {prod.sku || "-"}
-                            </td>
-                            <td className="py-1.5 px-2 text-gray-900">{prod.nombre}</td>
-                            <td className="py-1.5 px-2 text-right font-bold text-gray-900">
-                              {prod.cantidad} uds
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                    <tfoot className="bg-gray-50 font-bold border-t border-gray-300">
-                      <tr>
-                        <td colSpan={3} className="py-2 px-2 text-right">
-                          Total Unidades Físicas:
-                        </td>
-                        <td className="py-2 px-2 text-right text-amber-900">{totalUnidades} uds</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+                <EtiquetaPalet
+                  palet={{
+                    numero_palet: palet.numero_palet,
+                    codigo_barras: palet.codigo_barras,
+                    reserva_nombre: palet.reserva_nombre ?? "Reserva",
+                    generado_por: palet.generado_por,
+                    generado_en: palet.generado_en,
+                    productos: productos.map((producto) => ({
+                      id: producto.id,
+                      nombre: producto.nombre,
+                      sku: producto.sku,
+                      cantidad: producto.cantidad,
+                    })),
+                  }}
+                />
               </div>
             )}
           </div>
@@ -1030,6 +880,16 @@ export function ModalProductosPalet({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ModalInformeInventario
+        abierto={modalInformeAbierto}
+        onOpenChange={setModalInformeAbierto}
+        informe={informePalet}
+        puedeExportar={puedeExportar}
+        puedeEnviarEmail={puedeExportar}
+        esAdmin={perfil?.rol === "admin" && perfil.activo === true}
+        emailPropio={user?.email ?? ""}
+      />
 
       {/* DIÁLOGO 1: CONFIRMACIÓN DE BAJA MANUAL */}
       <AlertDialog open={confirmarBajaManual} onOpenChange={setConfirmarBajaManual}>

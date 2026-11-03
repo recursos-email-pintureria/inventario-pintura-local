@@ -88,6 +88,7 @@ import {
   desactivarProducto,
 } from "@/lib/inventario";
 import type { Producto, Categoria } from "@/lib/tipos";
+import { puedeExportarInventario, useMyProfile } from "@/hooks/usePermissions";
 
 // ============================================================================
 // DEFINICIÓN DE TIPOS
@@ -150,6 +151,8 @@ function adaptarProducto(p: Producto): ProductoItem {
 
 function ProductosPage() {
   const queryClient = useQueryClient();
+  const { perfil } = useMyProfile();
+  const puedeExportar = puedeExportarInventario(perfil);
 
   // 🔌 CONSULTAS REALES A SUPABASE
   const { data: productosRaw = [], isLoading: cargandoProductos } = useQuery<Producto[]>({
@@ -590,14 +593,16 @@ function ProductosPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={exportarCSV}
-            className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
-          >
-            <Download className="w-3.5 h-3.5 text-gray-500" />
-            <span>Exportar CSV</span>
-          </Button>
+          {puedeExportar && (
+            <Button
+              variant="outline"
+              onClick={exportarCSV}
+              className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5 text-gray-500" />
+              <span>Exportar CSV</span>
+            </Button>
+          )}
 
           <Button
             variant="outline"

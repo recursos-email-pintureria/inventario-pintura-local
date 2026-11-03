@@ -215,55 +215,53 @@
 }
 
 @media print {
-  [data-radix-dialog-overlay] {
+  body.printing .app-shell,
+  body.printing [data-radix-dialog-overlay],
+  body.printing [data-radix-dialog-content]:not(.print-target),
+  body.printing [data-sonner-toaster],
+  body.printing .no-print {
     display: none !important;
   }
-  [data-radix-dialog-content] {
+
+  body.printing .print-target {
     position: static !important;
+    inset: auto !important;
     transform: none !important;
+    max-height: none !important;
+    max-width: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
     box-shadow: none !important;
     background: transparent !important;
-  }
-  aside,
-  header,
-  nav,
-  .no-print,
-  .screen-only,
-  button:not(.print-include) {
-    display: none !important;
-  }
-
-  body {
-    background: white !important;
-    color: black !important;
-  }
-
-  main,
-  .flex-1,
-  div {
     overflow: visible !important;
-    height: auto !important;
   }
 
-  .print-only {
+  body.printing .print-area {
+    display: block !important;
+    background: white !important;
+  }
+
+  body.printing .print-only {
     display: block !important;
   }
 
-  table,
-  tr,
-  .divide-y > div,
-  .break-inside-avoid {
+  body.printing table,
+  body.printing tr,
+  body.printing .divide-y > div,
+  body.printing .break-inside-avoid {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  * {
+  body.printing * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   @page {
-    margin: 1cm;
+    margin: 10mm;
     size: auto;
   }
 }

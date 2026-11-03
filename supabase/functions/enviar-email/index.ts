@@ -1,11 +1,24 @@
 import { createClient } from "npm:@supabase/supabase-js@2.118.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.118.0/cors";
 
+interface EmailAttachment {
+  filename: string;
+  content: string;
+}
+
 interface EmailInput {
   destinatario: string;
   asunto: string;
   cuerpo: string;
-  tipo?: "incidencia";
+  tipo?: "incidencia" | "reporte_inventario";
+  adjunto?: EmailAttachment;
+}
+
+const MAX_ADJUNTO_BYTES = 1024 * 1024;
+
+function bytesDeBase64(base64: string): number {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
 }
 
 interface EmailProviderResponse {
@@ -42,16 +55,49 @@ function parseEmailInput(value: unknown): EmailInput | null {
   const asunto = typeof value["asunto"] === "string" ? value["asunto"].trim() : "";
   const cuerpo = typeof value["cuerpo"] === "string" ? value["cuerpo"].trim() : "";
   const tipo = value["tipo"];
+  const adjuntoValue = value["adjunto"];
   const formatoEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   if (!formatoEmail.test(destinatario) || destinatario.length > 254) return null;
   if (!asunto || asunto.length > 150 || /[\r\n]/.test(asunto)) return null;
   if (!cuerpo || cuerpo.length > 20_000) return null;
-  if (tipo !== undefined && tipo !== "incidencia") return null;
+  if (tipo !== undefined && tipo !== "incidencia" && tipo !== "reporte_inventario") return null;
+  const tipoValido = tipo === "incidencia" || tipo === "reporte_inventario" ? tipo : undefined;
 
-  return tipo === "incidencia"
-    ? { destinatario, asunto, cuerpo, tipo }
-    : { destinatario, asunto, cuerpo };
+  let adjunto: EmailAttachment | undefined;
+  if (adjuntoValue !== undefined) {
+    if (!isRecord(adjuntoValue) || tipoValido !== "reporte_inventario") return null;
+
+    const filename =
+      typeof adjuntoValue["filename"] === "string" ? adjuntoValue["filename"].trim() : "";
+    const content =
+      typeof adjuntoValue["content"] === "string" ? adjuntoValue["content"].trim() : "";
+
+    if (
+      !filename ||
+      filename.length > 120 ||
+      !/^[^\\/\r\n]+\.pdf$/i.test(filename) ||
+      !content ||
+      content.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(content) ||
+      !content.startsWith("JVBERi0") ||
+      bytesDeBase64(content) > MAX_ADJUNTO_BYTES
+    ) {
+      return null;
+    }
+
+    adjunto = { filename, content };
+  }
+
+  if (tipoValido === "reporte_inventario" && !adjunto) return null;
+
+  return {
+    destinatario,
+    asunto,
+    cuerpo,
+    ...(tipoValido !== undefined && { tipo: tipoValido }),
+    ...(adjunto !== undefined && { adjunto }),
+  };
 }
 
 async function handleRequest(request: Request): Promise<Response> {
@@ -109,7 +155,7 @@ async function handleRequest(request: Request): Promise<Response> {
     return jsonResponse(
       {
         error:
-          "Revisa los datos: destinatario válido, asunto de hasta 150 caracteres y cuerpo de hasta 20.000 caracteres.",
+          "Revisa los datos: destinatario válido, asunto de hasta 150 caracteres, cuerpo de hasta 20.000 caracteres y adjunto PDF de hasta 1 MB.",
       },
       400,
     );
@@ -155,7 +201,7 @@ async function handleRequest(request: Request): Promise<Response> {
       return jsonResponse(
         {
           error:
-            "Solo se pueden enviar emails a tu propia cuenta. Los reportes se limitan al email de soporte configurado.",
+            "Solo se pueden enviar emails a tu propia cuenta. Las incidencias se limitan al email de soporte configurado.",
         },
         403,
       );
@@ -181,6 +227,14 @@ async function handleRequest(request: Request): Promise<Response> {
         to: [email.destinatario],
         subject: email.asunto,
         text: email.cuerpo,
+        ...(email.adjunto && {
+          attachments: [
+            {
+              filename: email.adjunto.filename,
+              content: email.adjunto.content,
+            },
+          ],
+        }),
       }),
     });
   } catch (error) {

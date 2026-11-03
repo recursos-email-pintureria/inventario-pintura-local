@@ -35,7 +35,9 @@ describe("useEnviarEmail", () => {
     getSession.mockReset().mockResolvedValue({
       data: { session: { access_token: "valid-session-token" } },
     });
-    onAuthStateChange.mockReset();
+    onAuthStateChange.mockReset().mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    });
     invoke.mockReset().mockResolvedValue({ data: { id: "email-1" }, error: null });
     toastError.mockReset();
   });
@@ -74,5 +76,51 @@ describe("useEnviarEmail", () => {
     expect(requestOptions?.signal?.aborted).toBe(true);
     await expect(pendingRequest!).rejects.toMatchObject({ name: "AbortError" });
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("envía el tipo y el adjunto del informe recortados", async () => {
+    const { result } = renderHook(() => useEnviarEmail(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        destinatario: " admin@example.com ",
+        asunto: " Informe ",
+        cuerpo: " Adjunto el informe ",
+        tipo: "reporte_inventario",
+        adjunto: { filename: " informes/informe.pdf ", content: " JVBERi0xLjQ= " },
+      });
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "enviar-email",
+      expect.objectContaining({
+        body: {
+          destinatario: "admin@example.com",
+          asunto: "Informe",
+          cuerpo: "Adjunto el informe",
+          tipo: "reporte_inventario",
+          adjunto: { filename: "informes/informe.pdf", content: "JVBERi0xLjQ=" },
+        },
+      }),
+    );
+  });
+
+  it("rechaza un adjunto vacío sin invocar la función", async () => {
+    const { result } = renderHook(() => useEnviarEmail(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          destinatario: "admin@example.com",
+          asunto: "Informe",
+          cuerpo: "Adjunto el informe",
+          tipo: "reporte_inventario",
+          adjunto: { filename: "informe.pdf", content: "   " },
+        }),
+      ).rejects.toThrow("El adjunto del email no es válido.");
+    });
+
+    expect(invoke).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalled();
   });
 });

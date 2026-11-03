@@ -25,7 +25,6 @@ import {
   X,
   Trash2,
   Camera,
-  FileSpreadsheet,
   Printer,
   Minus,
   RefreshCw,
@@ -62,9 +61,26 @@ import {
   type Palet as PaletRegistro,
 } from "@/lib/palets";
 import { useAuth } from "@/contexts/AuthContext";
-import { puedeGestionarSecciones, useMyProfile } from "@/hooks/usePermissions";
+import {
+  puedeExportarInventario,
+  puedeGestionarSecciones,
+  useMyProfile,
+} from "@/hooks/usePermissions";
 import { getColorLateral } from "@/lib/tiposUbicacion";
 import { ModalProductosPalet } from "@/components/inventario/ModalProductosPalet";
+import { EtiquetaPalet } from "@/components/inventario/EtiquetaPalet";
+import { ModalInformeInventario } from "@/components/inventario/ModalInformeInventario";
+import { usePrint } from "@/lib/print";
+import {
+  crearInformePalet,
+  crearInformePasillo,
+  crearInformeReserva,
+  crearInformeUbicacion,
+  type InformeInventario,
+  type PaletInformeInput,
+  type ProductoInforme,
+  type UbicacionInformeInput,
+} from "@/lib/reportes";
 import { Mapa2DModal } from "@/components/ubicaciones/Mapa2DModal";
 import type { MapaUbicacion } from "@/components/ubicaciones/Mapa2D";
 import { useAddStock } from "@/hooks/useAddStock";
@@ -150,6 +166,37 @@ export interface UbicacionItem {
   productos: ProductoEnUbicacion[];
   subtitulo?: string;
   porcentaje_ocupacion?: number;
+}
+
+function aProductosInforme(productos: ProductoEnUbicacion[]): ProductoInforme[] {
+  return productos.map((producto) => ({
+    sku: producto.sku,
+    nombre: producto.nombre,
+    categoria: producto.categoria,
+    cantidad: producto.cantidad,
+    stock_minimo: producto.stock_minimo,
+  }));
+}
+
+function aUbicacionInforme(ubicacion: UbicacionItem): UbicacionInformeInput {
+  return {
+    id: ubicacion.id,
+    codigo: ubicacion.codigo,
+    nombre: ubicacion.nombre,
+    tipo: ubicacion.tipo,
+    productos: aProductosInforme(ubicacion.productos),
+  };
+}
+
+function aPaletInforme(palet: PaletItem): PaletInformeInput {
+  return {
+    id: palet.id,
+    numero_palet: palet.numero_palet,
+    codigo_barras: palet.codigo_barras,
+    generado_por: palet.generado_por,
+    generado_en: palet.generado_en,
+    productos: aProductosInforme(palet.productos),
+  };
 }
 
 // Configuración de niveles y colores estrictos según AGENTS.md
@@ -680,6 +727,8 @@ function UbicacionesPage() {
   const { user, loading: cargandoSesion } = useAuth();
   const { perfil, permisos } = useMyProfile();
   const seccionesGestionPermitida = puedeGestionarSecciones(perfil, permisos);
+  const puedeExportar = puedeExportarInventario(perfil);
+  const imprimirEtiqueta = usePrint();
   const usuarioNombre =
     [
       user?.user_metadata?.["full_name"] as string,
@@ -948,6 +997,8 @@ function UbicacionesPage() {
   const [errorPrevisualizacionPalet, setErrorPrevisualizacionPalet] = useState("");
   const [modalEtiquetaPaletAbierto, setModalEtiquetaPaletAbierto] = useState(false);
   const [paletParaImprimir, setPaletParaImprimir] = useState<PaletItem | null>(null);
+  const [modalInformeAbierto, setModalInformeAbierto] = useState(false);
+  const [informeActivo, setInformeActivo] = useState<InformeInventario | null>(null);
   const [paletSeleccionadoParaGestion, setPaletSeleccionadoParaGestion] =
     useState<PaletItem | null>(null);
   const [modalGestionPaletAbierto, setModalGestionPaletAbierto] = useState(false);
@@ -1562,47 +1613,55 @@ function UbicacionesPage() {
     setAlertOperacionAbierta(false);
   };
 
-  // Exportar Excel (CSV formateado) de la ubicación
-  const exportarExcelUbicacion = () => {
-    if (!ubicacionSeleccionada) return;
+  const abrirInformeUbicacion = () => {
+    const ubi = ubicacionSeleccionada;
+    if (!ubi) return;
+    if (!puedeExportar) {
+      toast.error("No tienes permisos para exportar inventario.");
+      return;
+    }
 
-    const encabezados = ["SKU", "Nombre", "Categoría", "Cantidad (Uds)", "Stock Mínimo", "Estado"];
-    const filas = (ubicacionSeleccionada.productos || []).map((p) => [
-      `"${p.sku}"`,
-      `"${p.nombre.replace(/"/g, '""')}"`,
-      `"${p.categoria}"`,
-      p.cantidad,
-      p.stock_minimo,
-      p.cantidad <= p.stock_minimo ? "BAJO STOCK" : "OK",
-    ]);
+    const meta = {
+      generadoPor: usuarioNombre || user?.email || "Usuario",
+      seccion: infoJerarquia.seccion,
+      pasillo: ubi.tipo === "pasillo" ? ubi.nombre : infoJerarquia.pasillo,
+    };
 
-    const contenidoCsv = [
-      `"Ubicación: ${ubicacionSeleccionada.nombre} [${ubicacionSeleccionada.codigo}]"`,
-      `"Jerarquía: ${infoJerarquia.seccion} > ${infoJerarquia.pasillo}"`,
-      `"Fecha de Extracción: ${new Date().toLocaleString()}"`,
-      "",
-      encabezados.join(";"),
-      ...filas.map((f) => f.join(";")),
-    ].join("\r\n");
+    let informe: InformeInventario;
+    if (ubi.tipo === "pasillo") {
+      const posiciones = ubicaciones
+        .filter(
+          (ubicacion) =>
+            ubicacion.id_padre === ubi.id &&
+            (ubicacion.tipo === "armario" || ubicacion.tipo === "cross"),
+        )
+        .map(aUbicacionInforme);
+      informe = crearInformePasillo(ubi, posiciones, meta);
+    } else if (ubi.tipo === "reserva") {
+      const paletsReserva = palets
+        .filter((palet) => palet.activo && palet.id_reserva === ubi.id)
+        .map(aPaletInforme);
+      informe = crearInformeReserva(ubi, paletsReserva, meta);
+    } else {
+      informe = crearInformeUbicacion(aUbicacionInforme(ubi), meta);
+    }
 
-    const blob = new Blob(["\uFEFF" + contenidoCsv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `Inventario_${ubicacionSeleccionada.codigo}_${new Date().toISOString().slice(0, 10)}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast.success(`Excel / CSV de ${ubicacionSeleccionada.nombre} descargado correctamente`);
+    setInformeActivo(informe);
+    setModalInformeAbierto(true);
   };
 
-  // Imprimir PDF / Documento físico
-  const imprimirPdfUbicacion = () => {
-    window.print();
+  const abrirInformePalet = (palet: PaletItem) => {
+    if (!puedeExportar) {
+      toast.error("No tienes permisos para exportar inventario.");
+      return;
+    }
+    const reserva = ubicaciones.find((ubicacion) => ubicacion.id === palet.id_reserva);
+    const informe = crearInformePalet(aPaletInforme(palet), {
+      generadoPor: usuarioNombre || user?.email || "Usuario",
+      seccion: reserva?.nombre || "Reserva",
+    });
+    setInformeActivo(informe);
+    setModalInformeAbierto(true);
   };
 
   // ----------------------------------------------------
@@ -2708,17 +2767,29 @@ function UbicacionesPage() {
                                         </div>
 
                                         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                              setPaletParaImprimir(palet);
-                                              setModalEtiquetaPaletAbierto(true);
-                                            }}
-                                            className="flex-1 h-7 text-xs border-amber-200 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
-                                          >
-                                            <Printer className="w-3 h-3" /> Imprimir Etiqueta
-                                          </Button>
+                                          {puedeExportar && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => {
+                                                setPaletParaImprimir(palet);
+                                                setModalEtiquetaPaletAbierto(true);
+                                              }}
+                                              className="flex-1 h-7 text-xs border-amber-200 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
+                                            >
+                                              <Printer className="w-3 h-3" /> Imprimir Etiqueta
+                                            </Button>
+                                          )}
+                                          {puedeExportar && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => abrirInformePalet(palet)}
+                                              className="flex-1 h-7 text-xs border-amber-200 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
+                                            >
+                                              <Printer className="w-3 h-3" /> Informe
+                                            </Button>
+                                          )}
                                           <Button
                                             size="sm"
                                             variant="outline"
@@ -3111,39 +3182,32 @@ function UbicacionesPage() {
                         <Plus className="w-3.5 h-3.5" />
                         Crear Palet en Reserva
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.print()}
-                        className="h-8 text-xs border-amber-300 text-amber-900 hover:bg-amber-100 gap-1.5 font-medium"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-amber-700" />
-                        Imprimir Listado
-                      </Button>
+                      {puedeExportar && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={abrirInformeUbicacion}
+                          className="h-8 text-xs border-amber-300 text-amber-900 hover:bg-amber-100 gap-1.5 font-medium"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-amber-700" />
+                          Informe de Reserva
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={imprimirPdfUbicacion}
-                        className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
-                        title="Imprimir PDF del contenido del armario"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-blue-600" />
-                        Imprimir PDF
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={exportarExcelUbicacion}
-                        className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
-                        title="Descargar hoja Excel (.csv) del armario"
-                      >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                        Exportar Excel
-                      </Button>
+                      {puedeExportar && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={abrirInformeUbicacion}
+                          className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
+                          title="Generar informe, PDF, Excel o email de esta ubicación"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-blue-600" />
+                          Informe / Exportar
+                        </Button>
+                      )}
 
                       <Button
                         variant={mostrarEscaner ? "default" : "outline"}
@@ -3310,18 +3374,32 @@ function UbicacionesPage() {
 
                               {/* ACCIONES: IMPRIMIR ETIQUETA Y REPONER EN TIENDA */}
                               <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setPaletParaImprimir(palet);
-                                    setModalEtiquetaPaletAbierto(true);
-                                  }}
-                                  className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
-                                >
-                                  <Printer className="w-3.5 h-3.5 text-amber-700" />
-                                  Imprimir Etiqueta
-                                </Button>
+                                {puedeExportar && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setPaletParaImprimir(palet);
+                                      setModalEtiquetaPaletAbierto(true);
+                                    }}
+                                    className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
+                                  >
+                                    <Printer className="w-3.5 h-3.5 text-amber-700" />
+                                    Imprimir Etiqueta
+                                  </Button>
+                                )}
+
+                                {puedeExportar && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => abrirInformePalet(palet)}
+                                    className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
+                                  >
+                                    <Printer className="w-3.5 h-3.5 text-amber-700" />
+                                    Informe
+                                  </Button>
+                                )}
 
                                 <Button
                                   variant="outline"
@@ -3796,10 +3874,10 @@ function UbicacionesPage() {
       {/* 🏷️ MODAL DE ETIQUETA IMPRIMIBLE DE PALET (HOMOLOGADA) */}
       {/* ========================================================================= */}
       <Dialog open={modalEtiquetaPaletAbierto} onOpenChange={setModalEtiquetaPaletAbierto}>
-        <DialogContent className="max-w-md p-6 bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Barcode className="w-5 h-5 text-amber-600" />
+        <DialogContent className="print-target max-w-md bg-white p-6">
+          <DialogHeader className="no-print">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Barcode className="h-5 w-5 text-amber-600" />
               Etiqueta Oficial de Palet
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
@@ -3808,84 +3886,24 @@ function UbicacionesPage() {
           </DialogHeader>
 
           {paletParaImprimir && (
-            <div className="p-4 border-2 border-dashed border-amber-300 rounded-xl bg-amber-50/30 space-y-3 font-sans print-area">
-              <div className="flex items-center justify-between border-b border-amber-200 pb-2">
-                <span className="font-black text-sm tracking-widest text-slate-900 uppercase">
-                  LEROY MERLIN
-                </span>
-                <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded border border-amber-300">
-                  PALET #{String(paletParaImprimir.numero_palet).padStart(3, "0")}
-                </span>
-              </div>
-
-              <div className="text-center py-2 space-y-1 bg-white p-3 rounded-lg border border-amber-100 shadow-2xs">
-                <div className="font-mono text-2xl font-black tracking-widest text-slate-900">
-                  |||||| || ||||| |||||||
-                </div>
-                <div className="font-mono text-xs font-bold text-slate-800">
-                  {paletParaImprimir.codigo_barras}
-                </div>
-              </div>
-
-              {/* DATOS OFICIALES: QUIÉN, CUÁNDO Y DÓNDE */}
-              <div className="grid grid-cols-2 gap-2 text-xs border-t border-amber-200 pt-2 text-slate-700">
-                <div className="p-2 bg-white rounded border border-amber-200/80">
-                  <span className="text-[10px] text-amber-800 block uppercase font-bold">
-                    DÓNDE (Ubicación)
-                  </span>
-                  <strong className="text-slate-900 text-xs block truncate">
-                    {ubicaciones.find((u) => u.id === paletParaImprimir.id_reserva)?.nombre ||
-                      ubicacionSeleccionada?.nombre ||
-                      "Reserva (Almacén de Tienda)"}
-                  </strong>
-                </div>
-                <div className="p-2 bg-white rounded border border-amber-200/80">
-                  <span className="text-[10px] text-amber-800 block uppercase font-bold">
-                    QUIÉN (Generado Por)
-                  </span>
-                  <strong className="text-slate-900 text-xs block truncate">
-                    {paletParaImprimir.generado_por}
-                  </strong>
-                </div>
-                <div className="p-2 bg-white rounded border border-amber-200/80">
-                  <span className="text-[10px] text-amber-800 block uppercase font-bold">
-                    CUÁNDO (Fecha y Hora)
-                  </span>
-                  <span className="text-slate-800 font-semibold text-xs block">
-                    {new Date(paletParaImprimir.generado_en).toLocaleString("es-ES")}
-                  </span>
-                </div>
-                <div className="p-2 bg-white rounded border border-amber-200/80">
-                  <span className="text-[10px] text-amber-800 block uppercase font-bold">
-                    CANTIDAD TOTAL
-                  </span>
-                  <span className="text-emerald-700 font-bold text-xs block">
-                    {paletParaImprimir.productos.reduce((a, b) => a + b.cantidad, 0)} unidades
-                  </span>
-                </div>
-              </div>
-
-              {/* ARTÍCULOS EN PALET */}
-              <div className="text-[11px] bg-white p-2.5 rounded border border-amber-200/80 space-y-1">
-                <div className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">
-                  Artículos Asignados:
-                </div>
-                {paletParaImprimir.productos.map((prod) => (
-                  <div key={prod.id} className="flex justify-between items-center text-slate-800">
-                    <span className="truncate max-w-[220px]">
-                      {prod.nombre}{" "}
-                      <span className="font-mono text-[10px] text-slate-400">({prod.sku})</span>
-                    </span>
-                    <strong className="shrink-0">{prod.cantidad} uds</strong>
-                  </div>
-                ))}
-              </div>
-
-              <div className="text-[10px] text-amber-900 bg-amber-100/60 p-2 rounded text-center border border-amber-200 font-medium">
-                🔒 Ubicación fijada: Solo en Reserva. Al reponer en tienda y quedar vacío, se
-                autodestruye.
-              </div>
-            </div>
+            <EtiquetaPalet
+              palet={{
+                numero_palet: paletParaImprimir.numero_palet,
+                codigo_barras: paletParaImprimir.codigo_barras,
+                reserva_nombre:
+                  ubicaciones.find((u) => u.id === paletParaImprimir.id_reserva)?.nombre ||
+                  ubicacionSeleccionada?.nombre ||
+                  "Reserva (Almacén de Tienda)",
+                generado_por: paletParaImprimir.generado_por,
+                generado_en: paletParaImprimir.generado_en,
+                productos: paletParaImprimir.productos.map((producto) => ({
+                  id: producto.id,
+                  nombre: producto.nombre,
+                  sku: producto.sku,
+                  cantidad: producto.cantidad,
+                })),
+              }}
+            />
           )}
 
           <DialogFooter className="mt-4 gap-2 no-print">
@@ -3894,10 +3912,10 @@ function UbicacionesPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => window.print()}
-              className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 font-bold"
+              onClick={imprimirEtiqueta}
+              className="gap-1.5 bg-amber-600 font-bold text-white hover:bg-amber-700"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="h-3.5 w-3.5" />
               Imprimir Etiqueta
             </Button>
           </DialogFooter>
@@ -3910,6 +3928,16 @@ function UbicacionesPage() {
         onOpenChange={(open) => {
           if (!open) setPaletSeleccionadoParaProductos(null);
         }}
+      />
+
+      <ModalInformeInventario
+        abierto={modalInformeAbierto}
+        onOpenChange={setModalInformeAbierto}
+        informe={informeActivo}
+        puedeExportar={puedeExportar}
+        puedeEnviarEmail={puedeExportar}
+        esAdmin={perfil?.rol === "admin" && perfil.activo === true}
+        emailPropio={user?.email ?? ""}
       />
 
       {/* ========================================================================= */}

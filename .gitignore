@@ -271,3 +271,6 @@ dist-ssr
 .gemini/commands/specify.toml
 .gemini/commands/tasks.toml
 .gemini/commands/verify.toml
+
+.vercel
+.env*

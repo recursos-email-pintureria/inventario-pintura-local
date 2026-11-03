@@ -2,11 +2,17 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
+export interface EmailAdjunto {
+  filename: string;
+  content: string;
+}
+
 export interface EmailPayload {
   destinatario: string;
   asunto: string;
   cuerpo: string;
-  tipo?: "incidencia";
+  tipo?: "incidencia" | "reporte_inventario";
+  adjunto?: EmailAdjunto;
 }
 
 export type EnviarEmailVariables = EmailPayload;
@@ -46,6 +52,12 @@ export function useEnviarEmail() {
           throw new Error("Todos los campos (destinatario, asunto y cuerpo) son obligatorios.");
         }
 
+        if (payload.adjunto) {
+          if (!payload.adjunto.filename.trim() || !payload.adjunto.content.trim()) {
+            throw new Error("El adjunto del email no es válido.");
+          }
+        }
+
         if (controller.signal.aborted) throw abortError();
 
         const { data: currentSession } = await supabase.auth.getSession();
@@ -57,6 +69,12 @@ export function useEnviarEmail() {
             asunto,
             cuerpo,
             ...(payload.tipo !== undefined && { tipo: payload.tipo }),
+            ...(payload.adjunto !== undefined && {
+              adjunto: {
+                filename: payload.adjunto.filename.trim(),
+                content: payload.adjunto.content.trim(),
+              },
+            }),
           },
           signal: controller.signal,
         });

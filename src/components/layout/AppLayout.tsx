@@ -126,7 +126,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const toggleTheme = () => setTheme(nextTheme);
 
   return (
-    <div className="flex h-dvh flex-col bg-background md:flex-row">
+    <div className="app-shell flex h-dvh flex-col bg-background md:flex-row">
       {/* ========================================== */}
       {/* BARRA LATERAL (SIDEBAR)                    */}
       {/* ========================================== */}

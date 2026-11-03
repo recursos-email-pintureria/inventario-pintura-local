@@ -48,6 +48,7 @@ import {
 
 import { crearMovimiento, getMovimientos, getProductos, getUbicaciones } from "@/lib/inventario";
 import type { MovimientoDetallado } from "@/lib/tipos";
+import { useMyProfile } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/_authenticated/movimientos")({
   component: MovimientosPage,
@@ -107,6 +108,8 @@ function fmtFecha(iso: string) {
 
 function MovimientosPage() {
   const queryClient = useQueryClient();
+  const { can } = useMyProfile();
+  const puedeExportar = can("puede_exportar_movimientos");
 
   // 🔌 Consultas reales (refresco automático cada 30s = "Tiempo Real")
   const { data: movimientos = [], isLoading } = useQuery({
@@ -378,24 +381,28 @@ function MovimientosPage() {
             </div>
 
             <div className="flex items-center gap-2.5 self-start md:self-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportarPDF}
-                className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
-              >
-                <FileDown className="w-4 h-4 text-slate-500" />
-                Exportar PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportarCSV}
-                className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
-              >
-                <Download className="w-4 h-4 text-slate-500" />
-                Exportar CSV
-              </Button>
+              {puedeExportar && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportarPDF}
+                    className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
+                  >
+                    <FileDown className="w-4 h-4 text-slate-500" />
+                    Exportar PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportarCSV}
+                    className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
+                  >
+                    <Download className="w-4 h-4 text-slate-500" />
+                    Exportar CSV
+                  </Button>
+                </>
+              )}
               <Button
                 size="sm"
                 onClick={abrirModalNuevo}

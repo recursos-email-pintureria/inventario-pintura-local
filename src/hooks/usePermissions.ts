@@ -52,6 +52,13 @@ export function puedeGestionarSecciones(
   );
 }
 
+/** Admin y vendedor pueden imprimir/exportar inventario; visualizador no. */
+export function puedeExportarInventario(
+  perfil: Pick<PerfilUsuario, "rol" | "activo"> | null,
+): boolean {
+  return perfil?.activo === true && (perfil.rol === "admin" || perfil.rol === "vendedor");
+}
+
 export function useMyProfile() {
   const { user } = useAuth();
   const query = useQuery({
