@@ -2011,11 +2011,6 @@ function UbicacionesPage() {
                   label: "Reserva",
                   count: ubicaciones.filter((u) => u.tipo === "reserva").length,
                 },
-                {
-                  id: "cross",
-                  label: "Cross",
-                  count: ubicaciones.filter((u) => u.tipo === "cross").length,
-                },
               ].map((chip) => {
                 const activo = filtroTipo === chip.id;
                 return (
@@ -2040,6 +2035,29 @@ function UbicacionesPage() {
                   </button>
                 );
               })}
+
+              <Button
+                type="button"
+                variant={filtroTipo === "cross" ? "default" : "outline"}
+                size="sm"
+                aria-pressed={filtroTipo === "cross"}
+                onClick={() => setFiltroTipo(filtroTipo === "cross" ? "todos" : "cross")}
+                className={`h-7 gap-1.5 px-2.5 text-xs ${
+                  filtroTipo === "cross"
+                    ? "border-purple-600 bg-purple-600 text-white hover:bg-purple-700"
+                    : "border-purple-200 text-purple-700 hover:bg-purple-50"
+                }`}
+              >
+                <Shuffle className="h-3.5 w-3.5" />
+                Mostrar solo ubicaciones tipo Cross
+                <span
+                  className={`rounded-full px-1 text-[10px] ${
+                    filtroTipo === "cross" ? "bg-purple-700/80 text-white" : "bg-purple-50"
+                  }`}
+                >
+                  {ubicaciones.filter((u) => u.tipo === "cross").length}
+                </span>
+              </Button>
 
               {filtroActivo && (
                 <Button
