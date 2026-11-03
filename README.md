@@ -1,12 +1,16 @@
 # Inventario Pintura - LM
 
-Sistema profesional de gestión de inventario jerárquico para tienda de pinturas. Permite el control de stock por ubicaciones específicas (secciones, pasillos, armarios, cross, cajas y reserva), con escáner de código de barras, ajustes rápidos, métricas en tiempo real, gestión de usuarios con permisos granulares, sistema de palets y exportación a Excel/PDF.
+Sistema profesional de gestión de inventario jerárquico para tienda de pinturas. Permite el control de stock por ubicaciones específicas (secciones, pasillos, armarios, altos, cross, cajas y reserva), con escáner de código de barras, ajustes rápidos, métricas en tiempo real, gestión de usuarios con permisos granulares y exportación a Excel/PDF.
 
 **🌐 Aplicación en producción:** [https://inventario-pintura-local.vercel.app](https://inventario-pintura-local.vercel.app)
-**📦 Repositorio GitHub:** [https://github.com/recursos-email-pintureria/inventario-pintura-local](https://github.com/recursos-email-pintureria/inventario-pintura-local)
-**🏷️ Versión estable actual:** [v1.4.0-palets](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets) *(Incluye mejoras de seguridad v1.3.0-reset-password)*
-**📋 Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
-**🗄️ Panel de Supabase:** [https://app.supabase.com](https://app.supabase.com)
+
+📦 **Repositorio GitHub:** [https://github.com/recursos-email-pintureria/inventario-pintura-local](https://github.com/recursos-email-pintureria/inventario-pintura-local)
+
+🏷️ **Versión estable actual:** [v1.9.0-secciones](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.9.0-secciones)
+
+📋 **Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
+
+🗄️ **Panel de Supabase:** [https://app.supabase.com](https://app.supabase.com)
 
 ---
 
@@ -14,93 +18,60 @@ Sistema profesional de gestión de inventario jerárquico para tienda de pintura
 
 | Capa | Tecnología | Enlace |
 | --- | --- | --- |
-| **Frontend** | React 19, TypeScript, TanStack Router, TanStack Query | [react.dev](https://react.dev) · [tanstack.com](https://tanstack.com) |
-| **UI/Estilos** | Tailwind CSS, Radix UI, Lucide React, shadcn/ui | [tailwindcss.com](https://tailwindcss.com) · [radix-ui.com](https://radix-ui.com) |
-| **Backend/BD** | Supabase (PostgreSQL con Row Level Security) | [supabase.com](https://supabase.com) |
-| **Despliegue** | Vercel (CI/CD automático desde `main`) | [vercel.com](https://vercel.com) |
-| **Testing** | Vitest | [vitest.dev](https://vitest.dev) |
-| **Herramientas** | Git, ESLint, Prettier, Bun, **Agent Skills** | [git-scm.com](https://git-scm.com) · [bun.sh](https://bun.sh) |
+| Frontend | React 18, TypeScript, TanStack Router, TanStack Query | [react.dev](https://react.dev) · [tanstack.com](https://tanstack.com) |
+| UI/Estilos | Tailwind CSS, Radix UI, Lucide React, shadcn/ui | [tailwindcss.com](https://tailwindcss.com) · [radix-ui.com](https://radix-ui.com) · [lucide.dev](https://lucide.dev) · [ui.shadcn.com](https://ui.shadcn.com) |
+| Backend/BD | Supabase (PostgreSQL con Row Level Security) | [supabase.com](https://supabase.com) |
+| Despliegue | Vercel (CI/CD automático desde `main`) | [vercel.com](https://vercel.com) |
+| Testing | Vitest | [vitest.dev](https://vitest.dev) |
+| Herramientas | Git, ESLint, Prettier, Bun | [git-scm.com](https://git-scm.com) · [bun.sh](https://bun.sh) |
 
 ---
 
 ## 📂 Estructura Jerárquica de Ubicaciones
 
-El sistema soporta una jerarquía estricta de 3 niveles (actualizada en Fase 6):
-
-🏷️ **Sección** (Ej: Pintura Exterior, Droguería) - Nivel 0
-└── ↔️ **Pasillo** / 🏭 **Reserva** / 📦 **Caja** - Nivel 1 (Padre = Sección)
-    └── 🗄️ **Armario** / 🔀 **Cross** - Nivel 2 (Padre = Pasillo)
-        └── Productos con stock
+El sistema soporta una jerarquía estricta de 3 niveles:
+🏷️ Sección (Ej: Pintura Exterior, Droguería)
+└── ↔️ Pasillo / 🏭 Reserva (Nivel 1 - Padre)
+└── 🗄️ Armario / 📚 Alto / 🔀 Cross / Caja (Nivel 2 - Hijo)
+└── Productos con stock
 
 ### Tipos de ubicación y sus reglas:
 
 | Tipo | Nivel | Icono | Color | Requiere padre | Posición lateral | Posición longitudinal | Sección origen |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `seccion` | 0 | 🏢 Building2 | Índigo | ❌ No | ❌ No | ❌ No | ❌ No |
-| `pasillo` | 1 | ↔️ ArrowLeftRight | Azul | ❌ No | ❌ No | ❌ No | ❌ No |
-| `reserva` | 1 | 🏭 Warehouse | Gris | ❌ No | ❌ No | ❌ No | ❌ No |
-| `caja` | 1 | 📦 Package | Rosa | ✅ Sí (Sección) | ❌ No | ❌ No | ❌ No |
-| `armario` | 2 | 🗄️ Archive | Esmeralda | ✅ Sí (Pasillo) | ✅ Sí (`derecha`/`izquierda`) | ❌ No | ❌ No (hereda) |
-| `cross` | 2 | 🔀 Shuffle | Púrpura | ✅ Sí (Pasillo) | ✅ Sí | ✅ Sí | ✅ Sí |
-
-> ⚠️ **Nota:** El tipo `alto` fue **eliminado** en la Fase 6. Los armarios ahora se agrupan visualmente por `posicion_lateral` (Lado Derecho / Lado Izquierda).
+| seccion | 0 | 🏢 Building2 | Índigo | ❌ No | No | ❌ No | ❌ No |
+| pasillo | 1 | ↔️ ArrowLeftRight | Azul | ❌ No | ❌ No | ❌ No | ❌ No |
+| reserva | 1 | 🏭 Warehouse | Gris | ❌ No | ❌ No | ❌ No | ❌ No |
+| armario | 2 | 🗄️ Archive | Esmeralda | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
+| alto | 2 | 📚 Layers | Ámbar | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
+| caja | 2 | 📦 Package | Rosa | ✅ Sí | ✅ Sí | ❌ No | ❌ No (hereda) |
+| cross | 2 | 🔀 Shuffle | Púrpura | ✅ Sí | ✅ Sí | ✅ Sí | ✅ Sí |
 
 ---
 
-## ⚙️ Arquitectura de Stock (CRÍTICO)
+## 🏗️ Arquitectura de Stock (CRÍTICO)
 
-**Principio fundamental:** El cliente (frontend) **NUNCA** escribe directamente en la tabla `stock`.
+**Principio fundamental:** El cliente NUNCA escribe directamente en la tabla `stock`
+
 La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificación se realiza mediante:
 
-1. `INSERT` en la tabla `movimientos` (entrada, salida, reposicion, ajuste).
-2. El trigger `actualizar_stock` en PostgreSQL que:
-   - Valida que el usuario tenga `puede_crear_productos = true`.
-   - Valida que `realizado_por` coincida con `auth.uid()`.
-   - Bloquea la fila con `FOR UPDATE` para evitar race conditions.
-   - Calcula el nuevo stock según el tipo de movimiento.
-   - Actualiza/inserta/elimina la fila en `stock`.
-   - Libera el bloqueo.
+1. `INSERT` en tabla `movimientos` (entrada, salida, reposición, ajuste)
+2. Trigger `actualizar_stock` en PostgreSQL que:
+   - Bloquea la fila con `FOR UPDATE`
+   - Calcula el nuevo stock según el tipo de movimiento
+   - Actualiza/inserta/elimina la fila en `stock`
+   - Libera el bloqueo
 
-### Nombres de campos REALES en `movimientos`:
-- `id_producto` (❌ NO usar `producto_id`)
-- `id_ubicacion` (❌ NO usar `ubicacion_id`)
-- `realizado_por` (❌ NO usar `creado_por`)
-- `id_palet` (nullable)
-- `cantidad`
-- `tipo`
+### Tipos de movimiento
 
-### Tipos de movimiento y comportamiento REAL del trigger:
+| Tipo | Efecto en stock | Caso de uso |
+| --- | --- | --- |
+| entrada | stock + cantidad | Recepción de mercancía |
+| salida | stock - cantidad | Venta, merma, traslado |
+| reposicion | stock + cantidad | Repuesto de lineal |
+| ajuste | stock = cantidad (valor absoluto) | Corrección de inventario |
 
-| Tipo | Efecto en stock | Caso de uso | Restricciones |
-| --- | --- | --- | --- |
-| `entrada` | `stock + cantidad` (suma) | Recepción de mercancía | Permitido en palets |
-| `salida` | `stock - cantidad` (resta) | Venta, merma, traslado | Permitido en palets (valida stock suficiente) |
-| `reposicion` | `stock = cantidad` (**FIJA valor absoluto**) | Repuesto de lineal | ❌ **NO permitido en palets** |
-| `ajuste` | `stock = cantidad` (**FIJA valor absoluto**) | Corrección de inventario | ❌ **NO permitido en palets** |
-
-> ⚠️ **IMPORTANTE sobre `reposicion`:** NO suma. Si el stock actual es 5 y quieres que quede en 15, debes enviar `cantidad: 15` (no 10).
-> ⚠️ **IMPORTANTE sobre palets:** Para movimientos con `id_palet`, el trigger **SOLO** permite los tipos `entrada` y `salida`. La `id_ubicacion` debe coincidir con la `id_reserva` del palet.
-
----
-
-## ⚙️ Configuración del sistema
-
-La ruta `/configuracion` ofrece ajustes generales, reglas de almacén, tintometría,
-lector de códigos y apariencia. Pueden acceder usuarios activos con
-`permisos_usuario.puede_gestionar_usuarios = true`.
-
-Antes de usar la página, ejecutar [`sql/configuracion_sistema.sql`](./sql/configuracion_sistema.sql)
-en el SQL Editor de Supabase. La tabla `configuracion_sistema` almacena cada ajuste como
-`clave`, `valor` JSONB y `categoria`, con identificador UUID y RLS: cualquier usuario
-autenticado puede leer, pero solo usuarios con `puede_gestionar_usuarios = true` pueden
-escribir o eliminar. La migración preserva los valores si encuentra el esquema anterior.
-La preferencia claro/oscuro/sistema se guarda en `localStorage` por navegador; no se
-comparte como ajuste global de la tienda.
-
-Los valores de bloqueo de despacho, stock negativo, alerta y lector quedan persistidos
-como configuración. No alteran por sí solos los triggers ni flujos operativos existentes;
-esos consumidores deben integrarse explícitamente antes de considerarlos reglas aplicadas.
-El stock continúa modificándose únicamente mediante `movimientos`.
+**Nota:** El trigger rechaza `cantidad <= 0` en movimientos. Para ajustar a 0, el sistema convierte automáticamente el ajuste en una `salida` por la cantidad total actual.
 
 ---
 
@@ -112,8 +83,8 @@ El stock continúa modificándose únicamente mediante `movimientos`.
 - [x] Tablas: `perfiles_usuario`, `permisos_usuario`, `categorias`, `productos`
 
 ### Fase 2: Ubicaciones jerárquicas
-- [x] Tablas: `ubicaciones`, `stock`, `movimientos`, `producto_ubicaciones`
-- [x] Triggers de actualización de stock (`actualizar_stock`)
+- [x] Tablas: `secciones`, `ubicaciones`, `stock`, `movimientos`, `producto_ubicaciones`
+- [x] Triggers de actualización de stock
 - [x] Políticas RLS para todas las tablas
 
 ### Fase 3: Dashboard y métricas
@@ -122,7 +93,7 @@ El stock continúa modificándose únicamente mediante `movimientos`.
 - [x] Exportación de movimientos a Excel y PDF
 
 ### Fase 4: Interfaz jerárquica completa
-- [x] Vista de árbol expandible
+- [x] Vista de árbol expandible (pasillos → armarios/altos)
 - [x] Badges de colores por tipo de ubicación
 - [x] Gestión de productos por ubicación (añadir, editar, eliminar)
 - [x] Escáner de código de barras con cámara
@@ -130,36 +101,71 @@ El stock continúa modificándose únicamente mediante `movimientos`.
 - [x] Ajuste rápido de stock
 - [x] Limpieza de stock de lineales
 
-### Fase 4.5 - 4.8: Estabilización y UX (v1.0.0 a v1.2.0)
+### Fase 4.5: Corrección de bugs críticos (v1.0.0-stable)
 - [x] Eliminación de escritura directa en `stock` desde el cliente
-- [x] Gestión de usuarios con permisos granulares y protección contra auto-desprivilegio
-- [x] Confirmaciones visuales (AlertDialog) para todas las acciones críticas
-- [x] Iconos y colores distintivos por tipo de ubicación
+- [x] Cálculo real de stock por ubicación usando `data.stock`
+- [x] Desglose expandible de productos por armario/pasillo
+- [x] Estabilización del escáner con `useRef` y `Dialog` de Radix
+- [x] Modal de ajuste rápido convertido a `Dialog` oficial
+- [x] Mensajes de error RLS claros y específicos
 
-### Fase 4.9: Seguridad de Sesión y Reset de Contraseñas (v1.3.0-reset-password)
-- [x] Edge Functions seguras (`reset-password-admin` y `completar-cambio-password`) sin exposición de `service_role`.
-- [x] Flujo de cambio de contraseña obligatorio que bloquea la app hasta su completado.
-- [x] Auditoría de estados parciales (éxito en DB + fallo en email).
-- [x] Corrección de bug crítico: bucle infinito y error 401 (`UNAUTHORIZED_LEGACY_JWT`) al cerrar sesión.
-- [x] Corrección de visibilidad de la pestaña de Configuración para administradores.
-- [x] Suite de tests ampliada y estabilizada (67 pruebas pasando).
+### Fase 4.6: Gestión de Usuarios y Permisos (v1.1.0)
+- [x] Página `/usuarios` con lista de usuarios y permisos
+- [x] Modal de edición con toggles individuales por permiso
+- [x] Protección contra auto-desprivilegio (no puedes quitarte el rol admin)
+- [x] Toasts de éxito/advertencia en operaciones
+- [x] Modal de confirmación (AlertDialog) para cambios críticos
+- [x] Visibilidad del menú condicionada a `isAdmin` o `puede_gestionar_usuarios`
 
-### Fase 5: Sistema de Palets (v1.3.0)
-- [x] Tabla independiente `palets` vinculada a ubicaciones de tipo `reserva`
-- [x] Restricción de trigger: solo `entrada` y `salida` para movimientos de palets
-- [x] Generación automática de códigos de palet
-- [x] Vista y gestión de stock por palet
+### Fase 4.7: Confirmaciones para acciones críticas (v1.1.5)
+- [x] AlertDialog al eliminar producto de ubicación
+- [x] AlertDialog al ajustar stock a 0 (ajuste rápido y edición)
+- [x] AlertDialog al desactivar/borrar ubicación
+- [x] AlertDialog al limpiar stock masivo de lineales
+- [x] Sustitución completa de `window.confirm` por AlertDialog de shadcn/ui
 
-### Fase 6: Reestructuración de Ubicaciones (v1.4.0-palets)
-- [x] **Eliminación total del tipo `alto`** (renombrado/absorbido por `armario`)
-- [x] Agrupación visual de armarios por `posicion_lateral` (Lado Derecho / Lado Izquierda)
-- [x] Creación masiva de 94 armarios (E651-E744) siguiendo el plano físico real
-- [x] Actualización de documentación y Agent Skills para reflejar la arquitectura real
+### Fase 4.8: Mejoras visuales y UX (v1.2.0-visual)
+- [x] Iconos específicos por tipo de ubicación (Lucide React)
+- [x] Paleta de colores distintiva por tipo (índigo, azul, esmeralda, ámbar, púrpura, rosa, gris)
+- [x] Componente reutilizable `BadgeTipoUbicacion` con 3 tamaños (sm, md, lg)
+- [x] Archivo de configuración `tiposUbicacion.ts` centralizado
+- [x] Hover effects suaves en filas de ubicaciones
+- [x] Vista de árbol con indentación y líneas conectoras
 
-### Fase 7: Agent Skills para IA (v1.4.0-palets)
-- [x] Instalación de skills oficiales de Supabase (`.agents/skills/`)
-- [x] Creación de skill personalizada `inventario-lm` con reglas críticas, esquema real y queries de ejemplo
-- [x] Validación de que Copilot/Cursor usa los nombres de campo reales y el comportamiento correcto del trigger
+### Fase 4.9: Despliegue por fases y gestión de Cross (v1.8.0-fases)
+- [x] Columna `activo` en tabla `secciones` para activar/desactivar secciones sin borrarlas (migración `20261103122557`)
+- [x] Filtros automáticos en frontend (`inventario.ts`, `ubicaciones.ts`) para mostrar solo secciones con `activo = true`
+- [x] Nuevo toggle "Mostrar solo ubicaciones tipo Cross" en la vista de ubicaciones para gestión rápida manual
+- [x] Tests de migración incluidos y verificados (70/70 tests pasando)
+
+### Fase 4.10: Seguridad de Acceso Mejorada
+- [x] Bloqueo automático de cuentas tras 3 intentos fallidos de login (duración: 30 minutos)
+- [x] Registro de intentos fallidos y estado de bloqueo en `perfiles_usuario`
+- [x] Auditoría completa de intentos de acceso
+
+### Fase 4.11: Flujo de Reset "Tienda Física" (Sin Emails) (v1.6.0-tienda-fisica)
+- [x] Eliminación completa de la auto-recuperación de contraseña (solo flujo administrativo)
+- [x] Edge Function `reset-password-admin` modificada para generar y devolver la contraseña temporal en la respuesta JSON
+- [x] Modal seguro en frontend que muestra la contraseña temporal una sola vez con botón "Copiar al portapapeles"
+- [x] Eliminación de la dependencia de Resend para este flujo (soluciona errores 403 en plan gratuito)
+- [x] Auditoría completa de resets de contraseña
+
+### Fase 4.12: Configuración Accesible para Todos los Usuarios (v1.7.0-config)
+- [x] Reestructuración de la página de Configuración con acceso diferenciado por rol
+- [x] Sección "Mi Cuenta" (cambiar contraseña) disponible para todos los usuarios activos
+- [x] Sección "Apariencia" (tema) disponible para todos los usuarios
+- [x] Sección "Soporte" (reportar incidencias) disponible para todos los usuarios
+- [x] Sección "Administración" (despacho, email de contacto) restringida exclusivamente a administradores
+- [x] Exclusión de `barcode-scanner.tsx` del linting de Prettier (archivo protegido por reglas del proyecto)
+- [x] Eliminación del formulario de prueba de email (obsoleto)
+
+### Fase 4.13: Gestión de Secciones desde Ubicaciones (v1.9.0-secciones)
+- [x] Nuevo componente `GestorSecciones` (Sheet/Panel lateral) integrado en la página de Ubicaciones
+- [x] Panel adaptable a móvil (inferior) y escritorio (lateral) para no saturar la UI
+- [x] Permiso granular `puede_gestionar_secciones` en tabla `permisos_usuario` (migración `20261103130000`)
+- [x] Solo Admin o usuarios con el permiso pueden activar/desactivar/crear secciones
+- [x] Invalidación automática de caché (TanStack Query) tras cada cambio
+- [x] Tests del nuevo permiso incluidos (74/74 tests pasando)
 
 ---
 
@@ -167,36 +173,111 @@ El stock continúa modificándose únicamente mediante `movimientos`.
 
 | # | Bug | Causa raíz | Solución |
 | --- | --- | --- | --- |
-| 1 | Error 42501 al guardar cantidad | Cliente escribía directo en `stock` (RLS bloquea) | Delegar al trigger vía `INSERT` en `movimientos` |
-| 2 | Nombres de campo incorrectos en docs | Documentación desactualizada vs trigger real | Actualizado a `id_producto`, `id_ubicacion`, `realizado_por` |
-| 3 | Lógica de reposición errónea en docs | Decía que sumaba, pero el trigger fija el valor | Corregido en README y Agent Skills |
-| 4 | Escáner de cámara no funcionaba | `div` casero bloqueado por `Dialog` padre de Radix | Envolver en `<Dialog>` oficial de Radix UI |
-| 5 | Mensaje genérico de permisos | `errorInventario()` no diferenciaba 42501/PGRST116 | Mensajes específicos según contexto |
-| 6 | Bucle infinito y error 401 al cerrar sesión | Llamada a Edge Function con JWT caducado durante el logout | Separación de responsabilidades: la función segura llama directo a Resend, y el `AuthContext` limpia el estado sin esperar respuestas de red bloqueantes. |
-| 7 | Pestaña de Configuración invisible para admins | Condición de permisos mal aplicada en el Sidebar tras refactorizaciones | Corregida la lógica de visibilidad en el componente de layout para evaluar correctamente `puede_gestionar_usuarios`. |
+| 1 | Error 42501 al guardar cantidad | Cliente escribía directo en `stock` (RLS bloquea) | Delegar al trigger vía INSERT en `movimientos` |
+| 2 | Totales de stock incorrectos en Movimientos | Reconstrucción desde movimientos (no distinguía productos) | Usar `data.stock` como fuente de verdad |
+| 3 | Escáner de cámara no funcionaba en Ubicaciones | `div` casero bloqueado por Dialog padre de Radix | Envolver en `<Dialog>` oficial de Radix UI |
+| 4 | Botón "Ajuste rápido" no respondía a clicks | Mini-modal `div` bajo `pointer-events: none` del Dialog padre | Convertir a `<Dialog>` oficial con portal DOM |
+| 5 | Autocompletado no mostraba todos los productos | Catálogo en caché obsoleto | Recargar al abrir modal "Añadir" |
+| 6 | Mensaje genérico de permisos | `errorInventario()` no diferenciaba 42501/PGRST116 | Mensajes específicos según contexto |
+| 7 | Error 403 al enviar emails de reset | Resend plan gratuito solo permite enviar al email propietario | Implementar flujo "Tienda Física" sin emails |
+| 8 | Vendedores no podían acceder a Configuración | Función `puedeGestionarConfiguracion` solo permitía admins | Reestructurar con acceso diferenciado por secciones |
 
 ---
 
 ## 🏷️ Versiones y Recuperación de Emergencia
 
-**Versión Actual Estable:** `v1.4.0-palets` *(Incluye parches de seguridad v1.3.0-reset-password)*
-**Fecha:** 03/11/2026
-**Estado:** ✅ Producción en Vercel
-**Tag:** [v1.4.0-palets](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.4.0-palets)
+### Versión Actual Estable: `v1.9.0-secciones`
+- **Fecha:** 03/11/2026
+- **Estado:** ✅ Producción en Vercel
+- **Tag:** [v1.9.0-secciones](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.9.0-secciones)
+- **Tests:** 74/74 pasando
 
-### 🚨 Cómo recuperar esta versión en caso de error crítico futuro
+### Historial de versiones:
+- `v1.9.0-secciones` (03/11/2026) - Gestión de secciones desde Ubicaciones
+- `v1.8.0-fases` (03/11/2026) - Despliegue por fases y filtro Cross
+- `v1.7.0-config` (03/11/2026) - Configuración accesible para todos
+- `v1.6.0-tienda-fisica` (03/11/2026) - Reset de contraseña sin emails
+- `v1.2.0-visual` (24/10/2026) - Mejoras visuales y UX
+- `v1.1.5` (24/10/2026) - Confirmaciones para acciones críticas
+- `v1.1.0` (24/10/2026) - Gestión de usuarios y permisos
+- `v1.0.0-stable` (24/10/2026) - Versión estable inicial
+
+### 🚨 Cómo recuperar una versión en caso de error crítico futuro
+
 ```bash
 # 1. Asegúrate de estar en la rama principal
 git checkout main
 
 # 2. Restablece el código local al estado de la versión estable
-git reset --hard v1.4.0-palets
+git reset --hard v1.9.0-secciones
 
 # 3. Fuerza la actualización en GitHub
 # ⚠️ ATENCIÓN: Esto sobrescribe el historial remoto
 git push origin main --force
+Alternativa segura (solo inspección, sin alterar main):
+git checkout v1.9.0-secciones
 
-# Alternativa segura (solo inspección, sin alterar main):
-git checkout v1.4.0-palets
 # Para volver al presente:
 git checkout main
+🔐 Seguridad y Credenciales
+Variables de entorno
+El archivo .env.example contiene las variables necesarias. Nunca subir .env al repositorio.
+VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+VITE_SUPABASE_ANON_KEY=tu_clave_anonima_aqui
+Reglas de seguridad
+✅ La clave anon de Supabase es pública por diseño (segura en frontend)
+✅ RLS (Row Level Security) activo en todas las tablas
+✅ Permisos granulares por usuario en permisos_usuario
+✅ Protección contra auto-desprivilegio en gestión de usuarios
+✅ Bloqueo automático tras 3 intentos fallidos de login
+✅ Contraseñas temporales solo visibles una vez (flujo tienda física)
+✅ NUNCA escribir directamente en tablas protegidas desde el cliente
+🔑 Si un token se expone
+Ir a GitHub Settings → Tokens
+Revocar el token inmediatamente (botón "Delete")
+Generar uno nuevo con los permisos mínimos necesarios
+🚀 Comandos Útiles
+Desarrollo local
+npm run dev              # Iniciar servidor de desarrollo
+npm run build            # Compilar para producción
+npm test                 # Ejecutar tests (Vitest)
+npx tsc --noEmit         # Verificar tipos TypeScript
+npm run lint             # Verificar estilo de código
+Git básico
+git status               # Estado del repositorio
+git log --oneline -5     # Últimos 5 commits
+git tag                  # Listar etiquetas
+git fetch --prune        # Limpiar referencias remotas obsoletes
+Despliegue
+git push origin main     # Vercel despliega automáticamente
+git tag v1.x.x-descripcion
+git push origin v1.x.x-descripcion
+Supabase
+supabase db push --linked        # Aplicar migraciones al remoto
+supabase migration list          # Ver estado de migraciones
+supabase functions deploy <nombre>  # Desplegar Edge Function
+📋 Próximas Fases Planificadas
+Fase 6: Mejoras visuales adicionales
+Rediseño del Dashboard con KPIs con semáforo de colores
+Badges de colores para tipos de movimiento en tabla de actividad
+Gráfico de movimientos de los últimos 7 días
+Filtros en tabla de actividad (por tipo, fecha, ubicación)
+Modo oscuro/claro
+Atajos de teclado para operaciones frecuentes
+Fase 7: Reportes y analítica avanzada
+Dashboard de rotación de stock
+Alertas automáticas de stock bajo por email
+Historial de movimientos por producto con gráficos
+Comparativa de inventarios entre fechas
+👥 Contribución
+Este proyecto fue desarrollado para gestión interna. Si necesitas colaborar:
+Crea una rama desde main: git checkout -b feature/nueva-funcionalidad
+Haz commits descriptivos siguiendo el patrón: tipo: descripción corta
+feat: nueva funcionalidad
+fix: corrección de bug
+docs: cambios en documentación
+style: cambios de formato (sin afectar lógica)
+Abre un Pull Request describiendo los cambios
+📄 Licencia
+Propietario. Uso interno para gestión de inventario de la tienda.
+Última actualización: 03/11/2026 · Versión: v1.9.0-secciones · Tests: 74/74 ✅
