@@ -139,7 +139,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col">
             <h1 className="font-bold text-lg leading-tight text-foreground">Inventario LM</h1>
             <span className="text-[10px] font-mono font-semibold bg-muted text-muted-foreground px-1.5 py-0.5 rounded border w-fit mt-1">
-              v1.0.0-beta
+              v1.9.0-secciones
             </span>
           </div>
         </div>
