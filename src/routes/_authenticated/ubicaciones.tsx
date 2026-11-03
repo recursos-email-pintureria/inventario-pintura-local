@@ -1885,7 +1885,7 @@ function UbicacionesPage() {
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
                   Ubicaciones del Almacén
                 </h1>
-                {true \&\& seccionesGestionPermitida \&\& \(
+                {seccionesGestionPermitida && (
                   <Button
                     type="button"
                     variant="outline"
@@ -4186,7 +4186,7 @@ function UbicacionesPage() {
         }}
       />
 
-      {true \&\& seccionesGestionPermitida \&\& \(
+      {seccionesGestionPermitida && (
         <GestorSecciones
           open={gestorSeccionesAbierto}
           onOpenChange={setGestorSeccionesAbierto}
