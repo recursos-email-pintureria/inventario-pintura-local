@@ -36,8 +36,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     async signIn(email, password, remember) {
       setRememberSession(remember);
+
+      // ── Comprobar bloqueo ANTES de intentar el login ──────────────────────
+      const { data: perfil } = await supabase
+        .from("perfiles_usuario")
+        .select("bloqueado_hasta, intentos_fallidos, activo")
+        .eq("correo", email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (perfil?.bloqueado_hasta && new Date(perfil.bloqueado_hasta) > new Date()) {
+        const hasta = new Date(perfil.bloqueado_hasta).toLocaleTimeString("es-ES", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        throw Object.assign(
+          new Error(
+            `Tu cuenta está temporalmente bloqueada hasta las ${hasta}. Contacta al administrador.`,
+          ),
+          { code: "account_locked" },
+        );
+      }
+
+      // ── Intentar login ─────────────────────────────────────────────────────
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (error) {
+        // Incrementar contador de intentos fallidos (función SECURITY DEFINER)
+        await supabase.rpc("registrar_intento_login", { p_email: email.trim().toLowerCase() });
+        throw error;
+      }
+
+      // ── Login exitoso: resetear contador ───────────────────────────────────
+      await supabase.rpc("reset_intentos_login", { p_email: email.trim().toLowerCase() });
     },
     async signUp(email, password) {
       const { error } = await supabase.auth.signUp({

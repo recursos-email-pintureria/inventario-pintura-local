@@ -11,6 +11,8 @@ export interface PerfilUsuario {
   rol: "admin" | "vendedor" | "visualizador";
   activo: boolean;
   debe_cambiar_password: boolean;
+  intentos_fallidos: number;
+  bloqueado_hasta: string | null;
 }
 
 export interface PermisosUsuario {
