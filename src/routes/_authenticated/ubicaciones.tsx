@@ -37,8 +37,10 @@ import {
   Database,
   Sparkles,
   Map as MapIcon,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { GestorSecciones } from "@/components/GestorSecciones";
 import {
   getSecciones,
   getUbicacionesCompletas,
@@ -60,6 +62,7 @@ import {
   type Palet as PaletRegistro,
 } from "@/lib/palets";
 import { useAuth } from "@/contexts/AuthContext";
+import { puedeGestionarSecciones, useMyProfile } from "@/hooks/usePermissions";
 import { getColorLateral } from "@/lib/tiposUbicacion";
 import { ModalProductosPalet } from "@/components/inventario/ModalProductosPalet";
 import { Mapa2DModal } from "@/components/ubicaciones/Mapa2DModal";
@@ -675,6 +678,8 @@ function UbicacionesPage() {
   const queryClient = useQueryClient();
   const addStockMutation = useAddStock();
   const { user, loading: cargandoSesion } = useAuth();
+  const { perfil, permisos } = useMyProfile();
+  const seccionesGestionPermitida = puedeGestionarSecciones(perfil, permisos);
   const usuarioNombre =
     [
       user?.user_metadata?.["full_name"] as string,
@@ -842,6 +847,7 @@ function UbicacionesPage() {
   useEffect(() => setPalets(paletsCombinados), [paletsCombinados]);
 
   const [vista, setVista] = useState<"arbol" | "lista">("arbol");
+  const [gestorSeccionesAbierto, setGestorSeccionesAbierto] = useState(false);
   const [mapa2DAbierto, setMapa2DAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
@@ -1879,6 +1885,18 @@ function UbicacionesPage() {
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
                   Ubicaciones del Almacén
                 </h1>
+                {seccionesGestionPermitida && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Abrir gestión de secciones"
+                    title="Gestión de Secciones"
+                    onClick={() => setGestorSeccionesAbierto(true)}
+                  >
+                    <Settings2 className="h-4 w-4" />
+                  </Button>
+                )}
                 <Badge
                   variant="outline"
                   className="bg-blue-50 text-blue-700 border-blue-200 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5"
@@ -4167,6 +4185,14 @@ function UbicacionesPage() {
           }
         }}
       />
+
+      {seccionesGestionPermitida && (
+        <GestorSecciones
+          open={gestorSeccionesAbierto}
+          onOpenChange={setGestorSeccionesAbierto}
+          canManageSections={seccionesGestionPermitida}
+        />
+      )}
     </div>
   );
 }

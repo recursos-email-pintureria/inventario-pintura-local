@@ -35,6 +35,16 @@ export async function getSecciones(): Promise<Seccion[]> {
   }
 }
 
+export async function getSeccionesParaGestion(): Promise<Seccion[]> {
+  const { data, error } = await supabase
+    .from("secciones")
+    .select("*")
+    .order("nombre", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function crearSeccion(nombre: string, descripcion?: string | null): Promise<Seccion> {
   const { data, error } = await supabase
     .from("secciones")
@@ -48,6 +58,18 @@ export async function crearSeccion(nombre: string, descripcion?: string | null):
 
   if (error) throw error;
   return data;
+}
+
+export async function actualizarEstadoSeccion(id: string, activo: boolean): Promise<void> {
+  const { data, error } = await supabase
+    .from("secciones")
+    .update({ activo })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error("No se pudo actualizar la sección o no tienes permiso.");
 }
 
 // ============================================================================

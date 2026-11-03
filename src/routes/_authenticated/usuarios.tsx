@@ -58,6 +58,7 @@ const PERMISOS: { key: keyof Omit<PermisosUsuario, "id_usuario">; label: string 
   { key: "puede_eliminar_productos", label: "Eliminar productos" },
   { key: "puede_crear_ubicaciones", label: "Crear ubicaciones" },
   { key: "puede_editar_ubicaciones", label: "Editar ubicaciones" },
+  { key: "puede_gestionar_secciones", label: "Gestionar secciones" },
   { key: "puede_ver_movimientos", label: "Ver movimientos" },
   { key: "puede_exportar_movimientos", label: "Exportar movimientos" },
   { key: "puede_gestionar_usuarios", label: "Gestionar usuarios" },

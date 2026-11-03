@@ -25,6 +25,7 @@ export interface PermisosUsuario {
   puede_ver_movimientos: boolean;
   puede_exportar_movimientos: boolean;
   puede_gestionar_usuarios: boolean;
+  puede_gestionar_secciones: boolean;
 }
 
 export type Permiso = keyof Omit<PermisosUsuario, "id_usuario">;
@@ -39,6 +40,16 @@ export function puedeGestionarConfiguracion(
   _permisos: Pick<PermisosUsuario, "puede_gestionar_usuarios"> | null,
 ): boolean {
   return perfil?.activo === true;
+}
+
+export function puedeGestionarSecciones(
+  perfil: Pick<PerfilUsuario, "rol" | "activo"> | null,
+  permisos: Pick<PermisosUsuario, "puede_gestionar_secciones"> | null,
+): boolean {
+  return (
+    perfil?.activo === true &&
+    (perfil.rol === "admin" || permisos?.puede_gestionar_secciones === true)
+  );
 }
 
 export function useMyProfile() {
