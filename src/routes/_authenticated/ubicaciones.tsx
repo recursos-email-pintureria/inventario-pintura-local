@@ -108,8 +108,7 @@ export const Route = createFileRoute("/_authenticated/ubicaciones")({
 });
 
 // Tipos de ubicación con jerarquía estricta
-export type TipoUbicacion =
-  "seccion" | "pasillo" | "reserva" | "armario" | "caja" | "cross";
+export type TipoUbicacion = "seccion" | "pasillo" | "reserva" | "armario" | "caja" | "cross";
 
 export interface ProductoEnUbicacion {
   id: string;
@@ -681,7 +680,8 @@ function UbicacionesPage() {
       user?.user_metadata?.["full_name"] as string,
       user?.user_metadata?.["name"] as string,
       user?.email,
-    ].find((nombre): nombre is string => typeof nombre === "string" && nombre.trim().length > 0)
+    ]
+      .find((nombre): nombre is string => typeof nombre === "string" && nombre.trim().length > 0)
       ?.trim() ?? "";
 
   const { data: seccionesBD = [] } = useQuery({
@@ -968,38 +968,35 @@ function UbicacionesPage() {
     }
   }, [productosPaletQuery.data]);
 
-  const ubicacionesDestinoDisponibles = useMemo(
-    () => {
-      const perteneceASeccion = (ubicacionId: string): boolean => {
-        let actual = ubicacionesBD.find((item) => item.id === ubicacionId);
-        const visitadas = new Set<string>();
+  const ubicacionesDestinoDisponibles = useMemo(() => {
+    const perteneceASeccion = (ubicacionId: string): boolean => {
+      let actual = ubicacionesBD.find((item) => item.id === ubicacionId);
+      const visitadas = new Set<string>();
 
-        while (actual && !visitadas.has(actual.id)) {
-          visitadas.add(actual.id);
-          if (
-            actual.seccion_id === filtroSeccionDestino ||
-            actual.seccion === filtroSeccionDestino ||
-            actual.id_ubicacion_padre === filtroSeccionDestino
-          ) {
-            return true;
-          }
-          actual = actual.id_ubicacion_padre
-            ? ubicacionesBD.find((item) => item.id === actual?.id_ubicacion_padre)
-            : undefined;
+      while (actual && !visitadas.has(actual.id)) {
+        visitadas.add(actual.id);
+        if (
+          actual.seccion_id === filtroSeccionDestino ||
+          actual.seccion === filtroSeccionDestino ||
+          actual.id_ubicacion_padre === filtroSeccionDestino
+        ) {
+          return true;
         }
+        actual = actual.id_ubicacion_padre
+          ? ubicacionesBD.find((item) => item.id === actual?.id_ubicacion_padre)
+          : undefined;
+      }
 
-        return false;
-      };
+      return false;
+    };
 
-      return ubicacionesBD.filter(
-        (ubicacion) =>
-          ["pasillo", "armario"].includes(ubicacion.tipo) &&
-          (filtroTipoDestino === "todos" || ubicacion.tipo === filtroTipoDestino) &&
-          (filtroSeccionDestino === "todas" || perteneceASeccion(ubicacion.id)),
-      );
-    },
-    [ubicacionesBD, filtroSeccionDestino, filtroTipoDestino],
-  );
+    return ubicacionesBD.filter(
+      (ubicacion) =>
+        ["pasillo", "armario"].includes(ubicacion.tipo) &&
+        (filtroTipoDestino === "todos" || ubicacion.tipo === filtroTipoDestino) &&
+        (filtroSeccionDestino === "todas" || perteneceASeccion(ubicacion.id)),
+    );
+  }, [ubicacionesBD, filtroSeccionDestino, filtroTipoDestino]);
 
   const crearPaletMutation = useMutation({
     mutationFn: crearPalet,
@@ -1040,9 +1037,8 @@ function UbicacionesPage() {
         queryClient.invalidateQueries({ queryKey: ["stock"] }),
         queryClient.invalidateQueries({ queryKey: ["palets"] }),
         queryClient.invalidateQueries({
-          queryKey: paletsPorReservaQueryOptions(
-            paletSeleccionadoParaGestion?.id_reserva ?? "",
-          ).queryKey,
+          queryKey: paletsPorReservaQueryOptions(paletSeleccionadoParaGestion?.id_reserva ?? "")
+            .queryKey,
         }),
       ]);
     },
@@ -1075,7 +1071,9 @@ function UbicacionesPage() {
       activo: registro.activo,
       creado_en: registro.creado_en ?? "",
       actualizado_en: registro.actualizado_en ?? registro.creado_en ?? "",
-      reserva_nombre: ubicacionesBD.find((ubicacion) => ubicacion.id === registro.id_reserva)?.nombre ?? "Sin reserva",
+      reserva_nombre:
+        ubicacionesBD.find((ubicacion) => ubicacion.id === registro.id_reserva)?.nombre ??
+        "Sin reserva",
       ...(posicionEnReserva ? { posicion_en_reserva: posicionEnReserva } : {}),
       ...(paletsEnReserva.length ? { total_en_reserva: paletsEnReserva.length } : {}),
     });
@@ -1161,9 +1159,7 @@ function UbicacionesPage() {
 
   const posicionesDePasillo = useCallback(
     (idPasillo: string) =>
-      ubicaciones.filter(
-        (u) => u.id_padre === idPasillo && ["armario", "cross"].includes(u.tipo),
-      ),
+      ubicaciones.filter((u) => u.id_padre === idPasillo && ["armario", "cross"].includes(u.tipo)),
     [ubicaciones],
   );
 
@@ -1649,9 +1645,7 @@ function UbicacionesPage() {
     const cantidadInvalida = seleccionadas.find((producto) => {
       const cantidad = cantidadesReposicion[producto.id_producto];
       return (
-        !Number.isInteger(cantidad) ||
-        (cantidad ?? 0) <= 0 ||
-        (cantidad ?? 0) > producto.cantidad
+        !Number.isInteger(cantidad) || (cantidad ?? 0) <= 0 || (cantidad ?? 0) > producto.cantidad
       );
     });
     if (cantidadInvalida) {
@@ -1834,23 +1828,23 @@ function UbicacionesPage() {
         },
       ];
       const ubiList = UBICACIONES_INICIALES.filter((u) => u.tipo !== "seccion").map((u) => {
-  const secPadre = UBICACIONES_INICIALES.find((s) => s.id === u.seccion_id);
-  const ubiPadre = UBICACIONES_INICIALES.find((p) => p.id === u.id_padre);
-  
-  // Construimos el objeto añadiendo solo las propiedades que tienen valor
-  const ubiData: any = {
-    nombre: u.nombre,
-    tipo: u.tipo,
-  };
-  
-  if (secPadre?.nombre) ubiData.seccion_nombre = secPadre.nombre;
-  if (ubiPadre?.nombre) ubiData.padre_nombre = ubiPadre.nombre;
-  if (u.lateral) ubiData.lateral = u.lateral;
-  if (u.piso) ubiData.piso = u.piso;
-  if (u.subtitulo) ubiData.descripcion = u.subtitulo;
-  
-  return ubiData;
-});
+        const secPadre = UBICACIONES_INICIALES.find((s) => s.id === u.seccion_id);
+        const ubiPadre = UBICACIONES_INICIALES.find((p) => p.id === u.id_padre);
+
+        // Construimos el objeto añadiendo solo las propiedades que tienen valor
+        const ubiData: any = {
+          nombre: u.nombre,
+          tipo: u.tipo,
+        };
+
+        if (secPadre?.nombre) ubiData.seccion_nombre = secPadre.nombre;
+        if (ubiPadre?.nombre) ubiData.padre_nombre = ubiPadre.nombre;
+        if (u.lateral) ubiData.lateral = u.lateral;
+        if (u.piso) ubiData.piso = u.piso;
+        if (u.subtitulo) ubiData.descripcion = u.subtitulo;
+
+        return ubiData;
+      });
 
       const res = await sincronizarEstructuraInicialSupabase(secList, ubiList);
       await Promise.all([
@@ -2352,7 +2346,9 @@ function UbicacionesPage() {
                                     id: "izquierda",
                                     lado: "izquierda",
                                     mostrarEtiqueta: true,
-                                    posiciones: armarios.filter((pos) => pos.lateral === "izquierda"),
+                                    posiciones: armarios.filter(
+                                      (pos) => pos.lateral === "izquierda",
+                                    ),
                                   },
                                   {
                                     id: "sin-lateralidad",
@@ -2640,8 +2636,7 @@ function UbicacionesPage() {
                                               className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
                                             >
                                               <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs">
-                                                Palet #
-                                                {String(palet.numero_palet).padStart(3, "0")}
+                                                Palet #{String(palet.numero_palet).padStart(3, "0")}
                                               </Badge>
                                             </button>
                                             <span className="text-[10px] font-mono text-slate-500">
@@ -2757,7 +2752,11 @@ function UbicacionesPage() {
                               <p className="mt-1 text-xs text-slate-600">
                                 Stock:{" "}
                                 <span className="font-semibold text-slate-900">
-                                  {item.productos.reduce((sum, product) => sum + product.cantidad, 0)} uds
+                                  {item.productos.reduce(
+                                    (sum, product) => sum + product.cantidad,
+                                    0,
+                                  )}{" "}
+                                  uds
                                 </span>
                                 {" · "}
                                 Productos:{" "}
@@ -3655,10 +3654,7 @@ function UbicacionesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={modalCrearPaletAbierto}
-        onOpenChange={setModalCrearPaletAbierto}
-      >
+      <Dialog open={modalCrearPaletAbierto} onOpenChange={setModalCrearPaletAbierto}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-slate-900">
@@ -4054,7 +4050,10 @@ function UbicacionesPage() {
               {productosPaletQuery.data && (
                 <p className="text-right text-sm font-semibold text-amber-950">
                   Total disponible:{" "}
-                  {productosPaletQuery.data.reduce((total, producto) => total + producto.cantidad, 0)}{" "}
+                  {productosPaletQuery.data.reduce(
+                    (total, producto) => total + producto.cantidad,
+                    0,
+                  )}{" "}
                   unidades
                 </p>
               )}

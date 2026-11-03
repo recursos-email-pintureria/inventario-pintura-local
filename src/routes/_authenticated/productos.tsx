@@ -846,7 +846,10 @@ function ProductosPage() {
               const agotado = product.stock_actual === 0;
               const bajo = product.stock_actual > 0 && product.stock_actual <= product.stock_minimo;
               return (
-                <article key={product.id} className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+                <article
+                  key={product.id}
+                  className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+                >
                   <div className="flex items-start gap-3">
                     <Checkbox
                       checked={seleccionados.has(product.id)}

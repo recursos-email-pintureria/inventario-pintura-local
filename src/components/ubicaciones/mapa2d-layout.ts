@@ -420,7 +420,8 @@ export function calcularLayoutPerimetral<T extends Ubicacion | MapaUbicacion = U
   if (!perimetral) return null;
 
   const hijos = ubicaciones.filter((u) => {
-    const parentId = "id_ubicacion_padre" in u ? u.id_ubicacion_padre : (u as MapaUbicacion).padreId;
+    const parentId =
+      "id_ubicacion_padre" in u ? u.id_ubicacion_padre : (u as MapaUbicacion).padreId;
     return parentId === perimetral.id && u.activo === true;
   });
 

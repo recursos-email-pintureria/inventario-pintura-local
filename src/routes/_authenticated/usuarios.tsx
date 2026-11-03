@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Pencil } from "lucide-react";
+import { Check, Copy, KeyRound, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,7 +77,11 @@ function Usuarios() {
     motivos: string[];
   } | null>(null);
   const [usuarioParaResetear, setUsuarioParaResetear] = useState<UsuarioConPermisos | null>(null);
-  const [forzarCambio, setForzarCambio] = useState(true);
+  const [passwordTemporal, setPasswordTemporal] = useState<{
+    password: string;
+    nombre: string;
+  } | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const {
     data: usuarios,
@@ -122,16 +131,14 @@ function Usuarios() {
   });
 
   const resetear = useMutation({
-    mutationFn: ({
-      usuario,
-      forzarCambio: debeCambiar,
-    }: {
-      usuario: UsuarioConPermisos;
-      forzarCambio: boolean;
-    }) => resetearPasswordUsuario(usuario, debeCambiar),
-    onSuccess: async (_, variables) => {
-      toast.success(`Contraseña temporal enviada a ${variables.usuario.correo}`);
+    mutationFn: ({ usuario }: { usuario: UsuarioConPermisos }) => resetearPasswordUsuario(usuario),
+    onSuccess: async (resultado, variables) => {
       setUsuarioParaResetear(null);
+      setPasswordTemporal({
+        password: resultado.password_temporal,
+        nombre: variables.usuario.nombre_completo,
+      });
+      setCopiado(false);
       await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
       await queryClient.invalidateQueries({ queryKey: ["mi-perfil", variables.usuario.id] });
     },
@@ -139,6 +146,17 @@ function Usuarios() {
       toast.error(error.message);
     },
   });
+
+  const copiarPassword = async () => {
+    if (!passwordTemporal) return;
+    try {
+      await navigator.clipboard.writeText(passwordTemporal.password);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar al portapapeles. Cópiala manualmente.");
+    }
+  };
 
   const verificarYGuardar = () => {
     if (!editando) return;
@@ -230,7 +248,6 @@ function Usuarios() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setForzarCambio(true);
                         setUsuarioParaResetear(u);
                       }}
                     >
@@ -312,6 +329,50 @@ function Usuarios() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={passwordTemporal !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPasswordTemporal(null);
+            setCopiado(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Contraseña temporal generada</DialogTitle>
+            <DialogDescription>
+              Para <strong className="text-foreground">{passwordTemporal?.nombre}</strong>. Esta
+              contraseña solo se muestra ahora. Comunícala en persona o por un canal interno; no se
+              envía por email.
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className="select-all rounded-md border bg-muted px-4 py-3 text-center font-mono text-lg tracking-wider"
+            aria-label="Contraseña temporal"
+          >
+            {passwordTemporal?.password}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            El usuario tendrá que cambiarla al iniciar sesión.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={copiarPassword}>
+              {copiado ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              {copiado ? "Copiada" : "Copiar contraseña"}
+            </Button>
+            <Button
+              onClick={() => {
+                setPasswordTemporal(null);
+                setCopiado(false);
+              }}
+            >
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={!!usuarioParaResetear}
         onOpenChange={(open) => {
@@ -322,22 +383,10 @@ function Usuarios() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Resetear la contraseña?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se generará una contraseña temporal y se enviará a{" "}
-              <strong className="text-foreground">{usuarioParaResetear?.correo}</strong>. La
-              contraseña actual dejará de funcionar.
+              Se generará una contraseña temporal para entregar al usuario en persona. La contraseña
+              actual dejará de funcionar y el usuario tendrá que cambiarla al iniciar sesión.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="forzar-cambio-password"
-              checked={forzarCambio}
-              onCheckedChange={(checked) => setForzarCambio(checked === true)}
-              disabled={resetear.isPending}
-            />
-            <Label htmlFor="forzar-cambio-password" className="font-normal">
-              Pedir que cambie la contraseña al iniciar sesión
-            </Label>
-          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={resetear.isPending}>Cancelar</AlertDialogCancel>
             <Button
@@ -345,11 +394,11 @@ function Usuarios() {
               disabled={resetear.isPending}
               onClick={() => {
                 if (usuarioParaResetear) {
-                  resetear.mutate({ usuario: usuarioParaResetear, forzarCambio });
+                  resetear.mutate({ usuario: usuarioParaResetear });
                 }
               }}
             >
-              {resetear.isPending ? "Restableciendo…" : "Resetear y enviar email"}
+              {resetear.isPending ? "Restableciendo…" : "Resetear contraseña"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

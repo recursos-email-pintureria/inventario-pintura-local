@@ -30,7 +30,7 @@ export interface MovimientoReciente {
 
 async function fetchKPIs(): Promise<DashboardKPIs> {
   const hoy = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-  
+
   const [productos, movimientos, stock, ubicaciones] = await Promise.all([
     getProductos(),
     getMovimientos(),

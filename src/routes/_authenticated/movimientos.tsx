@@ -598,7 +598,10 @@ function MovimientosPage() {
             paginados.map((movement) => {
               const info = TIPO_INFO[movement.tipo];
               return (
-                <article key={movement.id} className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+                <article
+                  key={movement.id}
+                  className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-foreground">
@@ -622,7 +625,8 @@ function MovimientosPage() {
                     <div>
                       <dt className="text-xs text-muted-foreground">Cantidad</dt>
                       <dd className={`mt-0.5 font-semibold ${info.texto}`}>
-                        {info.signo}{movement.cantidad}
+                        {info.signo}
+                        {movement.cantidad}
                       </dd>
                     </div>
                     <div>

@@ -4,7 +4,6 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2.118.0/cors";
 interface ResetInput {
   id_usuario: string;
   email: string;
-  forzar_cambio: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -48,15 +47,13 @@ function parseResetInput(value: unknown): ResetInput | null {
 
   const idUsuario = value["id_usuario"];
   const email = value["email"];
-  const forzarCambio = value["forzar_cambio"] ?? false;
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   if (typeof idUsuario !== "string" || !uuidPattern.test(idUsuario)) return null;
   if (typeof email !== "string" || email.length > 254 || !emailPattern.test(email)) return null;
-  if (typeof forzarCambio !== "boolean") return null;
 
-  return { id_usuario: idUsuario, email, forzar_cambio: forzarCambio };
+  return { id_usuario: idUsuario, email };
 }
 
 function randomIndex(maxExclusive: number): number {
@@ -100,69 +97,13 @@ function generateTemporaryPassword(): string {
 async function updateAuditStatus(
   adminClient: ReturnType<typeof createClient>,
   auditId: string,
-  estado: "fallido" | "completado" | "email_fallido",
+  estado: "fallido" | "completado",
 ): Promise<boolean> {
   const { error } = await adminClient.from("auditoria_admin").update({ estado }).eq("id", auditId);
   if (!error) return true;
 
   console.error("No se pudo actualizar el estado de la auditoría.", error);
   return false;
-}
-
-async function sendTemporaryPasswordEmail(
-  email: string,
-  password: string,
-  forzarCambio: boolean,
-): Promise<boolean> {
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  if (!resendApiKey) {
-    console.error("Falta RESEND_API_KEY en los secretos.");
-    return false;
-  }
-
-  let response: Response;
-  try {
-    response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: Deno.env.get("EMAIL_FROM")?.trim() || "onboarding@resend.dev",
-        to: [email],
-        subject: "Tu contraseña ha sido restablecida",
-        text: [
-          "Se ha restablecido la contraseña de tu cuenta de Inventario LM.",
-          "",
-          `Contraseña temporal: ${password}`,
-          "",
-          "Inicia sesión con esta contraseña temporal.",
-          forzarCambio
-            ? "El sistema te pedirá que elijas una contraseña nueva antes de continuar."
-            : "Por seguridad, cambia esta contraseña después de iniciar sesión.",
-        ].join("\n"),
-      }),
-    });
-  } catch (error) {
-    console.error("No se pudo conectar con Resend.", error);
-    return false;
-  }
-
-  if (!response.ok) {
-    console.error("Resend rechazó el envío.", response.status);
-    return false;
-  }
-
-  let result: unknown;
-  try {
-    result = await response.json();
-  } catch {
-    console.error("Resend devolvió una respuesta inválida.");
-    return false;
-  }
-
-  return isRecord(result) && typeof result["id"] === "string" && result["id"].length > 0;
 }
 
 async function handleRequest(request: Request): Promise<Response> {
@@ -269,7 +210,7 @@ async function handleRequest(request: Request): Promise<Response> {
       id_admin: userData.user.id,
       accion: "reset_password",
       id_usuario_afectado: input.id_usuario,
-      forzar_cambio: input.forzar_cambio,
+      forzar_cambio: true,
       estado: "iniciado",
     })
     .select("id")
@@ -293,7 +234,7 @@ async function handleRequest(request: Request): Promise<Response> {
 
   const { data: updatedProfile, error: forceChangeError } = await adminClient
     .from("perfiles_usuario")
-    .update({ debe_cambiar_password: input.forzar_cambio })
+    .update({ debe_cambiar_password: true })
     .eq("id", input.id_usuario)
     .select("id")
     .maybeSingle();
@@ -306,40 +247,18 @@ async function handleRequest(request: Request): Promise<Response> {
     return jsonResponse(
       {
         error:
-          "La contraseña se actualizó, pero no se pudo guardar la opción de cambio obligatorio. No se envió el email.",
+          "La contraseña se actualizó, pero no se pudo guardar la opción de cambio obligatorio.",
       },
       500,
-    );
-  }
-
-  let emailSent = false;
-  try {
-    emailSent = await sendTemporaryPasswordEmail(input.email, password, input.forzar_cambio);
-  } catch (error) {
-    console.error("No se pudo enviar el email de restablecimiento.", error);
-  }
-  if (!emailSent) {
-    await updateAuditStatus(adminClient, audit.id, "email_fallido");
-    return jsonResponse(
-      {
-        error:
-          "La contraseña se actualizó, pero no se pudo enviar el email. Repite el reset para generar otra.",
-      },
-      502,
     );
   }
 
   if (!(await updateAuditStatus(adminClient, audit.id, "completado"))) {
-    return jsonResponse(
-      {
-        error:
-          "La contraseña se actualizó y el email se envió, pero no se pudo cerrar el registro de auditoría.",
-      },
-      500,
-    );
+    // La contraseña ya se actualizó: devolvemos éxito aunque la auditoría falle.
+    console.error("No se pudo cerrar el registro de auditoría, pero el reset fue exitoso.");
   }
 
-  return jsonResponse({ success: true });
+  return jsonResponse({ success: true, password_temporal: password });
 }
 
 Deno.serve(async (request: Request) => {

@@ -23,21 +23,20 @@ export async function cargarUsuarios(): Promise<UsuarioConPermisos[]> {
 
 export async function resetearPasswordUsuario(
   usuario: Pick<UsuarioConPermisos, "id" | "correo">,
-  forzarCambio: boolean,
-): Promise<void> {
-  const { data, error } = await supabase.functions.invoke<{ success: boolean }>(
-    "reset-password-admin",
-    {
-      body: {
-        id_usuario: usuario.id,
-        email: usuario.correo,
-        forzar_cambio: forzarCambio,
-      },
+): Promise<{ password_temporal: string }> {
+  const { data, error } = await supabase.functions.invoke<{
+    success: boolean;
+    password_temporal: string;
+  }>("reset-password-admin", {
+    body: {
+      id_usuario: usuario.id,
+      email: usuario.correo,
     },
-  );
+  });
 
   if (error) throw new Error(await edgeFunctionErrorMessage(error));
-  if (data?.success !== true) {
+  if (data?.success !== true || typeof data.password_temporal !== "string") {
     throw new Error("El servidor no confirmó el restablecimiento de la contraseña.");
   }
+  return { password_temporal: data.password_temporal };
 }

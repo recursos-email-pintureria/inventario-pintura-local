@@ -8,26 +8,27 @@ status: in-progress
 
 ## Intent
 
-Permitir a un administrador restablecer la contraseña de un usuario y notificarle por email sin exponer claves privilegiadas ni la contraseña temporal al navegador.
+Permitir a un administrador restablecer la contraseña de un usuario en una tienda física, comunicarle la contraseña temporal en persona y obligar al usuario a cambiarla al iniciar sesión.
 
 ## Scope
 
-Incluye un botón por usuario, generación y aplicación segura de contraseña temporal, envío de email, cambio obligatorio opcional al siguiente acceso y registro de auditoría. No incluye cambios a otros permisos o flujos de autenticación.
+Incluye generación y aplicación segura de contraseña temporal en la Edge Function, entrega al frontend solo después de completar el reset, modal con opción de copiar, cambio obligatorio en el siguiente acceso y registro de auditoría. No se envían emails ni se modifica el servicio general de correo.
 
 ## Checklist
 
-- [ ] Crear la Edge Function de reset y completar cambio obligatorio; comprobar autorización, generación segura, envío, actualización y errores.
-- [ ] Añadir migración para la marca de cambio obligatorio y el registro de auditoría; comprobar RLS y permisos.
-- [ ] Añadir la acción de reset en Usuarios con confirmación; comprobar estados y manejo de errores.
-- [ ] Bloquear el uso normal de la aplicación hasta completar el cambio obligatorio; comprobar que se libera al guardar.
-- [x] Ejecutar pruebas y build aplicables; registrar la salida observada.
+- [x] Confirmar que la Edge Function valida al administrador, cambia la contraseña, fuerza el cambio obligatorio, completa la auditoría y no envía emails.
+- [x] Entregar la contraseña temporal en un modal con opción de copiar y limpiar el valor al cerrar.
+- [x] Confirmar que la aplicación bloquea el uso normal hasta completar el cambio obligatorio.
+- [x] Ejecutar pruebas, lint y build aplicables; registrar la salida observada.
 
 ## Evidence
 
-Inspeccionados la pantalla de Usuarios, su consulta de perfiles, el contexto de autenticación y la Edge Function `enviar-email`. El envío existente valida JWT y permite a admins activos enviar a otros destinatarios. El changelog de Supabase consultado no muestra cambios incompatibles pertinentes.
+La Edge Function valida JWT y administrador activo, genera una contraseña segura, actualiza Auth y `debe_cambiar_password` a `true`, marca la auditoría como completada y responde con `password_temporal`. No contiene llamadas a Resend ni lee sus secretos. La pantalla muestra el secreto en un diálogo con copia al portapapeles y lo elimina al cerrarlo. `AppLayout` bloquea el uso normal mientras el indicador esté activo, y `completar-cambio-password` lo desactiva al guardar la nueva contraseña.
 
-`npm run lint` terminó sin errores; mostró la advertencia existente sobre `.eslintignore`. `npm test` pasó 61/61 pruebas. `npm run build` completó las tres compilaciones. No se ejecutaron las Edge Functions contra un proyecto Supabase ni se aplicó la migración.
+Vitest pasó 68/68 pruebas. ESLint pasó en los archivos TypeScript modificados; mostró la advertencia existente sobre `.eslintignore`. `tsc --noEmit` terminó sin errores. `npm run build` completó las compilaciones de cliente, SSR y Nitro. `git diff --check` no encontró errores de espacios; Git mostró advertencias de conversión LF/CRLF.
+
+La función `reset-password-admin` se desplegó al proyecto Supabase `inventario-pintura` y la consulta de funciones confirmó estado `ACTIVE`, versión 6.
 
 ## Next
 
-Aplicar la migración y desplegar ambas Edge Functions en un entorno de prueba; comprobar permisos, entrega de email, bloqueo y desbloqueo.
+Probar el flujo completo con una cuenta de prueba autorizada. No se restableció ninguna cuenta real durante la verificación.

@@ -109,7 +109,27 @@ describe("AppLayout tras cerrar sesión", () => {
     );
   });
 
-  it("permite Configuración a admins activos y a otros usuarios con permiso", () => {
+  it("muestra Configuración a vendedores activos sin permiso de administración", () => {
+    profileState.perfil = {
+      id: "seller-1",
+      nombre_completo: "Vendedor",
+      correo: "seller@example.com",
+      rol: "vendedor",
+      activo: true,
+      debe_cambiar_password: false,
+    };
+    profileState.permisos = { puede_gestionar_usuarios: false };
+    profileState.isAdmin = false;
+
+    renderLayout();
+
+    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute(
+      "href",
+      "/configuracion",
+    );
+  });
+
+  it("permite Configuración a cualquier perfil activo y la deniega a perfiles inactivos", () => {
     expect(
       puedeGestionarConfiguracion(
         { rol: "admin", activo: true },
@@ -127,7 +147,13 @@ describe("AppLayout tras cerrar sesión", () => {
     ).toBe(true);
     expect(
       puedeGestionarConfiguracion(
-        { rol: "admin", activo: false },
+        { rol: "vendedor", activo: true },
+        { puede_gestionar_usuarios: false },
+      ),
+    ).toBe(true);
+    expect(
+      puedeGestionarConfiguracion(
+        { rol: "vendedor", activo: false },
         { puede_gestionar_usuarios: true },
       ),
     ).toBe(false);

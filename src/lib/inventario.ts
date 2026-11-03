@@ -300,9 +300,7 @@ export async function sincronizarEstructuraInicialSupabase(
   }
 
   // Crear después nivel 2 (Armarios y Cross)
-  for (const u of ubicacionesIniciales.filter((x) =>
-    ["armario", "cross"].includes(x.tipo),
-  )) {
+  for (const u of ubicacionesIniciales.filter((x) => ["armario", "cross"].includes(x.tipo))) {
     if (!mapaUbicaciones.has(u.nombre.toLowerCase())) {
       const secId = u.seccion_nombre ? mapaSecciones.get(u.seccion_nombre.toLowerCase()) : null;
       const padreId = u.padre_nombre ? mapaUbicaciones.get(u.padre_nombre.toLowerCase()) : null;
@@ -427,18 +425,18 @@ export async function crearProducto(producto: any): Promise<Producto> {
 
   if (producto.id_categoria) {
     payload.id_categoria = producto.id_categoria;
-  } else if (producto.categoria && producto.categoria !== 'Sin categoría') {
+  } else if (producto.categoria && producto.categoria !== "Sin categoría") {
     const { data: cat } = await supabase
-      .from('categorias')
-      .select('id')
-      .eq('nombre', producto.categoria)
+      .from("categorias")
+      .select("id")
+      .eq("nombre", producto.categoria)
       .maybeSingle();
     if (cat?.id) {
       payload.id_categoria = cat.id;
     }
   }
 
-  const { data, error } = await supabase.from('productos').insert(payload).select().single();
+  const { data, error } = await supabase.from("productos").insert(payload).select().single();
 
   if (error) throw error;
   return data;
@@ -463,13 +461,13 @@ export async function actualizarProducto(id: string, updates: any): Promise<Prod
   if (updates.id_categoria !== undefined) {
     payload.id_categoria = updates.id_categoria;
   } else if (updates.categoria !== undefined) {
-    if (updates.categoria === 'Sin categoría' || !updates.categoria) {
+    if (updates.categoria === "Sin categoría" || !updates.categoria) {
       payload.id_categoria = null;
     } else {
       const { data: cat } = await supabase
-        .from('categorias')
-        .select('id')
-        .eq('nombre', updates.categoria)
+        .from("categorias")
+        .select("id")
+        .eq("nombre", updates.categoria)
         .maybeSingle();
       if (cat?.id) {
         payload.id_categoria = cat.id;
@@ -478,9 +476,9 @@ export async function actualizarProducto(id: string, updates: any): Promise<Prod
   }
 
   const { data, error } = await supabase
-    .from('productos')
+    .from("productos")
     .update(payload)
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single();
 

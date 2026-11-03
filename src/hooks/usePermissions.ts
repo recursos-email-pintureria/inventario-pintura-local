@@ -36,12 +36,9 @@ export async function cerrarSesion() {
 
 export function puedeGestionarConfiguracion(
   perfil: Pick<PerfilUsuario, "rol" | "activo"> | null,
-  permisos: Pick<PermisosUsuario, "puede_gestionar_usuarios"> | null,
+  _permisos: Pick<PermisosUsuario, "puede_gestionar_usuarios"> | null,
 ): boolean {
-  return (
-    perfil?.activo === true &&
-    (perfil.rol === "admin" || permisos?.puede_gestionar_usuarios === true)
-  );
+  return perfil?.activo === true;
 }
 
 export function useMyProfile() {

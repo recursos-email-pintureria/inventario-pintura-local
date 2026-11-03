@@ -137,7 +137,9 @@ describe("SQL real: stock y permisos RLS", () => {
       { id: destinoPalet },
     ]);
     await expect(
-      db.query(`INSERT INTO ubicaciones(nombre,tipo,creado_por) VALUES ('No','altillo',$1)`, [viewer]),
+      db.query(`INSERT INTO ubicaciones(nombre,tipo,creado_por) VALUES ('No','altillo',$1)`, [
+        viewer,
+      ]),
     ).rejects.toThrow();
     expect(
       (await db.query("UPDATE ubicaciones SET nombre=$1 RETURNING id", ["No"])).rows,

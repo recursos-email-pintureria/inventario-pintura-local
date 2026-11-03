@@ -50,9 +50,7 @@ export function puedeGestionarUbicaciones(permisos: PermisosUsuario | null | und
 
 export function filtrarUbicaciones(items: Ubicacion[], seccion: "pasillos" | "armarios") {
   return items.filter(
-    (u) =>
-      u.activo &&
-      (seccion === "pasillos" ? u.tipo === "pasillo" : u.tipo === "armario"),
+    (u) => u.activo && (seccion === "pasillos" ? u.tipo === "pasillo" : u.tipo === "armario"),
   );
 }
 
@@ -160,5 +158,5 @@ export interface ProductoConCantidad extends Producto {
 // 2. Funciones de Ubicaciones (Aliases y wrappers)
 export async function getSecciones() {
   const { data, error } = await supabase.from("secciones").select("*").eq("activo", true);
-  return error ? [] : (data || []);
+  return error ? [] : data || [];
 }

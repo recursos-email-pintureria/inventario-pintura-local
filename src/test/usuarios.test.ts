@@ -63,25 +63,40 @@ describe("Carga de usuarios sin relación directa entre tablas", () => {
     await expect(cargarUsuarios()).rejects.toThrow("Acceso denegado");
   });
 
-  it("solicita el reset con identificador, email y opción de cambio obligatorio", async () => {
-    invoke.mockResolvedValue({ data: { success: true }, error: null });
+  it("solicita el reset con identificador y email", async () => {
+    invoke.mockResolvedValue({
+      data: { success: true, password_temporal: "Temporal-123!" },
+      error: null,
+    });
     const usuario = { id: "usuario-1", correo: "usuario@example.com" };
 
-    await expect(resetearPasswordUsuario(usuario, true)).resolves.toBeUndefined();
+    await expect(resetearPasswordUsuario(usuario)).resolves.toEqual({
+      password_temporal: "Temporal-123!",
+    });
     expect(invoke).toHaveBeenCalledWith("reset-password-admin", {
       body: {
         id_usuario: "usuario-1",
         email: "usuario@example.com",
-        forzar_cambio: true,
       },
     });
   });
 
-  it("no presenta un reset fallido como exitoso", async () => {
-    invoke.mockResolvedValue({ data: null, error: new Error("Email no enviado") });
+  it("rechaza un reset exitoso que no incluye la contraseña temporal", async () => {
+    invoke.mockResolvedValue({ data: { success: true }, error: null });
 
     await expect(
-      resetearPasswordUsuario({ id: "usuario-1", correo: "usuario@example.com" }, false),
-    ).rejects.toThrow("Email no enviado");
+      resetearPasswordUsuario({ id: "usuario-1", correo: "usuario@example.com" }),
+    ).rejects.toThrow("El servidor no confirmó el restablecimiento de la contraseña.");
+  });
+
+  it("no presenta un reset fallido como exitoso", async () => {
+    invoke.mockResolvedValue({
+      data: null,
+      error: new Error("No se pudo actualizar la contraseña"),
+    });
+
+    await expect(
+      resetearPasswordUsuario({ id: "usuario-1", correo: "usuario@example.com" }),
+    ).rejects.toThrow("No se pudo actualizar la contraseña");
   });
 });
