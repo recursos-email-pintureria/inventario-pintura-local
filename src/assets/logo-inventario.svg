@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- Fondo con degradado sutil y bordes redondeados -->
+  <rect width="120" height="120" rx="28" fill="url(#bg-gradient)" />
+  
+  <!-- Elemento 1: Estructura / Estanterías / Código de barras (Índigo) -->
+  <path d="M30 35V85" stroke="#E0E7FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M45 35V85" stroke="#E0E7FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M60 35V85" stroke="#E0E7FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M75 35V85" stroke="#E0E7FF" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Elemento 2: Gota de pintura / Flujo dinámico (Ámbar) que rompe la rigidez -->
+  <path d="M85 45C85 45 95 55 95 70C95 85 85 90 85 90C85 90 75 85 75 70C75 55 85 45 85 45Z" fill="#F59E0B" />
+  <circle cx="85" cy="65" r="6" fill="#FEF3C7" opacity="0.6"/>
+  
+  <!-- Definición del degradado de fondo -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#312E81" /> <!-- Indigo 900 -->
+      <stop offset="1" stop-color="#4338CA" /> <!-- Indigo 700 -->
+    </linearGradient>
+  </defs>
+</svg>

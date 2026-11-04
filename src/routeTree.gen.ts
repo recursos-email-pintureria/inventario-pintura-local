@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as AuthenticatedActualizacionMasivaStockRouteImport } from './routes/_authenticated/actualizacion-masiva-stock'
 import { Route as AuthenticatedCargarListaArmarioRouteImport } from './routes/_authenticated/cargar-lista-armario'
 import { Route as AuthenticatedCategoriasRouteImport } from './routes/_authenticated/categorias'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
@@ -47,6 +48,12 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedActualizacionMasivaStockRoute =
+  AuthenticatedActualizacionMasivaStockRouteImport.update({
+    id: '/actualizacion-masiva-stock',
+    path: '/actualizacion-masiva-stock',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCargarListaArmarioRoute =
   AuthenticatedCargarListaArmarioRouteImport.update({
     id: '/cargar-lista-armario',
@@ -97,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/actualizacion-masiva-stock': typeof AuthenticatedActualizacionMasivaStockRoute
   '/cargar-lista-armario': typeof AuthenticatedCargarListaArmarioRoute
   '/categorias': typeof AuthenticatedCategoriasRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
@@ -111,6 +119,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/actualizacion-masiva-stock': typeof AuthenticatedActualizacionMasivaStockRoute
   '/cargar-lista-armario': typeof AuthenticatedCargarListaArmarioRoute
   '/categorias': typeof AuthenticatedCategoriasRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
@@ -127,6 +136,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/_authenticated/actualizacion-masiva-stock': typeof AuthenticatedActualizacionMasivaStockRoute
   '/_authenticated/cargar-lista-armario': typeof AuthenticatedCargarListaArmarioRoute
   '/_authenticated/categorias': typeof AuthenticatedCategoriasRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/verify-email'
+    | '/actualizacion-masiva-stock'
     | '/cargar-lista-armario'
     | '/categorias'
     | '/configuracion'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/verify-email'
+    | '/actualizacion-masiva-stock'
     | '/cargar-lista-armario'
     | '/categorias'
     | '/configuracion'
@@ -172,6 +184,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/verify-email'
+    | '/_authenticated/actualizacion-masiva-stock'
     | '/_authenticated/cargar-lista-armario'
     | '/_authenticated/categorias'
     | '/_authenticated/configuracion'
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/verify-email'
       preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/actualizacion-masiva-stock': {
+      id: '/_authenticated/actualizacion-masiva-stock'
+      path: '/actualizacion-masiva-stock'
+      fullPath: '/actualizacion-masiva-stock'
+      preLoaderRoute: typeof AuthenticatedActualizacionMasivaStockRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/cargar-lista-armario': {
       id: '/_authenticated/cargar-lista-armario'
@@ -287,6 +307,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedActualizacionMasivaStockRoute: typeof AuthenticatedActualizacionMasivaStockRoute
   AuthenticatedCargarListaArmarioRoute: typeof AuthenticatedCargarListaArmarioRoute
   AuthenticatedCategoriasRoute: typeof AuthenticatedCategoriasRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
@@ -298,6 +319,8 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedActualizacionMasivaStockRoute:
+    AuthenticatedActualizacionMasivaStockRoute,
   AuthenticatedCargarListaArmarioRoute: AuthenticatedCargarListaArmarioRoute,
   AuthenticatedCategoriasRoute: AuthenticatedCategoriasRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
