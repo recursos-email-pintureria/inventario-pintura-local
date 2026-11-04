@@ -13,6 +13,8 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Trash2 } from 'lucide-react';
+import { ModalLimpiarLotes } from '@/components/inventario/ModalLimpiarLotes';
 import { ModalRevertirListaArmario } from "@/components/inventario/ModalRevertirListaArmario";
 import {
   TablaVistaPreviaArmario,
@@ -151,6 +153,7 @@ function CargarListaArmarioPage() {
   const [resultadoParser, setResultadoParser] = useState<ResultadoParser | null>(null);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const [modalReversionAbierto, setModalReversionAbierto] = useState(false);
+  const [modalLimpiezaOpen, setModalLimpiezaOpen] = useState(false);
   const [resultadoImportacion, setResultadoImportacion] = useState<RespuestaImportacion | null>(
     null,
   );
@@ -454,6 +457,14 @@ function CargarListaArmarioPage() {
               className="min-h-11"
               onClick={() => setModalReversionAbierto(true)}
             >
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setModalLimpiezaOpen(true)}
+    >
+      <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+      Limpiar BD
+    </Button>
               <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
               Revertir lote
             </Button>
@@ -949,6 +960,11 @@ function CargarListaArmarioPage() {
         open={modalReversionAbierto}
         onOpenChange={setModalReversionAbierto}
       />
+
+      <ModalLimpiarLotes
+        open={modalLimpiezaOpen}
+        onOpenChange={setModalLimpiezaOpen}
+      />
     </div>
   );
 }
@@ -1016,3 +1032,5 @@ function ResumenFinal({ titulo, valor }: { titulo: string; valor: number }) {
     </div>
   );
 }
+
+
