@@ -6,7 +6,7 @@ Sistema profesional de gestión de inventario jerárquico para tienda de pintura
 
 📦 **Repositorio GitHub:** [https://github.com/recursos-email-pintureria/inventario-pintura-local](https://github.com/recursos-email-pintureria/inventario-pintura-local)
 
-🏷️ **Versión estable actual:** [v1.9.0-secciones](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.9.0-secciones)
+🏷️ **Versión estable actual:** [v1.9.1](https://github.com/recursos-email-pintureria/inventario-pintura-local/releases/tag/v1.9.1)
 
 📋 **Panel de despliegues Vercel:** [https://vercel.com/aritx26-3717/~/deployments](https://vercel.com/aritx26-3717/~/deployments)
 
@@ -166,6 +166,16 @@ La tabla `stock` tiene `GRANT SELECT` para usuarios autenticados. Toda modificac
 - [x] Solo Admin o usuarios con el permiso pueden activar/desactivar/crear secciones
 - [x] Invalidación automática de caché (TanStack Query) tras cada cambio
 - [x] Tests del nuevo permiso incluidos (74/74 tests pasando)
+---
+
+## 🆕 Últimos Cambios (v1.9.1)
+
+### ✨ Nuevas funcionalidades
+- **Eliminación de productos de armario con stock 0**: Nuevo botón (papelera roja) junto a "Ajuste" que permite retirar productos sin existencias de un armario, con confirmación mediante diálogo y motivo obligatorio.
+- **Función RPC segura en Supabase** (`eliminar_producto_armario`): Valida autenticación, exige motivo, bloquea la eliminación si el stock es > 0 y registra la operación de forma segura.
+
+### 🐛 Correcciones
+- Manejo robusto de errores en la RPC de eliminación: ahora lanza excepciones reales en lugar de silenciarlas, evitando inconsistencias entre la interfaz y la base de datos.
 
 ---
 
