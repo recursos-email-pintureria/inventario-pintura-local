@@ -309,7 +309,7 @@ export function ModalRevertirListaArmario({ open, onOpenChange }: ModalRevertirL
         throw new Error("Selecciona un lote válido.");
       }
 
-      const { data, error } = await supabase.rpc('revertir_lote_importacion', {
+      const { data, error } = await supabase.rpc("revertir_lote_importacion", {
         p_lote_id: loteSeleccionado,
       });
 

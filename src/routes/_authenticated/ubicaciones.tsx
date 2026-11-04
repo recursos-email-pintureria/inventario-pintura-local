@@ -40,6 +40,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 import { GestorSecciones } from "@/components/GestorSecciones";
 import {
   getSecciones,
@@ -779,6 +780,11 @@ function UbicacionesPage() {
     return CATALOGO_PRODUCTOS_MOCK;
   }, [productosBD]);
 
+  // Rastreo de productos eliminados de ubicaciones (para desasignación con stock = 0)
+  const [productosEliminadosMap, setProductosEliminadosMap] = useState<Record<string, string[]>>(
+    {},
+  );
+
   // Combinar ubicaciones de Supabase o fallback a iniciales
   const ubicacionesCombinadas: UbicacionItem[] = useMemo(() => {
     if (ubicacionesBD.length > 0 || seccionesBD.length > 0) {
@@ -808,18 +814,21 @@ function UbicacionesPage() {
         const config = CONFIG_JERARQUIA[tipo] || CONFIG_JERARQUIA.armario;
 
         // Stock asignado
+        const eliminadosEnUbi = productosEliminadosMap[u.id] || [];
         const stockDeUbi = stockBD.filter((s) => s.id_ubicacion === u.id);
-        const prodsEnUbi: ProductoEnUbicacion[] = stockDeUbi.map((stk) => {
-          const prod = productosBD.find((p) => p.id === stk.id_producto);
-          return {
-            id: stk.id_producto,
-            sku: prod?.sku || "SKU-GEN",
-            nombre: prod?.nombre || "Producto",
-            categoria: prod?.categoria || "Pintura",
-            cantidad: stk.cantidad,
-            stock_minimo: prod?.stock_minimo || 5,
-          };
-        });
+        const prodsEnUbi: ProductoEnUbicacion[] = stockDeUbi
+          .filter((stk) => !eliminadosEnUbi.includes(stk.id_producto))
+          .map((stk) => {
+            const prod = productosBD.find((p) => p.id === stk.id_producto);
+            return {
+              id: stk.id_producto,
+              sku: prod?.sku || "SKU-GEN",
+              nombre: prod?.nombre || "Producto",
+              categoria: prod?.categoria || "Pintura",
+              cantidad: stk.cantidad,
+              stock_minimo: prod?.stock_minimo || 5,
+            };
+          });
 
         const totalUds = prodsEnUbi.reduce((acc, p) => acc + p.cantidad, 0);
         const cap = 100;
@@ -850,8 +859,15 @@ function UbicacionesPage() {
       return items;
     }
 
-    return UBICACIONES_INICIALES;
-  }, [seccionesBD, ubicacionesBD, stockBD, productosBD]);
+    return UBICACIONES_INICIALES.map((u) => {
+      const eliminadosEnUbi = productosEliminadosMap[u.id] || [];
+      if (eliminadosEnUbi.length === 0) return u;
+      return {
+        ...u,
+        productos: u.productos.filter((p) => !eliminadosEnUbi.includes(p.id)),
+      };
+    });
+  }, [seccionesBD, ubicacionesBD, stockBD, productosBD, productosEliminadosMap]);
 
   // Los palets y sus cantidades solo proceden de Supabase.
   const paletsCombinados: PaletItem[] = useMemo(() => {
@@ -987,6 +1003,14 @@ function UbicacionesPage() {
   const [productoEnOperacion, setProductoEnOperacion] = useState<ProductoEnUbicacion | null>(null);
   const [cantidadOperacion, setCantidadOperacion] = useState<number>(1);
   const [motivoOperacion, setMotivoOperacion] = useState("Gestión en tienda");
+
+  // Eliminación de producto del armario (solo permitido con stock = 0, Regla de Oro nº 4)
+  const [alertEliminarProdAbierto, setAlertEliminarProdAbierto] = useState(false);
+  const [productoParaEliminar, setProductoParaEliminar] = useState<ProductoEnUbicacion | null>(
+    null,
+  );
+  const [motivoEliminarProd, setMotivoEliminarProd] = useState("");
+  const [eliminandoProd, setEliminandoProd] = useState(false);
 
   // ----------------------------------------------------
   // MODAL DE PALETS Y AUTODESTRUCCIÓN
@@ -1612,6 +1636,97 @@ function UbicacionesPage() {
       `Operación de ${tipoOperacion} (${cantidadOperacion} uds) aplicada y registrada en movimientos`,
     );
     setAlertOperacionAbierta(false);
+  };
+
+  // Eliminar producto del armario (solo permitido con stock = 0, confirmado con AlertDialog)
+  const handleConfirmarEliminarProductoDeArmario = async () => {
+    if (!ubicacionSeleccionada || !productoParaEliminar) return;
+
+    if (productoParaEliminar.cantidad > 0) {
+      toast.error(
+        `No se puede eliminar: el producto tiene existencias (${productoParaEliminar.cantidad} uds). Ajusta el stock a 0 primero.`,
+      );
+      setAlertEliminarProdAbierto(false);
+      return;
+    }
+
+    if (!motivoEliminarProd.trim()) {
+      toast.error("El motivo de la retirada es obligatorio.");
+      return;
+    }
+
+    setEliminandoProd(true);
+
+    try {
+      // 1. Invocar RPC segura en Supabase si está disponible
+      try {
+        const { error: rpcError } = await supabase.rpc("eliminar_producto_armario", {
+          p_id_producto: productoParaEliminar.id,
+          p_id_ubicacion: ubicacionSeleccionada.id,
+          p_motivo: motivoEliminarProd.trim(),
+          p_usuario_id: user?.id,
+        });
+        if (rpcError) {
+          console.warn("Aviso RPC eliminar_producto_armario:", rpcError.message);
+        }
+      } catch (rpcErr) {
+        console.warn("Excepción al llamar RPC eliminar_producto_armario:", rpcErr);
+      }
+
+      // 2. Registrar en mapa de productos eliminados localmente
+      setProductosEliminadosMap((prev) => {
+        const actual = prev[ubicacionSeleccionada.id] || [];
+        return {
+          ...prev,
+          [ubicacionSeleccionada.id]: [...actual, productoParaEliminar.id],
+        };
+      });
+
+      // 3. Actualizar estado local reactivo de ubicaciones
+      setUbicaciones((prev) =>
+        prev.map((u) => {
+          if (u.id === ubicacionSeleccionada.id) {
+            const nuevosProds = u.productos.filter((p) => p.id !== productoParaEliminar.id);
+            const totalUds = nuevosProds.reduce((acc, p) => acc + p.cantidad, 0);
+            const cap = u.capacidad_max || 100;
+            const pct = Math.min(100, Math.round((totalUds / cap) * 100));
+
+            const uActualizada = {
+              ...u,
+              productos: nuevosProds,
+              porcentaje_ocupacion: pct,
+              subtitulo:
+                nuevosProds.length > 0
+                  ? `${nuevosProds.length} productos · ${totalUds} uds`
+                  : "0 productos · 0 uds",
+            };
+
+            setUbicacionSeleccionada(uActualizada);
+            return uActualizada;
+          }
+          return u;
+        }),
+      );
+
+      // 4. Invalidar queries de TanStack Query
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["ubicacionesCompletas"] }),
+      ]);
+
+      toast.success(
+        `Producto "${productoParaEliminar.nombre}" eliminado del armario "${ubicacionSeleccionada.nombre}" con éxito.`,
+      );
+      setAlertEliminarProdAbierto(false);
+      setProductoParaEliminar(null);
+      setMotivoEliminarProd("");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al eliminar el producto del armario.",
+      );
+    } finally {
+      setEliminandoProd(false);
+    }
   };
 
   const abrirInformeUbicacion = () => {
@@ -3687,6 +3802,33 @@ function UbicacionesPage() {
                                   >
                                     Ajuste
                                   </Button>
+
+                                  {/* Botón Eliminar Producto del Armario (solo habilitado con stock = 0) */}
+                                  {prod.cantidad === 0 ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setProductoParaEliminar(prod);
+                                        setMotivoEliminarProd("");
+                                        setAlertEliminarProdAbierto(true);
+                                      }}
+                                      className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/70 rounded-md transition-colors shadow-2xs"
+                                      title="Eliminar producto del armario (stock en 0)"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled
+                                      className="h-7 w-7 p-0 text-slate-300 border border-slate-100 rounded-md cursor-not-allowed opacity-50"
+                                      title={`No se puede eliminar: el producto tiene existencias (${prod.cantidad} uds). Ajusta el stock a 0 primero.`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -3774,6 +3916,102 @@ function UbicacionesPage() {
               }`}
             >
               {addStockMutation.isPending ? "Guardando..." : "Confirmar y Registrar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ========================================================================= */}
+      {/* 🗑️ MODAL ALERT DIALOG PARA ELIMINAR PRODUCTO DEL ARMARIO (STOCK = 0) */}
+      {/* ========================================================================= */}
+      <AlertDialog open={alertEliminarProdAbierto} onOpenChange={setAlertEliminarProdAbierto}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <span>Eliminar Producto del Armario</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-slate-600">
+              ¿Estás seguro de que deseas retirar este producto de la ubicación{" "}
+              <strong>{ubicacionSeleccionada?.nombre}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            {productoParaEliminar && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-900 text-xs">
+                    {productoParaEliminar.nombre}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="border-slate-300 text-slate-700 font-mono text-[10px]"
+                  >
+                    0 uds
+                  </Badge>
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono">
+                  SKU: {productoParaEliminar.sku} • {productoParaEliminar.categoria}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-md bg-amber-50 border border-amber-200/80 p-2.5 text-[11px] text-amber-900 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                Esta acción retirará la asignación del producto en este armario. Solo se permite
+                porque el producto tiene actualmente <strong>0 existencias</strong>.
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                Motivo de la retirada (obligatorio) <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                value={motivoEliminarProd}
+                onChange={(e) => setMotivoEliminarProd(e.target.value)}
+                placeholder="Ej. Fin de campaña, descatalogado o reubicación en otra zona..."
+                className="h-8 text-xs focus-visible:ring-rose-500"
+                autoFocus
+              />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">
+                Indica la justificación de inventario para el registro de auditoría.
+              </span>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={eliminandoProd}
+              onClick={() => {
+                setAlertEliminarProdAbierto(false);
+                setProductoParaEliminar(null);
+                setMotivoEliminarProd("");
+              }}
+              className="text-xs h-8"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmarEliminarProductoDeArmario}
+              disabled={eliminandoProd || !motivoEliminarProd.trim()}
+              className="text-xs h-8 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1.5"
+            >
+              {eliminandoProd ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Eliminando...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Confirmar y Eliminar</span>
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -46,10 +46,7 @@ describe("validarFilasCSV", () => {
   });
 
   it.each([null, "", "0", "0,0"])("omite una cantidad vacía o cero (%s)", (cantidadTexto) => {
-    const resultado = validarFilasCSV(
-      [fila({ cantidadTexto })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ cantidadTexto })], opcionesSumar);
 
     expect(resultado.filasConError[0]).toMatchObject({
       estado: "omitida",
@@ -61,10 +58,7 @@ describe("validarFilasCSV", () => {
     ["12", 12],
     ["12,0", 12],
   ])("acepta cantidad entera %s", (cantidadTexto, cantidad) => {
-    const resultado = validarFilasCSV(
-      [fila({ cantidadTexto })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ cantidadTexto })], opcionesSumar);
 
     expect(resultado.filasValidas[0]).toMatchObject({
       cantidad,
@@ -73,10 +67,7 @@ describe("validarFilasCSV", () => {
   });
 
   it("rechaza cantidades fraccionarias", () => {
-    const resultado = validarFilasCSV(
-      [fila({ cantidadTexto: "12,5" })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ cantidadTexto: "12,5" })], opcionesSumar);
 
     expect(resultado.filasConError[0]).toMatchObject({
       estado: "error",
@@ -85,10 +76,7 @@ describe("validarFilasCSV", () => {
   });
 
   it("rechaza cantidades no numéricas", () => {
-    const resultado = validarFilasCSV(
-      [fila({ cantidadTexto: "abc" })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ cantidadTexto: "abc" })], opcionesSumar);
 
     expect(resultado.filasConError[0]).toMatchObject({
       estado: "error",
@@ -97,20 +85,14 @@ describe("validarFilasCSV", () => {
   });
 
   it("acepta un EAN-13 válido sin aviso", () => {
-    const resultado = validarFilasCSV(
-      [fila({ ean: "4006381333931" })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ ean: "4006381333931" })], opcionesSumar);
 
     expect(resultado.filasValidas[0]).toMatchObject({ estado: "valida" });
     expect(resultado.resumen.avisos).toBe(0);
   });
 
   it("marca un EAN-13 con dígito incorrecto como aviso", () => {
-    const resultado = validarFilasCSV(
-      [fila({ ean: "4006381333932" })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ ean: "4006381333932" })], opcionesSumar);
 
     expect(resultado.filasValidas[0]).toMatchObject({
       estado: "aviso",
@@ -120,20 +102,14 @@ describe("validarFilasCSV", () => {
   });
 
   it("acepta EAN de 8 dígitos sin validar dígito de control", () => {
-    const resultado = validarFilasCSV(
-      [fila({ ean: "12345678" })],
-      opcionesSumar,
-    );
+    const resultado = validarFilasCSV([fila({ ean: "12345678" })], opcionesSumar);
 
     expect(resultado.filasValidas[0]).toMatchObject({ estado: "valida" });
   });
 
   it("marca los duplicados como conflicto cuando la opción es rechazar", () => {
     const resultado = validarFilasCSV(
-      [
-        fila({ numeroFila: 2 }),
-        fila({ numeroFila: 3, cantidadTexto: "4" }),
-      ],
+      [fila({ numeroFila: 2 }), fila({ numeroFila: 3, cantidadTexto: "4" })],
       opcionesRechazar,
     );
 
@@ -148,10 +124,7 @@ describe("validarFilasCSV", () => {
 
   it("suma duplicados a la primera fila y omite las siguientes", () => {
     const resultado = validarFilasCSV(
-      [
-        fila({ numeroFila: 2, cantidadTexto: "12" }),
-        fila({ numeroFila: 3, cantidadTexto: "4" }),
-      ],
+      [fila({ numeroFila: 2, cantidadTexto: "12" }), fila({ numeroFila: 3, cantidadTexto: "4" })],
       opcionesSumar,
     );
 
@@ -169,10 +142,7 @@ describe("validarFilasCSV", () => {
 
   it("detecta el mismo SKU asociado a EAN distintos", () => {
     const resultado = validarFilasCSV(
-      [
-        fila({ numeroFila: 2, ean: "EAN-01" }),
-        fila({ numeroFila: 3, ean: "EAN-02" }),
-      ],
+      [fila({ numeroFila: 2, ean: "EAN-01" }), fila({ numeroFila: 3, ean: "EAN-02" })],
       opcionesSumar,
     );
 

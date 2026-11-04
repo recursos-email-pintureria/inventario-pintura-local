@@ -1,0 +1,6 @@
+{
+  "summary": "Plan de implementación para la funcionalidad de eliminar productos con stock cero de los armarios en la vista de ubicaciones. Incluye botón con icono de papelera roja junto a Ajuste, validación de stock (solo permitido si cantidad = 0, deshabilitado si stock > 0 con tooltip informativo), diálogo de confirmación AlertDialog de shadcn/ui con motivo obligatorio, registro de movimiento de auditoría y desvinculación visual y persistente.",
+  "updatedAt": "2026-11-04T16:15:52.341072629Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

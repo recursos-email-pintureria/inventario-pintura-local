@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,22 +8,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { Trash2, AlertTriangle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useMyProfile } from '@/hooks/usePermissions';
+} from "@/components/ui/select";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { Trash2, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useMyProfile } from "@/hooks/usePermissions";
 
 interface ModalLimpiarLotesProps {
   open: boolean;
@@ -34,18 +34,18 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
   const { user } = useAuth();
   const { isAdmin, permisos } = useMyProfile();
   const queryClient = useQueryClient();
-  const [dias, setDias] = useState('90');
+  const [dias, setDias] = useState("90");
 
   const mutacionLimpiar = useMutation({
     mutationFn: async () => {
       if (!isAdmin || !user?.id) {
-        throw new Error('Solo administradores pueden limpiar lotes');
+        throw new Error("Solo administradores pueden limpiar lotes");
       }
       if (permisos?.puede_crear_productos !== true) {
-        throw new Error('Necesitas permiso para realizar esta acción');
+        throw new Error("Necesitas permiso para realizar esta acción");
       }
 
-      const { data, error } = await supabase.rpc('limpiar_lotes_antiguos', {
+      const { data, error } = await supabase.rpc("limpiar_lotes_antiguos", {
         p_dias: parseInt(dias),
       });
 
@@ -54,23 +54,23 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
     },
     onSuccess: (data) => {
       toast.success(
-        `Limpieza completada: ${data?.lotes_borrados} lotes y ${data?.movimientos_borrados} movimientos eliminados`
+        `Limpieza completada: ${data?.lotes_borrados} lotes y ${data?.movimientos_borrados} movimientos eliminados`,
       );
-      queryClient.invalidateQueries({ queryKey: ['movimientos'] });
-      queryClient.invalidateQueries({ queryKey: ['productos'] });
+      queryClient.invalidateQueries({ queryKey: ["movimientos"] });
+      queryClient.invalidateQueries({ queryKey: ["productos"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Error al limpiar la base de datos');
+      toast.error(error.message || "Error al limpiar la base de datos");
     },
   });
 
   const diasOpciones = [
-    { valor: '30', etiqueta: '30 días (1 mes)' },
-    { valor: '60', etiqueta: '60 días (2 meses)' },
-    { valor: '90', etiqueta: '90 días (3 meses)' },
-    { valor: '180', etiqueta: '180 días (6 meses)' },
-    { valor: '365', etiqueta: '365 días (1 año)' },
+    { valor: "30", etiqueta: "30 días (1 mes)" },
+    { valor: "60", etiqueta: "60 días (2 meses)" },
+    { valor: "90", etiqueta: "90 días (3 meses)" },
+    { valor: "180", etiqueta: "180 días (6 meses)" },
+    { valor: "365", etiqueta: "365 días (1 año)" },
   ];
 
   return (
@@ -82,8 +82,8 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
             Limpiar lotes antiguos
           </DialogTitle>
           <DialogDescription>
-            Elimina movimientos y lotes de importación antiguos para liberar espacio en la base de datos.
-            Esta acción no se puede deshacer.
+            Elimina movimientos y lotes de importación antiguos para liberar espacio en la base de
+            datos. Esta acción no se puede deshacer.
           </DialogDescription>
         </DialogHeader>
 
@@ -130,7 +130,7 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
             disabled={mutacionLimpiar.isPending}
           >
             {mutacionLimpiar.isPending ? (
-              'Limpiando...'
+              "Limpiando..."
             ) : (
               <>
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -143,4 +143,3 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
     </Dialog>
   );
 }
-
