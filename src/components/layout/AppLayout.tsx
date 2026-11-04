@@ -17,6 +17,7 @@ import {
   Menu,
   ScanLine,
   UserRound,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyProfile, cerrarSesion, puedeGestionarConfiguracion } from "@/hooks/usePermissions";
@@ -97,6 +98,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const items = [
     ...menuItems,
+    ...(isAdmin ? [{ to: "/cargar-lista-armario", label: "Cargar lista CSV", icon: Upload }] : []),
     ...(isAdmin || can("puede_gestionar_usuarios")
       ? [{ to: "/usuarios", label: "Usuarios", icon: Users }]
       : []),

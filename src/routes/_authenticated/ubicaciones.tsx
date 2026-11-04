@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,6 +37,7 @@ import {
   Sparkles,
   Map as MapIcon,
   Settings2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { GestorSecciones } from "@/components/GestorSecciones";
@@ -725,7 +726,7 @@ function UbicacionesPage() {
   const queryClient = useQueryClient();
   const addStockMutation = useAddStock();
   const { user, loading: cargandoSesion } = useAuth();
-  const { perfil, permisos } = useMyProfile();
+  const { perfil, permisos, isAdmin } = useMyProfile();
   const seccionesGestionPermitida = puedeGestionarSecciones(perfil, permisos);
   const puedeExportar = puedeExportarInventario(perfil);
   const imprimirEtiqueta = usePrint();
@@ -1966,15 +1967,25 @@ function UbicacionesPage() {
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setMapa2DAbierto(true)}
-              className="self-start gap-2 md:self-auto"
-            >
-              <MapIcon className="h-4 w-4" />
-              Ver Mapa 2D
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {isAdmin && (
+                <Button asChild type="button" variant="outline" className="min-h-11">
+                  <Link to="/cargar-lista-armario">
+                    <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Cargar lista desde CSV
+                  </Link>
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMapa2DAbierto(true)}
+                className="min-h-11 gap-2"
+              >
+                <MapIcon className="h-4 w-4" />
+                Ver Mapa 2D
+              </Button>
+            </div>
 
             <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 p-1 rounded-lg border border-slate-200">
               <Button

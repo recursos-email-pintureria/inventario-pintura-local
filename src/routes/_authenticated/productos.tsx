@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
@@ -22,6 +22,7 @@ import {
   FolderOpen,
   FileText,
   DollarSign,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -151,7 +152,7 @@ function adaptarProducto(p: Producto): ProductoItem {
 
 function ProductosPage() {
   const queryClient = useQueryClient();
-  const { perfil } = useMyProfile();
+  const { perfil, isAdmin } = useMyProfile();
   const puedeExportar = puedeExportarInventario(perfil);
 
   // 🔌 CONSULTAS REALES A SUPABASE
@@ -521,7 +522,15 @@ function ProductosPage() {
           </h1>
         </div>
 
-        <div className="flex items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <Button asChild type="button" variant="outline" className="min-h-11">
+              <Link to="/cargar-lista-armario">
+                <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                Cargar lista desde CSV
+              </Link>
+            </Button>
+          )}
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-medium shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
             <span>
