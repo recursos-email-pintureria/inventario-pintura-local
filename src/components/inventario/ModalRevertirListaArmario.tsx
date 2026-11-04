@@ -305,110 +305,16 @@ export function ModalRevertirListaArmario({ open, onOpenChange }: ModalRevertirL
       if (!isAdmin || !user?.id) {
         throw new Error("Solo un administrador autenticado puede revertir un lote.");
       }
-      if (permisos?.puede_crear_productos !== true) {
-        throw new Error(
-          "Tu perfil necesita el permiso puede_crear_productos para registrar movimientos.",
-        );
-      }
-      if (!datosLote || !loteSeleccionado) {
+      if (!loteSeleccionado) {
         throw new Error("Selecciona un lote válido.");
       }
-      const datosActuales = await cargarDatosLote(loteSeleccionado);
-      const filasActuales = datosActuales.filas;
-      const conflictosActuales = filasActuales.filter((fila) => fila.conflictoPosterior);
-      const filasActualesSinAuditoria = filasActuales.filter(
-        (fila) =>
-          fila.auditoria?.origen !== "importacion" ||
-          !esModoImportacion(fila.auditoria.modo) ||
-          typeof fila.auditoria.cantidad_anterior !== "number" ||
-          typeof fila.auditoria.cantidad_nueva !== "number" ||
-          typeof fila.auditoria.cantidad_csv !== "number",
-      );
-      if (filasActualesSinAuditoria.length > 0) {
-        throw new Error("El lote no contiene auditoría suficiente para revertirse con seguridad.");
-      }
-      if (datosActuales.yaRevertido) {
-        throw new Error("Este lote ya tiene una reversión registrada.");
-      }
-      if (conflictosActuales.length > 0 && !confirmarConflictos) {
-        throw new Error(
-          "Confirma explícitamente la reversión de filas con movimientos posteriores.",
-        );
-      }
 
-      const idsProducto = [...new Set(filasActuales.map((fila) => fila.movimiento.id_producto))];
-      const idsUbicacion = [...new Set(filasActuales.map((fila) => fila.movimiento.id_ubicacion))];
-      const { data: stocksData, error: stockError } = await supabase
-        .from("stock")
-        .select("id_producto,id_ubicacion,cantidad")
-        .in("id_producto", idsProducto)
-        .in("id_ubicacion", idsUbicacion)
-        .is("id_palet", null);
-      if (stockError) throw stockError;
-
-      const stockActual = new Map(
-        (
-          (stocksData ?? []) as {
-            id_producto: string;
-            id_ubicacion: string;
-            cantidad: number;
-          }[]
-        ).map((stock) => [`${stock.id_producto}:${stock.id_ubicacion}`, stock.cantidad]),
-      );
-      const notasBase = `Reversión CSV Lote: ${loteSeleccionado} | `;
-      const compensatorios = filasActuales.flatMap((fila) => {
-        const { movimiento, auditoria } = fila;
-        const cantidadAnterior = auditoria!.cantidad_anterior!;
-        const claveStock = `${movimiento.id_producto}:${movimiento.id_ubicacion}`;
-        const actual = stockActual.get(claveStock) ?? 0;
-        let tipo: "entrada" | "salida";
-        let cantidad: number;
-
-        if (datosLote.modo === "sumar") {
-          tipo = "salida";
-          cantidad = auditoria!.cantidad_csv!;
-        } else if (cantidadAnterior === actual) {
-          return [];
-        } else if (cantidadAnterior > actual) {
-          tipo = "entrada";
-          cantidad = cantidadAnterior - actual;
-        } else {
-          tipo = "salida";
-          cantidad = actual - cantidadAnterior;
-        }
-
-        if (!Number.isSafeInteger(cantidad) || cantidad <= 0) return [];
-        return [
-          {
-            id_producto: movimiento.id_producto,
-            id_ubicacion: movimiento.id_ubicacion,
-            tipo,
-            cantidad,
-            precio_unitario: null,
-            precio_total: null,
-            notas:
-              notasBase +
-              JSON.stringify({
-                origen: "reversion_importacion",
-                movimiento_original: movimiento.id,
-                sku: auditoria!.sku,
-                cantidad_anterior: actual,
-                cantidad_restaurada: cantidadAnterior,
-                conflicto_confirmado: fila.conflictoPosterior,
-              }),
-            realizado_por: user.id,
-            id_palet: null,
-          },
-        ];
+      const { data, error } = await supabase.rpc('revertir_lote_importacion', {
+        p_lote_id: loteSeleccionado,
       });
 
-      if (compensatorios.length === 0) {
-        throw new Error("No se generaron movimientos compensatorios para este lote.");
-      }
-
-      const { error } = await supabase.from("movimientos").insert(compensatorios);
       if (error) throw error;
-      return compensatorios.length;
+      return data?.movimientos_compensatorios ?? 0;
     },
     onSuccess: async (cantidad) => {
       toast.success(`Lote revertido con ${cantidad} movimiento(s) compensatorio(s).`);
