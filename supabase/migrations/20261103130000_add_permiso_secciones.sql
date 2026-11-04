@@ -1,7 +1,17 @@
 BEGIN;
 
-ALTER TABLE public.permisos_usuario
-  ADD COLUMN puede_gestionar_secciones boolean NOT NULL DEFAULT false;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'permisos_usuario'
+      AND column_name = 'puede_gestionar_secciones'
+  ) THEN
+    ALTER TABLE public.permisos_usuario
+      ADD COLUMN puede_gestionar_secciones boolean NOT NULL DEFAULT false;
+  END IF;
+END $$;
 
 DROP POLICY IF EXISTS secciones_all ON public.secciones;
 DROP POLICY IF EXISTS secciones_auth_policy ON public.secciones;

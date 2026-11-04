@@ -1,0 +1,21 @@
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/Archivo-Black.woff2') format('woff2'), url('/fonts/Archivo-Black.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/SourceSans3-Regular.woff2') format('woff2'), url('/fonts/SourceSans3-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2'), url('/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+}
