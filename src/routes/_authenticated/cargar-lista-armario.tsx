@@ -389,19 +389,30 @@ function CargarListaArmarioPage() {
       return;
     }
 
+    const TAMANO_MAXIMO = 10 * 1024 * 1024;
+    if (nuevoArchivo.size > TAMANO_MAXIMO) {
+      setArchivo(null);
+      setErrorArchivo(`El archivo es demasiado grande. Máximo 10 MB.`);
+      return;
+    }
+
     try {
-      const bytes = await nuevoArchivo.arrayBuffer();
-      const resultado = parsearCSVArmarioDesdeBytes(bytes);
+      const resultadoAdaptativo = await parsearCSV(nuevoArchivo, { maxFilas: 5 });
       setArchivo(nuevoArchivo);
-      setResultadoParser(resultado);
-      if (resultado.erroresParseo.length > 0) {
-        setErrorArchivo("El archivo tiene problemas de lectura. Corrígelos antes de continuar.");
-      } else {
-        toast.success(`${resultado.filas.length} fila(s) leída(s) del CSV.`);
+      setCabecerasCSV(resultadoAdaptativo.cabeceras);
+      setFilasPreview(resultadoAdaptativo.filas);
+      setFasePaso2('mapeo');
+      
+      if (resultadoAdaptativo.metadata.advertencias.length > 0) {
+        toast.warning(`${resultadoAdaptativo.metadata.advertencias.length} advertencia(s) en el CSV.`);
       }
+      
+      toast.success(`${resultadoAdaptativo.metadata.totalFilas} fila(s) detectada(s).`);
     } catch (error) {
       setArchivo(null);
-      setResultadoParser(null);
+      setCabecerasCSV([]);
+      setFilasPreview([]);
+      setFasePaso2('subida');
       setErrorArchivo(`No se pudo leer el archivo: ${errorMensaje(error)}`);
     }
   };
