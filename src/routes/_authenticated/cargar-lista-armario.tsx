@@ -36,6 +36,10 @@ import {
 } from "@/components/ui/select";
 import { useMyProfile } from "@/hooks/usePermissions";
 import { parsearCSVArmarioDesdeBytes, type ResultadoParser } from "@/lib/parser-lista-armario";
+import { parsearCSV } from "@/lib/csv-parser";
+import { transformarACanonico } from "@/lib/csv-transformer";
+import { type MapeoSugerido } from "@/lib/csv-mapper";
+import { PanelMapeoColumnas } from "@/components/csv-import/PanelMapeoColumnas";
 import { supabase } from "@/lib/supabase";
 import {
   validarFilasCSV,
@@ -913,7 +917,7 @@ function CargarListaArmarioPage() {
             <CardContent>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <Regla>
-                  Usa NOMBRE, REFERENCIA, EAN y CANTIDAD; las demás columnas se ignoran.
+                  El sistema detectará las columnas de tu CSV y te pedirá mapearlas a REFERENCIA, NOMBRE, EAN y CANTIDAD.
                 </Regla>
                 <Regla>
                   El SKU y el EAN son obligatorios. Un EAN-13 incorrecto genera un aviso.
