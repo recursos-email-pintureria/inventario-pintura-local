@@ -1,0 +1,209 @@
+/* ==========================================================
+   TOKENS SEMÁNTICOS DE COLOR (generado)
+   Sin valores hardcodeados: todo sale de la paleta de Tailwind
+   (var(--color-*)) y de tus tokens (--background).
+   Uso: bg-info-soft, text-reserva-strong, border-caja-line...
+   ========================================================== */
+
+@layer base {
+  :root {
+    --info-subtle: var(--color-blue-50);
+    --info-soft: var(--color-blue-100);
+    --info-line: var(--color-blue-200);
+    --info-edge: var(--color-blue-300);
+    --info-solid: var(--color-blue-600);
+    --info-solid-hover: var(--color-blue-700);
+    --info-strong: var(--color-blue-800);
+    --info-ink: var(--color-blue-900);
+
+    --seccion-subtle: var(--color-indigo-50);
+    --seccion-soft: var(--color-indigo-100);
+    --seccion-line: var(--color-indigo-200);
+    --seccion-edge: var(--color-indigo-300);
+    --seccion-solid: var(--color-indigo-600);
+    --seccion-solid-hover: var(--color-indigo-700);
+    --seccion-strong: var(--color-indigo-800);
+    --seccion-ink: var(--color-indigo-900);
+
+    --reserva-subtle: var(--color-amber-50);
+    --reserva-soft: var(--color-amber-100);
+    --reserva-line: var(--color-amber-200);
+    --reserva-edge: var(--color-amber-300);
+    --reserva-solid: var(--color-amber-600);
+    --reserva-solid-hover: var(--color-amber-700);
+    --reserva-strong: var(--color-amber-800);
+    --reserva-ink: var(--color-amber-900);
+
+    --caja-subtle: var(--color-rose-50);
+    --caja-soft: var(--color-rose-100);
+    --caja-line: var(--color-rose-200);
+    --caja-edge: var(--color-rose-300);
+    --caja-solid: var(--color-rose-600);
+    --caja-solid-hover: var(--color-rose-700);
+    --caja-strong: var(--color-rose-800);
+    --caja-ink: var(--color-rose-900);
+
+    --danger-subtle: var(--color-rose-50);
+    --danger-soft: var(--color-rose-100);
+    --danger-line: var(--color-rose-200);
+    --danger-edge: var(--color-rose-300);
+    --danger-solid: var(--color-rose-600);
+    --danger-solid-hover: var(--color-rose-700);
+    --danger-strong: var(--color-rose-800);
+    --danger-ink: var(--color-rose-900);
+
+    --success-subtle: var(--color-emerald-50);
+    --success-soft: var(--color-emerald-100);
+    --success-line: var(--color-emerald-200);
+    --success-edge: var(--color-emerald-300);
+    --success-solid: var(--color-emerald-600);
+    --success-solid-hover: var(--color-emerald-700);
+    --success-strong: var(--color-emerald-800);
+    --success-ink: var(--color-emerald-900);
+
+    --cross-subtle: var(--color-purple-50);
+    --cross-soft: var(--color-purple-100);
+    --cross-line: var(--color-purple-200);
+    --cross-edge: var(--color-purple-300);
+    --cross-solid: var(--color-purple-600);
+    --cross-solid-hover: var(--color-purple-700);
+    --cross-strong: var(--color-purple-800);
+    --cross-ink: var(--color-purple-900);
+
+    --solid-foreground: var(--color-white);
+  }
+
+  .dark {
+    --info-subtle: color-mix(in oklab, var(--color-blue-500) 10%, var(--background));
+    --info-soft: color-mix(in oklab, var(--color-blue-500) 18%, var(--background));
+    --info-line: color-mix(in oklab, var(--color-blue-500) 30%, var(--background));
+    --info-edge: color-mix(in oklab, var(--color-blue-400) 45%, var(--background));
+    --info-solid: var(--color-blue-500);
+    --info-solid-hover: var(--color-blue-400);
+    --info-strong: var(--color-blue-300);
+    --info-ink: var(--color-blue-200);
+
+    --seccion-subtle: color-mix(in oklab, var(--color-indigo-500) 10%, var(--background));
+    --seccion-soft: color-mix(in oklab, var(--color-indigo-500) 18%, var(--background));
+    --seccion-line: color-mix(in oklab, var(--color-indigo-500) 30%, var(--background));
+    --seccion-edge: color-mix(in oklab, var(--color-indigo-400) 45%, var(--background));
+    --seccion-solid: var(--color-indigo-500);
+    --seccion-solid-hover: var(--color-indigo-400);
+    --seccion-strong: var(--color-indigo-300);
+    --seccion-ink: var(--color-indigo-200);
+
+    --reserva-subtle: color-mix(in oklab, var(--color-amber-500) 10%, var(--background));
+    --reserva-soft: color-mix(in oklab, var(--color-amber-500) 18%, var(--background));
+    --reserva-line: color-mix(in oklab, var(--color-amber-500) 30%, var(--background));
+    --reserva-edge: color-mix(in oklab, var(--color-amber-400) 45%, var(--background));
+    --reserva-solid: var(--color-amber-500);
+    --reserva-solid-hover: var(--color-amber-400);
+    --reserva-strong: var(--color-amber-300);
+    --reserva-ink: var(--color-amber-200);
+
+    --caja-subtle: color-mix(in oklab, var(--color-rose-500) 10%, var(--background));
+    --caja-soft: color-mix(in oklab, var(--color-rose-500) 18%, var(--background));
+    --caja-line: color-mix(in oklab, var(--color-rose-500) 30%, var(--background));
+    --caja-edge: color-mix(in oklab, var(--color-rose-400) 45%, var(--background));
+    --caja-solid: var(--color-rose-500);
+    --caja-solid-hover: var(--color-rose-400);
+    --caja-strong: var(--color-rose-300);
+    --caja-ink: var(--color-rose-200);
+
+    --danger-subtle: color-mix(in oklab, var(--color-rose-500) 10%, var(--background));
+    --danger-soft: color-mix(in oklab, var(--color-rose-500) 18%, var(--background));
+    --danger-line: color-mix(in oklab, var(--color-rose-500) 30%, var(--background));
+    --danger-edge: color-mix(in oklab, var(--color-rose-400) 45%, var(--background));
+    --danger-solid: var(--color-rose-500);
+    --danger-solid-hover: var(--color-rose-400);
+    --danger-strong: var(--color-rose-300);
+    --danger-ink: var(--color-rose-200);
+
+    --success-subtle: color-mix(in oklab, var(--color-emerald-500) 10%, var(--background));
+    --success-soft: color-mix(in oklab, var(--color-emerald-500) 18%, var(--background));
+    --success-line: color-mix(in oklab, var(--color-emerald-500) 30%, var(--background));
+    --success-edge: color-mix(in oklab, var(--color-emerald-400) 45%, var(--background));
+    --success-solid: var(--color-emerald-500);
+    --success-solid-hover: var(--color-emerald-400);
+    --success-strong: var(--color-emerald-300);
+    --success-ink: var(--color-emerald-200);
+
+    --cross-subtle: color-mix(in oklab, var(--color-purple-500) 10%, var(--background));
+    --cross-soft: color-mix(in oklab, var(--color-purple-500) 18%, var(--background));
+    --cross-line: color-mix(in oklab, var(--color-purple-500) 30%, var(--background));
+    --cross-edge: color-mix(in oklab, var(--color-purple-400) 45%, var(--background));
+    --cross-solid: var(--color-purple-500);
+    --cross-solid-hover: var(--color-purple-400);
+    --cross-strong: var(--color-purple-300);
+    --cross-ink: var(--color-purple-200);
+
+  }
+}
+
+/* Exponer como utilidades de Tailwind (bg-*, text-*, border-*, ring-*, from-*...) */
+@theme inline {
+  --color-info-subtle: var(--info-subtle);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-info-edge: var(--info-edge);
+  --color-info-solid: var(--info-solid);
+  --color-info-solid-hover: var(--info-solid-hover);
+  --color-info-strong: var(--info-strong);
+  --color-info-ink: var(--info-ink);
+
+  --color-seccion-subtle: var(--seccion-subtle);
+  --color-seccion-soft: var(--seccion-soft);
+  --color-seccion-line: var(--seccion-line);
+  --color-seccion-edge: var(--seccion-edge);
+  --color-seccion-solid: var(--seccion-solid);
+  --color-seccion-solid-hover: var(--seccion-solid-hover);
+  --color-seccion-strong: var(--seccion-strong);
+  --color-seccion-ink: var(--seccion-ink);
+
+  --color-reserva-subtle: var(--reserva-subtle);
+  --color-reserva-soft: var(--reserva-soft);
+  --color-reserva-line: var(--reserva-line);
+  --color-reserva-edge: var(--reserva-edge);
+  --color-reserva-solid: var(--reserva-solid);
+  --color-reserva-solid-hover: var(--reserva-solid-hover);
+  --color-reserva-strong: var(--reserva-strong);
+  --color-reserva-ink: var(--reserva-ink);
+
+  --color-caja-subtle: var(--caja-subtle);
+  --color-caja-soft: var(--caja-soft);
+  --color-caja-line: var(--caja-line);
+  --color-caja-edge: var(--caja-edge);
+  --color-caja-solid: var(--caja-solid);
+  --color-caja-solid-hover: var(--caja-solid-hover);
+  --color-caja-strong: var(--caja-strong);
+  --color-caja-ink: var(--caja-ink);
+
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-danger-edge: var(--danger-edge);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
+  --color-danger-strong: var(--danger-strong);
+  --color-danger-ink: var(--danger-ink);
+
+  --color-success-subtle: var(--success-subtle);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-success-edge: var(--success-edge);
+  --color-success-solid: var(--success-solid);
+  --color-success-solid-hover: var(--success-solid-hover);
+  --color-success-strong: var(--success-strong);
+  --color-success-ink: var(--success-ink);
+
+  --color-cross-subtle: var(--cross-subtle);
+  --color-cross-soft: var(--cross-soft);
+  --color-cross-line: var(--cross-line);
+  --color-cross-edge: var(--cross-edge);
+  --color-cross-solid: var(--cross-solid);
+  --color-cross-solid-hover: var(--cross-solid-hover);
+  --color-cross-strong: var(--cross-strong);
+  --color-cross-ink: var(--cross-ink);
+
+  --color-solid-foreground: var(--solid-foreground);
+}

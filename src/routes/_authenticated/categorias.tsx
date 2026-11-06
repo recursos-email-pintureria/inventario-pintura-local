@@ -154,20 +154,20 @@ function CategoriasPage() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-gray-400 mb-1">
+          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-muted-foreground mb-1">
             <span>INVENTARIO LM</span>
-            <span className="text-gray-300">/</span>
+            <span className="text-muted-foreground">/</span>
             <span>CATÁLOGO</span>
-            <span className="text-gray-300">/</span>
-            <span className="text-amber-700 font-bold">CATEGORÍAS</span>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-reserva-strong font-bold">CATEGORÍAS</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
             Categorías de Productos
           </h1>
         </div>
         <Button
           onClick={abrirModalNueva}
-          className="h-10 bg-[#8c4314] hover:bg-[#78370e] text-white rounded-lg text-xs font-semibold px-4 gap-1.5"
+          className="h-10 bg-[#8c4314] hover:bg-[#78370e] text-solid-foreground rounded-lg text-xs font-semibold px-4 gap-1.5"
         >
           <Plus className="w-4 h-4" />
           <span>Nueva Categoría</span>
@@ -198,19 +198,19 @@ function CategoriasPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                     Cargando categorías desde Supabase...
                   </TableCell>
                 </TableRow>
               ) : isError ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-rose-600">
+                  <TableCell colSpan={4} className="text-center py-8 text-danger-solid">
                     Error al cargar las categorías. Revisa la conexión y las políticas RLS.
                   </TableCell>
                 </TableRow>
               ) : categorias.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                     No hay categorías activas. Crea la primera.
                   </TableCell>
                 </TableRow>
@@ -220,18 +220,18 @@ function CategoriasPage() {
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className="bg-indigo-50 text-indigo-800 border-indigo-200 text-xs font-medium"
+                        className="bg-seccion-subtle text-seccion-strong border-seccion-line text-xs font-medium"
                       >
                         {cat.nombre}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600 max-w-[320px] truncate">
+                    <TableCell className="text-xs text-muted-foreground max-w-[320px] truncate">
                       {cat.descripcion || "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge
                         variant="outline"
-                        className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs"
+                        className="bg-success-subtle text-success-strong border-success-line text-xs"
                       >
                         Activa
                       </Badge>
@@ -242,7 +242,7 @@ function CategoriasPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => abrirModalEditar(cat)}
-                          className="h-7 w-7 p-0 text-slate-500 hover:text-blue-600"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-info-solid"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
@@ -250,7 +250,7 @@ function CategoriasPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setCategoriaADesactivar(cat)}
-                          className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-danger-solid"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -276,10 +276,10 @@ function CategoriasPage() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">
+            <DialogTitle className="text-base font-bold text-foreground">
               {categoriaEditando ? "Editar Categoría" : "Nueva Categoría"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               {categoriaEditando
                 ? "Modifica los datos de la categoría."
                 : "Crea una nueva categoría en la base de datos."}
@@ -287,7 +287,7 @@ function CategoriasPage() {
           </DialogHeader>
           <form onSubmit={handleGuardar} className="space-y-3.5">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Nombre *</Label>
+              <Label className="text-xs font-semibold text-foreground">Nombre *</Label>
               <Input
                 value={formNombre}
                 onChange={(e) => setFormNombre(e.target.value)}
@@ -297,7 +297,7 @@ function CategoriasPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Descripción</Label>
+              <Label className="text-xs font-semibold text-foreground">Descripción</Label>
               <Textarea
                 value={formDescripcion}
                 onChange={(e) => setFormDescripcion(e.target.value)}
@@ -318,7 +318,7 @@ function CategoriasPage() {
               <Button
                 type="submit"
                 size="sm"
-                className="bg-[#8c4314] hover:bg-[#78370e] text-white text-xs"
+                className="bg-[#8c4314] hover:bg-[#78370e] text-solid-foreground text-xs"
                 disabled={mutationCrear.isPending || mutationActualizar.isPending}
               >
                 {categoriaEditando ? "Guardar Cambios" : "Crear Categoría"}
@@ -345,7 +345,7 @@ function CategoriasPage() {
             <AlertDialogCancel className="text-xs">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmarDesactivar}
-              className="bg-rose-600 hover:bg-rose-700 text-white text-xs"
+              className="bg-danger-solid hover:bg-danger-solid-hover text-solid-foreground text-xs"
             >
               Desactivar
             </AlertDialogAction>
