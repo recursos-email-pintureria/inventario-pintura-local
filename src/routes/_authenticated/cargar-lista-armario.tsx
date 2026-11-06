@@ -38,6 +38,8 @@ import { useMyProfile } from "@/hooks/usePermissions";
 import { parsearCSVArmarioDesdeBytes, type ResultadoParser } from "@/lib/parser-lista-armario";
 import { parsearCSV } from "@/lib/csv-parser";
 import { transformarACanonico } from "@/lib/csv-transformer";
+import { generarFirmaCabeceras } from "@/lib/csv-mapper";
+import { obtenerMapeoGuardado, guardarMapeo } from "@/lib/mapeo-storage";
 import { type MapeoSugerido } from "@/lib/csv-mapper";
 import { PanelMapeoColumnas } from "@/components/csv-import/PanelMapeoColumnas";
 import { supabase } from "@/lib/supabase";

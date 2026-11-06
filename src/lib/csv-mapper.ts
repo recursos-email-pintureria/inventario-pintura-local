@@ -9,68 +9,30 @@ export interface MapeoSugerido {
   cantidad: string | null;
 }
 
-export interface ValidacionMapeo {
-  esValido: boolean;
-  camposFaltantes: CampoRequerido[];
-  columnasRepetidas: string[];
-  camposConColumnaInexistente: CampoRequerido[];
-}
-
-/**
- * Sinónimos normalizados.
- * 'articulo' solo en 'sku' según convención de ERPs españoles.
- */
+/** Sinónimos ya normalizados (ver normalizarTexto). */
 const SINONIMOS: Record<CampoRequerido, string[]> = {
-  sku: ['referencia', 'ref', 'codigo', 'id', 'articulo', 'cod', 'sku', 'id_producto'],
-  nombre: ['descripcion', 'producto', 'denominacion', 'detalle', 'desc', 'nombre'],
+  sku: ['sku', 'referencia', 'ref', 'codigo', 'codigo_producto', 'id', 'id_producto', 'cod', 'articulo'],
+  nombre: ['nombre', 'descripcion', 'producto', 'denominacion', 'articulo', 'detalle', 'desc'],
   ean: ['ean', 'ean13', 'codigo_barras', 'barcode', 'gtin', 'upc', 'barras'],
   cantidad: ['cantidad', 'unidades', 'qty', 'stock', 'units', 'uds', 'piezas', 'pzs', 'stock_actual'],
 };
 
-/** Palabras que anulan coincidencias no exactas. */
-const EXCLUSIONES = ['minimo', 'maximo', 'pedido', 'descuento', 'precio', 'coste', 'costo'];
-
-/** Prioridad de desempate (menor número = mayor prioridad). */
-const PRIORIDAD_CAMPO: Record<CampoRequerido, number> = {
-  ean: 1,
-  sku: 2,
-  cantidad: 3,
-  nombre: 4,
+/**
+ * Palabras que delatan otra columna ("stock_minimo" no es la cantidad).
+ * Solo se aplican a coincidencias NO exactas.
+ */
+const EXCLUSIONES: Record<CampoRequerido, string[]> = {
+  sku: ['precio', 'coste', 'barras', 'barcode'],
+  nombre: ['descuento', 'dto', 'precio', 'coste', 'codigo', 'id', 'ref', 'referencia'],
+  ean: ['precio', 'coste'],
+  cantidad: ['minimo', 'min', 'maximo', 'max', 'pedido', 'caja', 'pack', 'precio', 'coste', 'descuento'],
 };
 
-/**
- * Distancia de Levenshtein optimizada con 2 filas (O(n) memoria).
- * Usa aserciones no nulas (!) porque matemáticamente los índices siempre existen.
- */
-function levenshtein(a: string, b: string): number {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
+/** Orden de prioridad ante empates y para repartir columnas ("codigo_barras" es EAN antes que SKU). */
+const PRIORIDAD: CampoRequerido[] = ['ean', 'sku', 'cantidad', 'nombre'];
 
-  let filaAnterior: number[] = Array.from({ length: a.length + 1 }, (_, j) => j);
-  let filaActual: number[] = new Array(a.length + 1);
+const UMBRAL_MINIMO = 50;
 
-  for (let i = 1; i <= b.length; i++) {
-    filaActual[0] = i;
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        filaActual[j] = filaAnterior[j - 1]!;
-      } else {
-        const costo = filaAnterior[j - 1]! + 1;
-        const insercion = filaActual[j - 1]! + 1;
-        const borrado = filaAnterior[j]! + 1;
-        filaActual[j] = Math.min(costo, insercion, borrado);
-      }
-    }
-    const temp = filaAnterior;
-    filaAnterior = filaActual;
-    filaActual = temp;
-  }
-  return filaAnterior[a.length]!;
-}
-
-/**
- * Normaliza un texto para hacerlo comparable.
- */
 export function normalizarTexto(texto: string): string {
   return texto
     .toLowerCase()
@@ -81,114 +43,133 @@ export function normalizarTexto(texto: string): string {
     .replace(/^_|_$/g, '');
 }
 
-/**
- * Calcula la mejor puntuación de una cabecera contra una lista de sinónimos.
- */
-function obtenerMejorPuntuacion(headerNorm: string, sinonimos: string[]): number {
-  const hWords = headerNorm.split('_').filter((w) => w.length > 0);
-  const hasExclusion = hWords.some((w) => EXCLUSIONES.includes(w));
-  let maxScore = 0;
-
-  for (const sin of sinonimos) {
-    const sWords = sin.split('_').filter((w) => w.length > 0);
-
-    if (hasExclusion && headerNorm !== sin) {
-      continue;
-    }
-
-    for (const hWord of hWords) {
-      for (const sWord of sWords) {
-        if (hWord === sWord) {
-          return 100;
-        }
-
-        if (sWord.length >= 3) {
-          const dist = levenshtein(hWord, sWord);
-          const maxDistAllowed = sWord.length > 6 ? 2 : 1;
-
-          if (dist <= maxDistAllowed) {
-            const score = 100 - dist * 15;
-            if (score > maxScore) {
-              maxScore = score;
-            }
-          }
-        }
-      }
+/** Distancia de edición (para erratas tipo "referenica"). */
+function levenshtein(a: string, b: string): number {
+  const fila = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let anterior = fila[0] ?? 0;
+    fila[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temporal = fila[j] ?? 0;
+      fila[j] = Math.min(
+        (fila[j] ?? 0) + 1,
+        (fila[j - 1] ?? 0) + 1,
+        anterior + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1),
+      );
+      anterior = temporal;
     }
   }
-  return maxScore;
+  return fila[b.length] ?? 0;
+}
+
+/** 0-100: cuánto se parece la cabecera normalizada a un sinónimo. */
+function puntuar(campo: CampoRequerido, cabecera: string, sinonimo: string): number {
+  if (!cabecera) return 0;
+  if (cabecera === sinonimo) return 100;
+  if (sinonimo.length < 3) return 0; // sinónimos tan cortos ("id") solo valen exactos
+
+  const tokensCab = cabecera.split('_');
+  if (tokensCab.some((t) => EXCLUSIONES[campo].includes(t))) return 0;
+
+  // Todas las palabras del sinónimo aparecen como palabras completas ("ref_proveedor" ~ "ref").
+  const tokensSin = sinonimo.split('_');
+  if (tokensSin.every((t) => tokensCab.includes(t))) {
+    const sobrantes = tokensCab.length - tokensSin.length;
+    return Math.max(UMBRAL_MINIMO, 85 - 8 * sobrantes);
+  }
+
+  // Erratas: 1 letra de diferencia (sinónimos de 5+ letras) o 2 (de 8+, p. ej. letras intercambiadas).
+  if (sinonimo.length >= 5 && cabecera.length >= 5) {
+    const maxErratas = sinonimo.length >= 8 ? 2 : 1;
+    if (levenshtein(cabecera, sinonimo) <= maxErratas) return 70;
+  }
+
+  return 0;
 }
 
 /**
- * Analiza las cabeceras y sugiere un mapeo 1 a 1 basado en puntuación global.
+ * Sugiere un mapeo. Cada columna se asigna como máximo a UN campo.
+ * Devuelve el nombre ORIGINAL de la cabecera (el mismo que usa parsearCSV como clave).
  */
 export function sugerirMapeo(cabeceras: string[]): MapeoSugerido {
+  const normalizadas = cabeceras.map(normalizarTexto);
+  const candidatos: { campo: CampoRequerido; indice: number; puntos: number }[] = [];
+
+  for (const campo of PRIORIDAD) {
+    normalizadas.forEach((cabecera, indice) => {
+      const puntos = Math.max(...SINONIMOS[campo].map((s) => puntuar(campo, cabecera, s)));
+      if (puntos >= UMBRAL_MINIMO) candidatos.push({ campo, indice, puntos });
+    });
+  }
+
+  candidatos.sort(
+    (a, b) =>
+      b.puntos - a.puntos ||
+      PRIORIDAD.indexOf(a.campo) - PRIORIDAD.indexOf(b.campo) ||
+      a.indice - b.indice,
+  );
+
   const mapeo: MapeoSugerido = { sku: null, nombre: null, ean: null, cantidad: null };
-  const cabecerasNorm = cabeceras.map((c) => normalizarTexto(c));
-
-  type Asignacion = { campo: CampoRequerido; colIndex: number; score: number; header: string };
-  const asignaciones: Asignacion[] = [];
-
-  for (let colIndex = 0; colIndex < cabeceras.length; colIndex++) {
-    const hNorm = cabecerasNorm[colIndex] ?? '';
-    const hOrig = cabeceras[colIndex] ?? '';
-
-    for (const campo of Object.keys(SINONIMOS) as CampoRequerido[]) {
-      const score = obtenerMejorPuntuacion(hNorm, SINONIMOS[campo]);
-      if (score > 0) {
-        asignaciones.push({ campo, colIndex, score, header: hOrig });
-      }
-    }
+  const usadas = new Set<number>();
+  for (const { campo, indice } of candidatos) {
+    if (mapeo[campo] !== null || usadas.has(indice)) continue;
+    mapeo[campo] = cabeceras[indice] ?? null;
+    usadas.add(indice);
   }
-
-  asignaciones.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return PRIORIDAD_CAMPO[a.campo] - PRIORIDAD_CAMPO[b.campo];
-  });
-
-  const columnasUsadas = new Set<number>();
-  const camposAsignados = new Set<CampoRequerido>();
-
-  for (const asig of asignaciones) {
-    if (!columnasUsadas.has(asig.colIndex) && !camposAsignados.has(asig.campo)) {
-      mapeo[asig.campo] = asig.header;
-      columnasUsadas.add(asig.colIndex);
-      camposAsignados.add(asig.campo);
-    }
-  }
-
   return mapeo;
 }
 
+export interface ResultadoValidacion {
+  esValido: boolean;
+  camposFaltantes: CampoRequerido[];
+  /** Columnas asignadas a más de un campo. */
+  columnasRepetidas: string[];
+  /** Campos cuya columna ya no existe en el archivo (p. ej. un mapeo guardado de otro CSV). */
+  camposConColumnaInexistente: CampoRequerido[];
+}
+
+/** Alias por compatibilidad con componentes que ya importan este nombre. */
+export type ValidacionMapeo = ResultadoValidacion;
+
 /**
- * Valida que el mapeo sea coherente y completo.
+ * sku, ean y cantidad son obligatorios; nombre es opcional.
+ * Pasa `cabeceras` para comprobar también que las columnas existen.
  */
-export function validarMapeo(mapeo: MapeoSugerido, cabeceras?: string[]): ValidacionMapeo {
+export function validarMapeo(mapeo: MapeoSugerido, cabeceras?: string[]): ResultadoValidacion {
   const obligatorios: CampoRequerido[] = ['sku', 'ean', 'cantidad'];
   const camposFaltantes = obligatorios.filter((campo) => !mapeo[campo]);
 
-  const valores = Object.values(mapeo).filter((v): v is string => v !== null);
-  const conteo = new Map<string, number>();
-  valores.forEach((v) => conteo.set(v, (conteo.get(v) || 0) + 1));
-  const columnasRepetidas = Array.from(conteo.entries())
-    .filter(([, count]) => count > 1)
-    .map(([col]) => col);
+  const asignadas = (Object.keys(mapeo) as CampoRequerido[])
+    .map((campo) => mapeo[campo])
+    .filter((c): c is string => Boolean(c));
+  const columnasRepetidas = [...new Set(asignadas.filter((c, i) => asignadas.indexOf(c) !== i))];
 
-  const camposConColumnaInexistente: CampoRequerido[] = [];
-  if (cabeceras) {
-    const cabecerasSet = new Set(cabeceras);
-    for (const campo of Object.keys(mapeo) as CampoRequerido[]) {
-      const col = mapeo[campo];
-      if (col && !cabecerasSet.has(col)) {
-        camposConColumnaInexistente.push(campo);
-      }
-    }
-  }
+  const camposConColumnaInexistente = cabeceras
+    ? (Object.keys(mapeo) as CampoRequerido[]).filter((campo) => {
+        const columna = mapeo[campo];
+        return Boolean(columna) && !cabeceras.includes(columna as string);
+      })
+    : [];
 
   return {
-    esValido: camposFaltantes.length === 0 && columnasRepetidas.length === 0 && camposConColumnaInexistente.length === 0,
+    esValido:
+      camposFaltantes.length === 0 &&
+      columnasRepetidas.length === 0 &&
+      camposConColumnaInexistente.length === 0,
     camposFaltantes,
     columnasRepetidas,
     camposConColumnaInexistente,
   };
+}
+
+
+/**
+ * Genera una firma única y consistente a partir de las cabeceras.
+ * Se normalizan, se ordenan alfabéticamente y se unen con '|'.
+ */
+export function generarFirmaCabeceras(cabeceras: string[]): string {
+  return cabeceras
+    .map(normalizarTexto)
+    .sort()
+    .join('|');
 }
