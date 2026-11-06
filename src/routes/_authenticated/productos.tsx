@@ -532,7 +532,7 @@ function ProductosPage() {
             </Button>
           )}
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-medium shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-reserva-solid animate-pulse" />
             <span>
               {cargandoProductos
                 ? "Conectando a Supabase..."
@@ -624,7 +624,7 @@ function ProductosPage() {
 
           <Button
             onClick={abrirModalCrear}
-            className="h-10 bg-orange-600 hover:bg-orange-700 text-solid-foreground rounded-lg text-xs font-semibold px-4 gap-1.5 shadow-xs transition-colors"
+            className="h-10 bg-reserva-solid hover:bg-orange-700 text-solid-foreground rounded-lg text-xs font-semibold px-4 gap-1.5 shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo Producto</span>
@@ -781,7 +781,7 @@ function ProductosPage() {
                             </span>
                           ) : esBajo ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-reserva-solid" />
                               Bajo
                             </span>
                           ) : (
@@ -984,7 +984,7 @@ function ProductosPage() {
               onClick={() => setPaginaActual(num)}
               className={`h-8 w-8 p-0 text-xs font-semibold ${
                 paginaActual === num
-                  ? "bg-orange-600 hover:bg-orange-700 text-solid-foreground border-transparent"
+                  ? "bg-reserva-solid hover:bg-orange-700 text-solid-foreground border-transparent"
                   : "border-border text-foreground"
               }`}
             >
@@ -1102,7 +1102,7 @@ function ProductosPage() {
                 {(!formCategoria || formCategoria === "Sin categoría") && (
                   <Badge
                     variant="outline"
-                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs font-normal"
+                    className="bg-muted text-muted-foreground border-border text-xs font-normal"
                   >
                     Sin categoría
                   </Badge>
@@ -1195,7 +1195,7 @@ function ProductosPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-orange-600 hover:bg-orange-700 text-solid-foreground font-medium"
+                className="bg-reserva-solid hover:bg-orange-700 text-solid-foreground font-medium"
                 disabled={mutationCrear.isPending}
               >
                 {mutationCrear.isPending ? "Guardando..." : "Guardar Producto"}
@@ -1302,7 +1302,7 @@ function ProductosPage() {
                 {(!formCategoria || formCategoria === "Sin categoría") && (
                   <Badge
                     variant="outline"
-                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs font-normal"
+                    className="bg-muted text-muted-foreground border-border text-xs font-normal"
                   >
                     Sin categoría
                   </Badge>
@@ -1395,7 +1395,7 @@ function ProductosPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-orange-600 hover:bg-orange-700 text-solid-foreground font-medium"
+                className="bg-reserva-solid hover:bg-orange-700 text-solid-foreground font-medium"
                 disabled={mutationActualizar.isPending}
               >
                 {mutationActualizar.isPending ? "Guardando..." : "Guardar Cambios"}
