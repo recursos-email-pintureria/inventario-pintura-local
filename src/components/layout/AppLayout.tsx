@@ -7,7 +7,6 @@ import {
   MapPin,
   ArrowRightLeft,
   LogOut,
-  Boxes,
   Settings,
   Users,
   Sun,
@@ -34,6 +33,9 @@ import {
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import { CambioPasswordObligatorio } from "@/components/auth/CambioPasswordObligatorio";
 import { toast } from "sonner";
+
+// ✅ Importación compatible con SSR (TanStack Start)
+import logoInventarioSrc from "@/assets/logo-inventario.svg";
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -64,7 +66,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (cargandoSesion || user) return;
-
     queryClient.clear();
     void navigate({ to: "/login", replace: true });
   }, [cargandoSesion, navigate, queryClient, user]);
@@ -106,15 +107,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       ? [{ to: "/configuracion", label: "Configuración", icon: Settings }]
       : []),
   ];
+
   const nextTheme: ThemePreference =
     theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
   const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
   const themeLabel = theme === "light" ? "claro" : theme === "dark" ? "oscuro" : "del sistema";
+
   const bottomItems = [
     { to: "/", label: "Inicio", icon: LayoutDashboard },
     { to: "/ubicaciones", label: "Ubicaciones", icon: MapPin },
     { to: "/movimientos", label: "Movimientos", icon: ArrowRightLeft },
   ];
+
   const handleScan = (code: string) => {
     try {
       window.sessionStorage.setItem("inventario:codigo-busqueda", code);
@@ -125,19 +129,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     void navigate({ to: "/productos" });
     toast.success(`Buscando código ${code} en productos`);
   };
+
   const toggleTheme = () => setTheme(nextTheme);
 
   return (
     <div className="app-shell flex h-dvh flex-col bg-background md:flex-row">
       {/* ========================================== */}
-      {/* BARRA LATERAL (SIDEBAR)                    */}
+      {/* BARRA LATERAL (SIDEBAR) - ESCRITORIO       */}
       {/* ========================================== */}
       <aside className="hidden w-64 shrink-0 flex-col border-r bg-card md:flex">
+        
         {/* 🎯 LOGO Y VERSIÓN DE LA APP */}
         <div className="flex items-center gap-3 px-5 py-6 border-b border-border">
-          <div className="bg-primary text-primary-foreground p-2.5 rounded-xl shadow-sm">
-            <Boxes className="h-6 w-6" /> {/* Icono chulo de inventario */}
-          </div>
+          <img 
+            src={logoInventarioSrc} 
+            alt="Logo Inventario LM" 
+            className="h-12 w-12 shrink-0" 
+          />
           <div className="flex flex-col">
             <h1 className="font-bold text-lg leading-tight text-foreground">Inventario LM</h1>
             <span className="text-[10px] font-mono font-semibold bg-muted text-muted-foreground px-1.5 py-0.5 rounded border w-fit mt-1">
@@ -169,13 +177,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* PIE DE PÁGINA DEL SIDEBAR (USUARIO Y SALIR) */}
+        {/* PIE DE PÁGINA DEL SIDEBAR */}
         <div className="border-t border-border p-4 space-y-3">
           <Button
             type="button"
             variant="ghost"
             className="w-full justify-start text-muted-foreground"
-            aria-label={`Tema ${themeLabel}. Cambiar al tema ${nextTheme === "light" ? "claro" : nextTheme === "dark" ? "oscuro" : "del sistema"}`}
+            aria-label={`Tema ${themeLabel}. Cambiar al tema ${nextTheme ==="light" ? "claro" : nextTheme === "dark" ? "oscuro" : "del sistema"}`}
             onClick={() => setTheme(nextTheme)}
           >
             <ThemeIcon className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -207,7 +215,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ========================================== */}
-      {/* CONTENIDO PRINCIPAL                        */}
+      {/* HEADER MÓVIL                               */}
       {/* ========================================== */}
       <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b bg-card px-3 md:hidden">
         <Button
@@ -218,11 +226,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <Menu className="h-5 w-5" />
         </Button>
+        
         <div className="flex items-center gap-2 font-semibold">
-          <Boxes className="h-5 w-5 text-primary" />
+          <img src={logoInventarioSrc} alt="Logo" className="h-8 w-8" />
           <span>Inventario LM</span>
           <span className="h-2 w-2 rounded-full bg-emerald-500" aria-label="En línea" />
         </div>
+
         <Button
           variant="ghost"
           size="icon"
@@ -233,10 +243,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </Button>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-auto bg-muted/30 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main className="min-h-0 flex-1 overflow-auto bg-background pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
       </main>
 
+      {/* NAVEGACIÓN INFERIOR MÓVIL */}
       <nav
         aria-label="Navegación principal móvil"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-end border-t bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur md:hidden"
@@ -298,11 +309,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </Button>
       </nav>
 
+      {/* MENÚ LATERAL MÓVIL */}
       <Sheet open={menuAbierto} onOpenChange={setMenuAbierto}>
         <SheetContent side="left" className="flex w-[min(20rem,85vw)] flex-col p-0">
           <SheetHeader className="border-b px-5 py-5 text-left">
             <SheetTitle className="flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-primary" />
+              <img src={logoInventarioSrc} alt="Logo" className="h-8 w-8" />
               Inventario LM
             </SheetTitle>
             <SheetDescription>Navegación de la aplicación</SheetDescription>
@@ -354,6 +366,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
 
+      {/* PERFIL MÓVIL */}
       <Sheet open={perfilAbierto} onOpenChange={setPerfilAbierto}>
         <SheetContent side="right" className="w-[min(20rem,85vw)]">
           <SheetHeader className="text-left">
@@ -393,12 +406,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </SheetContent>
       </Sheet>
+      
       <BarcodeScanner open={escanerAbierto} onOpenChange={setEscanerAbierto} onScan={handleScan} />
     </div>
   );
 }
 
-// Componente PageHeader para usar en las páginas internas
 export function PageHeader({
   title,
   description,

@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
+import { CustomCursor } from "@/components/ui/CustomCursor";
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -127,6 +128,8 @@ function RootComponent() {
         <AuthProvider>
           <Outlet />
           <Toaster />
+          {/* ✅ Cursor personalizado añadido aquí */}
+          <CustomCursor />
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
