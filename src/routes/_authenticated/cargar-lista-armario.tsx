@@ -21,7 +21,6 @@ import {
   type FilaVistaPreviaArmario,
 } from "@/components/inventario/TablaVistaPreviaArmario";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,9 +37,8 @@ import { useMyProfile } from "@/hooks/usePermissions";
 import { parsearCSVArmarioDesdeBytes, type ResultadoParser } from "@/lib/parser-lista-armario";
 import { parsearCSV } from "@/lib/csv-parser";
 import { transformarACanonico } from "@/lib/csv-transformer";
-import { generarFirmaCabeceras } from "@/lib/csv-mapper";
+import { generarFirmaCabeceras, normalizarTexto, type MapeoSugerido } from "@/lib/csv-mapper";
 import { obtenerMapeoGuardado, guardarMapeo } from "@/lib/mapeo-storage";
-import { type MapeoSugerido } from "@/lib/csv-mapper";
 import { PanelMapeoColumnas } from "@/components/csv-import/PanelMapeoColumnas";
 import { supabase } from "@/lib/supabase";
 import {
@@ -57,6 +55,7 @@ export const Route = createFileRoute("/_authenticated/cargar-lista-armario")({
 type Paso = 1 | 2 | 3 | 4;
 type ModoImportacion = OpcionesValidacion["modo"];
 type OpcionDuplicados = OpcionesValidacion["duplicados"];
+type FasePaso2 = "subida" | "mapeo";
 
 interface UbicacionArmario {
   id: string;
@@ -132,12 +131,29 @@ function errorMensaje(error: unknown): string {
   return error instanceof Error ? error.message : "Error inesperado al procesar la solicitud.";
 }
 
+/**
+ * El mapeo guardado usa los nombres de columna del archivo en que se creó.
+ * Si el nuevo archivo tiene las mismas cabeceras con otra capitalización/tildes
+ * ("Descripción" vs "DESCRIPCION"), se traduce al nombre real de esta vez.
+ */
+function adaptarMapeoGuardado(guardado: MapeoSugerido, cabeceras: string[]): MapeoSugerido {
+  const porNormalizada = new Map(cabeceras.map((c) => [normalizarTexto(c), c] as const));
+  const resolver = (columna: string | null | undefined): string | null =>
+    columna ? (porNormalizada.get(normalizarTexto(columna)) ?? null) : null;
+  return {
+    sku: resolver(guardado.sku),
+    nombre: resolver(guardado.nombre),
+    ean: resolver(guardado.ean),
+    cantidad: resolver(guardado.cantidad),
+  };
+}
+
 function claseEstado(estado: string | undefined): string {
   if (estado === "error" || estado === "conflicto")
-    return "border-rose-200 bg-rose-50 text-rose-900";
-  if (estado === "omitida") return "border-slate-200 bg-slate-50 text-slate-700";
-  if (estado === "aviso") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    return "border-danger-line bg-danger-subtle text-danger-ink";
+  if (estado === "omitida") return "border-border bg-muted text-foreground";
+  if (estado === "aviso") return "border-reserva-line bg-reserva-subtle text-reserva-ink";
+  return "border-success-line bg-success-subtle text-success-ink";
 }
 
 function CargarListaArmarioPage() {
@@ -164,6 +180,18 @@ function CargarListaArmarioPage() {
     null,
   );
   const [arrastrando, setArrastrando] = useState(false);
+
+  // --- Paso 2: lectura adaptativa + mapeo de columnas ---
+  const [fasePaso2, setFasePaso2] = useState<FasePaso2>("subida");
+  const [cabecerasCSV, setCabecerasCSV] = useState<string[]>([]);
+  const [filasPreview, setFilasPreview] = useState<Record<string, string>[]>([]);
+  const [totalFilasCSV, setTotalFilasCSV] = useState(0);
+  const [mapeoGuardado, setMapeoGuardado] = useState<MapeoSugerido | undefined>(undefined);
+  const [mapeoActual, setMapeoActual] = useState<MapeoSugerido | null>(null);
+  const [mapeoValido, setMapeoValido] = useState(false);
+  const [procesando, setProcesando] = useState(false);
+  // Evita que una lectura lenta pise a una más reciente (o a un "Cambiar archivo").
+  const solicitudArchivo = useRef(0);
 
   useEffect(() => {
     if (!cargandoPerfil && !errorPerfil && !isAdmin) {
@@ -378,42 +406,100 @@ function CargarListaArmarioPage() {
     onError: (error) => toast.error(errorMensaje(error)),
   });
 
+  const reiniciarArchivo = () => {
+    solicitudArchivo.current += 1;
+    setArchivo(null);
+    setResultadoParser(null);
+    setErrorArchivo(null);
+    setCabecerasCSV([]);
+    setFilasPreview([]);
+    setTotalFilasCSV(0);
+    setMapeoGuardado(undefined);
+    setMapeoActual(null);
+    setMapeoValido(false);
+    setFasePaso2("subida");
+    if (inputArchivo.current) inputArchivo.current.value = "";
+  };
+
   const seleccionarArchivo = async (nuevoArchivo: File | undefined) => {
     if (!nuevoArchivo) return;
-    setErrorArchivo(null);
     setResultadoImportacion(null);
     if (!/\.csv$/i.test(nuevoArchivo.name) && nuevoArchivo.type !== "text/csv") {
-      setArchivo(null);
-      setResultadoParser(null);
+      reiniciarArchivo();
       setErrorArchivo("Selecciona un archivo CSV.");
       return;
     }
 
     const TAMANO_MAXIMO = 10 * 1024 * 1024;
     if (nuevoArchivo.size > TAMANO_MAXIMO) {
-      setArchivo(null);
-      setErrorArchivo(`El archivo es demasiado grande. Máximo 10 MB.`);
+      reiniciarArchivo();
+      setErrorArchivo("El archivo es demasiado grande. Máximo 10 MB.");
       return;
     }
 
+    const solicitud = ++solicitudArchivo.current;
+    setErrorArchivo(null);
     try {
-      const resultadoAdaptativo = await parsearCSV(nuevoArchivo, { maxFilas: 5 });
+      // Lectura ligera: solo cabeceras y 5 filas para el panel de mapeo.
+      const leido = await parsearCSV(nuevoArchivo, { maxFilas: 5 });
+      const guardado = await obtenerMapeoGuardado(generarFirmaCabeceras(leido.cabeceras));
+      if (solicitud !== solicitudArchivo.current) return;
+
+      setResultadoParser(null);
       setArchivo(nuevoArchivo);
-      setCabecerasCSV(resultadoAdaptativo.cabeceras);
-      setFilasPreview(resultadoAdaptativo.filas);
-      setFasePaso2('mapeo');
-      
-      if (resultadoAdaptativo.metadata.advertencias.length > 0) {
-        toast.warning(`${resultadoAdaptativo.metadata.advertencias.length} advertencia(s) en el CSV.`);
+      setCabecerasCSV(leido.cabeceras);
+      setFilasPreview(leido.filas);
+      setTotalFilasCSV(leido.metadata.totalFilas);
+      setMapeoGuardado(guardado ? adaptarMapeoGuardado(guardado, leido.cabeceras) : undefined);
+      setMapeoActual(null);
+      setMapeoValido(false);
+      setFasePaso2("mapeo");
+
+      if (leido.metadata.advertencias.length > 0) {
+        toast.warning(`${leido.metadata.advertencias.length} advertencia(s) en el CSV.`);
       }
-      
-      toast.success(`${resultadoAdaptativo.metadata.totalFilas} fila(s) detectada(s).`);
+      toast.success(`${leido.metadata.totalFilas} fila(s) detectada(s).`);
     } catch (error) {
-      setArchivo(null);
-      setCabecerasCSV([]);
-      setFilasPreview([]);
-      setFasePaso2('subida');
+      if (solicitud !== solicitudArchivo.current) return;
+      reiniciarArchivo();
       setErrorArchivo(`No se pudo leer el archivo: ${errorMensaje(error)}`);
+    }
+  };
+
+  /**
+   * Lee el archivo COMPLETO, aplica el mapeo de columnas, lo convierte al formato
+   * canónico (REFERENCIA, NOMBRE, EAN, CANTIDAD) y lo pasa por el parser legacy,
+   * de modo que validación, vista previa e importación siguen igual que antes.
+   */
+  const confirmarMapeo = async () => {
+    if (!archivo || !mapeoActual || !mapeoValido || procesando) return;
+    const solicitud = solicitudArchivo.current;
+    setProcesando(true);
+    setErrorArchivo(null);
+    try {
+      const completo = await parsearCSV(archivo, { maxFilas: Infinity });
+      const bytes = transformarACanonico(completo.filas, mapeoActual);
+      const resultado = await parsearCSVArmarioDesdeBytes(bytes);
+      if (solicitud !== solicitudArchivo.current) return;
+
+      setResultadoParser(resultado);
+      // Si hay errores o ninguna fila útil, se queda en el paso 2 y se muestran abajo.
+      if (resultado.erroresParseo.length > 0 || resultado.filas.length === 0) return;
+
+      // Recordar el mapeo para archivos con las mismas cabeceras (no bloquea el flujo).
+      void guardarMapeo(
+        generarFirmaCabeceras(completo.cabeceras),
+        mapeoActual,
+        completo.metadata.separador,
+        completo.metadata.codificacion,
+      ).catch(() => undefined);
+      setPaso(3);
+    } catch (error) {
+      if (solicitud !== solicitudArchivo.current) return;
+      setResultadoParser(null);
+      setErrorArchivo(`No se pudo procesar el archivo: ${errorMensaje(error)}`);
+    } finally {
+      setProcesando(false);
     }
   };
 
@@ -472,12 +558,17 @@ function CargarListaArmarioPage() {
               type="button"
               variant="outline"
               className="min-h-11"
+              onClick={() => setModalLimpiezaOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+              Limpiar BD
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11"
               onClick={() => setModalReversionAbierto(true)}
             >
-              <Button variant="outline" size="sm" onClick={() => setModalLimpiezaOpen(true)}>
-                <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                Limpiar BD
-              </Button>
               <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
               Revertir lote
             </Button>
@@ -506,9 +597,9 @@ function CargarListaArmarioPage() {
                   aria-current={activo ? "step" : undefined}
                   className={`flex min-h-14 items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                     activo
-                      ? "border-amber-500 bg-amber-50 text-amber-950"
+                      ? "border-reserva-solid bg-reserva-subtle text-reserva-ink"
                       : terminado
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        ? "border-success-line bg-success-subtle text-success-ink"
                         : "bg-card text-muted-foreground"
                   }`}
                 >
@@ -623,7 +714,7 @@ function CargarListaArmarioPage() {
                 <div className="flex justify-end">
                   <Button
                     type="button"
-                    className="min-h-11 bg-amber-600 text-white hover:bg-amber-700"
+                    className="min-h-11 bg-reserva-solid text-solid-foreground hover:bg-reserva-solid-hover"
                     disabled={!armarioId || armariosQuery.isPending || armariosQuery.isError}
                     onClick={() => setPaso(2)}
                   >
@@ -635,17 +726,17 @@ function CargarListaArmarioPage() {
             </Card>
           )}
 
-          {paso === 2 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>2. Sube el archivo CSV</CardTitle>
-                <CardDescription>
-                  {armarioSeleccionado
-                    ? `Destino: ${armarioSeleccionado.nombre}`
-                    : "El archivo debe tener las columnas NOMBRE, REFERENCIA, EAN y CANTIDAD."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+          {/* Paso 2: se mantiene montado (oculto) al cambiar de paso para no perder el mapeo del usuario. */}
+          <Card className={paso === 2 ? "" : "hidden"}>
+            <CardHeader>
+              <CardTitle>2. Sube el archivo CSV y mapea las columnas</CardTitle>
+              <CardDescription>
+                {armarioSeleccionado ? `Destino: ${armarioSeleccionado.nombre}. ` : ""}
+                El CSV puede tener cualquier cabecera: tú eliges qué columna es cada campo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {fasePaso2 === "subida" && (
                 <div
                   onDragOver={(event) => {
                     event.preventDefault();
@@ -654,10 +745,10 @@ function CargarListaArmarioPage() {
                   onDragLeave={() => setArrastrando(false)}
                   onDrop={soltarArchivo}
                   className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-10 ${
-                    arrastrando ? "border-amber-500 bg-amber-50" : "border-muted-foreground/30"
+                    arrastrando ? "border-reserva-solid bg-reserva-subtle" : "border-muted-foreground/30"
                   }`}
                 >
-                  <FileUp className="mx-auto h-10 w-10 text-amber-600" aria-hidden="true" />
+                  <FileUp className="mx-auto h-10 w-10 text-reserva-solid" aria-hidden="true" />
                   <p className="mt-3 font-medium">Arrastra el CSV aquí</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     o selecciónalo desde tu equipo
@@ -680,73 +771,87 @@ function CargarListaArmarioPage() {
                     Seleccionar CSV
                   </Button>
                 </div>
+              )}
 
-                {archivo && resultadoParser && (
+              {fasePaso2 === "mapeo" && archivo && (
+                <>
                   <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{archivo.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {resultadoParser.filas.length} fila(s) ·{" "}
-                        {resultadoParser.totalFilasDescartadas} descartada(s)
+                        {totalFilasCSV} fila(s) · {cabecerasCSV.length} columna(s)
                       </p>
                     </div>
-                    <Badge variant={errorParserBloqueante ? "destructive" : "outline"}>
-                      {errorParserBloqueante ? "Revisar archivo" : "CSV leído"}
-                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={reiniciarArchivo}
+                      disabled={procesando}
+                    >
+                      Cambiar archivo
+                    </Button>
                   </div>
-                )}
-                {(errorArchivo || errorParserBloqueante) && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      {errorArchivo}
-                      {resultadoParser?.erroresParseo.map((error, indice) => (
-                        <span key={`${indice}-${error}`} className="block">
-                          {error}
-                        </span>
-                      ))}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {resultadoParser &&
-                  !errorParserBloqueante &&
-                  resultadoParser.filas.length === 0 && (
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        El CSV se leyó, pero no contiene filas con nombre o referencia.
-                      </AlertDescription>
-                    </Alert>
-                  )}
 
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11"
-                    onClick={() => setPaso(1)}
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Volver
-                  </Button>
-                  <Button
-                    type="button"
-                    className="min-h-11 bg-amber-600 text-white hover:bg-amber-700"
-                    disabled={
-                      !archivo ||
-                      !resultadoParser ||
-                      errorParserBloqueante ||
-                      resultadoParser.filas.length === 0
-                    }
-                    onClick={() => setPaso(3)}
-                  >
-                    Revisar vista previa
-                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  <PanelMapeoColumnas
+                    key={`${archivo.name}-${archivo.lastModified}`}
+                    cabeceras={cabecerasCSV}
+                    filasPreview={filasPreview}
+                    {...(mapeoGuardado ? { mapeoInicial: mapeoGuardado } : {})}
+                    onMapeoChange={(mapeo) => {
+                      setMapeoActual(mapeo);
+                      setResultadoParser(null); // el resultado anterior ya no corresponde a este mapeo
+                    }}
+                    onValidoChange={setMapeoValido}
+                  />
+                </>
+              )}
+
+              {(errorArchivo || errorParserBloqueante) && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {errorArchivo}
+                    {resultadoParser?.erroresParseo.map((error, indice) => (
+                      <span key={`${indice}-${error}`} className="block">
+                        {error}
+                      </span>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {resultadoParser && !errorParserBloqueante && resultadoParser.filas.length === 0 && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    El CSV se leyó, pero no contiene filas con nombre o referencia.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => setPaso(1)}
+                  disabled={procesando}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Volver
+                </Button>
+                <Button
+                  type="button"
+                  className="min-h-11 bg-reserva-solid text-solid-foreground hover:bg-reserva-solid-hover"
+                  disabled={fasePaso2 !== "mapeo" || !archivo || !mapeoValido || procesando}
+                  onClick={() => void confirmarMapeo()}
+                >
+                  {procesando ? "Procesando..." : "Revisar vista previa"}
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {paso === 3 && resultadoParser && (
             <Card>
@@ -820,9 +925,9 @@ function CargarListaArmarioPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {resultadoImportacion.aplicado ? (
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600" aria-hidden="true" />
+                    <CheckCircle2 className="h-6 w-6 text-success-solid" aria-hidden="true" />
                   ) : (
-                    <AlertCircle className="h-6 w-6 text-rose-600" aria-hidden="true" />
+                    <AlertCircle className="h-6 w-6 text-danger-solid" aria-hidden="true" />
                   )}
                   {resultadoImportacion.aplicado
                     ? "Importación completada"
@@ -899,13 +1004,11 @@ function CargarListaArmarioPage() {
                   )}
                   <Button
                     type="button"
-                    className="min-h-11 bg-amber-600 text-white hover:bg-amber-700"
+                    className="min-h-11 bg-reserva-solid text-solid-foreground hover:bg-reserva-solid-hover"
                     onClick={() => {
                       setPaso(1);
-                      setArchivo(null);
-                      setResultadoParser(null);
+                      reiniciarArchivo();
                       setResultadoImportacion(null);
-                      setErrorArchivo(null);
                     }}
                   >
                     Cargar otra lista
@@ -923,7 +1026,7 @@ function CargarListaArmarioPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Info className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+                <Info className="h-4 w-4 text-seccion-solid" aria-hidden="true" />
                 Reglas de la importación
               </CardTitle>
             </CardHeader>
@@ -1017,7 +1120,7 @@ function OpcionRadio({
 function Regla({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" aria-hidden="true" />
+      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-seccion-solid" aria-hidden="true" />
       <span>{children}</span>
     </li>
   );

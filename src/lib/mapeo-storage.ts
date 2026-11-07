@@ -2,37 +2,67 @@
 import { supabase } from "@/lib/supabase";
 import { type MapeoSugerido } from "./csv-mapper";
 
-export async function obtenerMapeoGuardado(firma: string): Promise<MapeoSugerido | null> {
-  const { data, error } = await supabase
-    .from("mapeos_importacion_csv")
-    .select("mapeo")
-    .eq("firma_cabeceras", firma)
-    .maybeSingle();
+const TABLA = "mapeos_importacion_csv";
 
-  if (error || !data) return null;
-  return data.mapeo as MapeoSugerido;
+/**
+ * Busca el mapeo guardado para esa firma de cabeceras.
+ * NUNCA lanza: el mapeo guardado es una comodidad y un fallo de red, de permisos
+ * o de sesión (401) no debe bloquear la importación; en ese caso devuelve null.
+ */
+export async function obtenerMapeoGuardado(firma: string): Promise<MapeoSugerido | null> {
+  try {
+    const { data, error } = await supabase
+      .from(TABLA)
+      .select("mapeo")
+      .eq("firma_cabeceras", firma)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("[mapeo-storage] No se pudo leer el mapeo guardado:", error.message);
+      return null;
+    }
+    return data ? (data.mapeo as MapeoSugerido) : null;
+  } catch (error) {
+    console.warn("[mapeo-storage] Error inesperado al leer el mapeo guardado:", error);
+    return null;
+  }
 }
 
+/**
+ * Guarda (o actualiza) el mapeo. Devuelve true si se guardó.
+ * NUNCA lanza. Usa getSession() (lectura local) en lugar de getUser(), que añade
+ * una petición extra al servidor de Auth justo cuando la sesión puede haber caducado.
+ */
 export async function guardarMapeo(
   firma: string,
   mapeo: MapeoSugerido,
   separador?: string,
-  codificacion?: string
-) {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  const { error } = await supabase
-    .from("mapeos_importacion_csv")
-    .upsert({
-      firma_cabeceras: firma,
-      mapeo,
-      separador,
-      codificacion,
-      creado_por: user?.id || null,
-      ultimo_uso: new Date().toISOString(),
-    }, { onConflict: "firma_cabeceras" });
+  codificacion?: string,
+): Promise<boolean> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  if (error) {
-    console.error("Error al guardar mapeo:", error);
+    const { error } = await supabase.from(TABLA).upsert(
+      {
+        firma_cabeceras: firma,
+        mapeo,
+        separador: separador ?? null,
+        codificacion: codificacion ?? null,
+        creado_por: session?.user.id ?? null,
+        ultimo_uso: new Date().toISOString(),
+      },
+      { onConflict: "firma_cabeceras" },
+    );
+
+    if (error) {
+      console.warn("[mapeo-storage] No se pudo guardar el mapeo:", error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn("[mapeo-storage] Error inesperado al guardar el mapeo:", error);
+    return false;
   }
 }
