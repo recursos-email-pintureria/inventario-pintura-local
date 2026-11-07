@@ -279,6 +279,20 @@ Dashboard de rotación de stock
 Alertas automáticas de stock bajo por email
 Historial de movimientos por producto con gráficos
 Comparativa de inventarios entre fechas
+---
+
+## 🐛 Deuda técnica pendiente
+
+| # | Tarea | Archivos afectados | Prioridad |
+|---|-------|-------------------|-----------|
+| 1 | Migrar pantalla de importación CSV a tokens semánticos para modo oscuro (actualmente usa colores Tailwind estándar que se ven lavados en modo oscuro) | `src/routes/_authenticated/cargar-lista-armario.tsx`, `src/components/csv-import/PanelMapeoColumnas.tsx`, `src/components/inventario/TablaVistaPreviaArmario.tsx` | Media |
+| 2 | Implementar sistema global de tokens semánticos en CSS para unificar el modo oscuro en toda la app | `src/styles.css` | Alta |
+
+---
+
+## 👥 Contribución
+Este proyecto fue desarrollado para gestión interna. Si necesitas colaborar:
+...
 👥 Contribución
 Este proyecto fue desarrollado para gestión interna. Si necesitas colaborar:
 Crea una rama desde main: git checkout -b feature/nueva-funcionalidad
