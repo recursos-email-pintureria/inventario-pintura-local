@@ -363,7 +363,7 @@ export function ModalRevertirListaArmario({ open, onOpenChange }: ModalRevertirL
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-amber-600" aria-hidden="true" />
+              <History className="h-5 w-5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
               Revertir lote de importación
             </DialogTitle>
             <DialogDescription>

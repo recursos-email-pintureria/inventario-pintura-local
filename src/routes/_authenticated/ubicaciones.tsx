@@ -218,54 +218,54 @@ export const CONFIG_JERARQUIA: Record<
     label: "Sección",
     nivel: 0,
     icon: Building2,
-    badgeClass: "bg-indigo-100 text-indigo-800 border-indigo-200",
-    borderClass: "border-indigo-300",
-    bgHoverClass: "hover:bg-indigo-50/60",
+    badgeClass: "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-500/30",
+    borderClass: "border-indigo-300 dark:border-indigo-500/40",
+    bgHoverClass: "hover:bg-indigo-50/60 dark:hover:bg-indigo-500/10",
     descripcion: "Nivel 0: Área principal (No requiere padre)",
   },
   pasillo: {
     label: "Pasillo",
     nivel: 1,
     icon: ArrowLeftRight,
-    badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
-    borderClass: "border-blue-300",
-    bgHoverClass: "hover:bg-blue-50/60",
+    badgeClass: "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-500/30",
+    borderClass: "border-blue-300 dark:border-blue-500/40",
+    bgHoverClass: "hover:bg-blue-50/60 dark:hover:bg-blue-500/10",
     descripcion: "Nivel 1: Corredor principal (Pertenece a Sección)",
   },
   caja: {
     label: "Caja",
     nivel: 1,
     icon: Package,
-    badgeClass: "bg-rose-100 text-rose-800 border-rose-200",
-    borderClass: "border-rose-300",
-    bgHoverClass: "hover:bg-rose-50/60",
+    badgeClass: "bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-500/30",
+    borderClass: "border-rose-300 dark:border-rose-500/40",
+    bgHoverClass: "hover:bg-rose-50/60 dark:hover:bg-rose-500/10",
     descripcion: "Nivel 1: Caja independiente (Sin niveles inferiores)",
   },
   reserva: {
     label: "Reserva",
     nivel: 1,
     icon: Warehouse,
-    badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
-    borderClass: "border-amber-300",
-    bgHoverClass: "hover:bg-amber-50/60",
+    badgeClass: "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-500/30",
+    borderClass: "border-amber-300 dark:border-amber-500/40",
+    bgHoverClass: "hover:bg-amber-50/60 dark:hover:bg-amber-500/10",
     descripcion: "Nivel 1: Almacén de tienda / Palets (Sin niveles inferiores)",
   },
   armario: {
     label: "Armario",
     nivel: 2,
     icon: Archive,
-    badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    borderClass: "border-emerald-300",
-    bgHoverClass: "hover:bg-emerald-50/60",
+    badgeClass: "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-500/30",
+    borderClass: "border-emerald-300 dark:border-emerald-500/40",
+    bgHoverClass: "hover:bg-emerald-50/60 dark:hover:bg-emerald-500/10",
     descripcion: "Nivel 2: Estantería media (Requiere Pasillo)",
   },
   cross: {
     label: "Cross",
     nivel: 2,
     icon: Shuffle,
-    badgeClass: "bg-purple-100 text-purple-800 border-purple-200",
-    borderClass: "border-purple-300",
-    bgHoverClass: "hover:bg-purple-50/60",
+    badgeClass: "bg-purple-100 dark:bg-purple-500/20 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-500/30",
+    borderClass: "border-purple-300 dark:border-purple-500/40",
+    bgHoverClass: "hover:bg-purple-50/60 dark:hover:bg-purple-500/10",
     descripcion: "Nivel 2: Cruce de alta rotación (Requiere Pasillo)",
   },
 };
@@ -2043,21 +2043,21 @@ function UbicacionesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-16">
+    <div className="min-h-screen bg-background pb-16">
       {/* CABECERA SUPERIOR */}
-      <div className="border-b bg-white no-print">
+      <div className="border-b bg-card no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                 <span>INVENTARIO LM</span>
                 <span>/</span>
                 <span>ALMACÉN</span>
                 <span>/</span>
-                <span className="text-blue-600 font-semibold">JERARQUÍA DE UBICACIONES</span>
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">JERARQUÍA DE UBICACIONES</span>
               </div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                   Ubicaciones del Almacén
                 </h1>
                 {seccionesGestionPermitida && (
@@ -2074,7 +2074,7 @@ function UbicacionesPage() {
                 )}
                 <Badge
                   variant="outline"
-                  className="bg-blue-50 text-blue-700 border-blue-200 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5"
+                  className="bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5"
                 >
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
                   18 Zonas Activas • 94% Ocupación
@@ -2102,12 +2102,12 @@ function UbicacionesPage() {
               </Button>
             </div>
 
-            <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2 self-start md:self-auto bg-muted p-1 rounded-lg border border-border">
               <Button
                 variant={vista === "arbol" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setVista("arbol")}
-                className={`text-xs gap-1.5 h-8 ${vista === "arbol" ? "bg-white text-blue-700 shadow-xs hover:bg-white" : "text-slate-600 hover:text-slate-900"}`}
+                className={`text-xs gap-1.5 h-8 ${vista === "arbol" ? "bg-card text-blue-700 dark:text-blue-300 shadow-xs hover:bg-card" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <FolderTree className="w-3.5 h-3.5" />
                 Vista Árbol
@@ -2116,7 +2116,7 @@ function UbicacionesPage() {
                 variant={vista === "lista" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setVista("lista")}
-                className={`text-xs gap-1.5 h-8 ${vista === "lista" ? "bg-white text-blue-700 shadow-xs hover:bg-white" : "text-slate-600 hover:text-slate-900"}`}
+                className={`text-xs gap-1.5 h-8 ${vista === "lista" ? "bg-card text-blue-700 dark:text-blue-300 shadow-xs hover:bg-card" : "text-muted-foreground hover:text-foreground"}`}
               >
                 <List className="w-3.5 h-3.5" />
                 Vista Lista
@@ -2128,17 +2128,17 @@ function UbicacionesPage() {
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
               <div className="flex flex-1 items-center gap-2 max-w-xl">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <Input
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar ubicación por nombre o código (ej. A1-01, Látex)..."
-                    className="pl-9 bg-slate-50/70 border-slate-200 text-sm h-9 focus-visible:ring-blue-500"
+                    className="pl-9 bg-muted/70 border-border text-sm h-9 focus-visible:ring-blue-500"
                   />
                   {busqueda && (
                     <button
                       onClick={() => setBusqueda("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -2148,7 +2148,7 @@ function UbicacionesPage() {
                 <select
                   value={filtroTipo}
                   onChange={(e) => setFiltroTipo(e.target.value)}
-                  className="h-9 text-xs rounded-md border border-slate-200 bg-white px-2.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="h-9 text-xs rounded-md border border-border bg-card px-2.5 text-foreground focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   <option value="todos">Tipo de ubicación (Todos)</option>
                   <option value="seccion">Sección (Nivel 0)</option>
@@ -2165,7 +2165,7 @@ function UbicacionesPage() {
                   variant="outline"
                   size="sm"
                   onClick={toggleExpandirColapsarTodo}
-                  className="text-xs h-9 text-slate-700 border-slate-200 gap-1.5"
+                  className="text-xs h-9 text-foreground border-border gap-1.5"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
                   {todosExpandidos ? "Colapsar todo" : "Expandir todo"}
@@ -2188,7 +2188,7 @@ function UbicacionesPage() {
 
             {/* CHIPS RÁPIDOS DE FILTRADO POR TIPO */}
             <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[11px] font-semibold text-slate-400 mr-1 flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-muted-foreground mr-1 flex items-center gap-1">
                 <Filter className="w-3 h-3" /> Filtro:
               </span>
               {[
@@ -2224,13 +2224,13 @@ function UbicacionesPage() {
                     className={`px-2.5 py-1 text-xs rounded-full transition-all border flex items-center gap-1.5 cursor-pointer ${
                       activo
                         ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 font-medium"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted font-medium"
                     }`}
                   >
                     <span>{chip.label}</span>
                     <span
                       className={`text-[10px] px-1 py-0.2 rounded-full ${
-                        activo ? "bg-blue-700/80 text-white" : "bg-slate-100 text-slate-500"
+                        activo ? "bg-blue-700/80 text-white" : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {chip.count}
@@ -2248,14 +2248,14 @@ function UbicacionesPage() {
                 className={`h-7 gap-1.5 px-2.5 text-xs ${
                   filtroTipo === "cross"
                     ? "border-purple-600 bg-purple-600 text-white hover:bg-purple-700"
-                    : "border-purple-200 text-purple-700 hover:bg-purple-50"
+                    : "border-purple-200 dark:border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-500/10"
                 }`}
               >
                 <Shuffle className="h-3.5 w-3.5" />
                 Mostrar solo ubicaciones tipo Cross
                 <span
                   className={`rounded-full px-1 text-[10px] ${
-                    filtroTipo === "cross" ? "bg-purple-700/80 text-white" : "bg-purple-50"
+                    filtroTipo === "cross" ? "bg-purple-700/80 text-white" : "bg-purple-50 dark:bg-purple-500/10"
                   }`}
                 >
                   {ubicaciones.filter((u) => u.tipo === "cross").length}
@@ -2270,7 +2270,7 @@ function UbicacionesPage() {
                     setFiltroTipo("todos");
                     setBusqueda("");
                   }}
-                  className="h-6 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 ml-auto gap-1"
+                  className="h-6 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-2 ml-auto gap-1"
                 >
                   <X className="w-3 h-3" /> Limpiar filtros
                 </Button>
@@ -2279,9 +2279,9 @@ function UbicacionesPage() {
 
             {/* BANNER INFORMATIVO DE FILTRO ACTIVO */}
             {filtroActivo && (
-              <div className="flex items-center justify-between bg-blue-50/70 border border-blue-200/90 rounded-lg px-3 py-1.5 text-xs text-blue-900 animate-in fade-in-50">
+              <div className="flex items-center justify-between bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200/90 dark:border-blue-500/30 rounded-lg px-3 py-1.5 text-xs text-blue-900 dark:text-blue-100 animate-in fade-in-50">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Filter className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <Filter className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                   <span>
                     Filtrando por:{" "}
                     <strong>
@@ -2296,7 +2296,7 @@ function UbicacionesPage() {
                       </>
                     )}
                   </span>
-                  <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-[10px] font-semibold">
+                  <Badge className="bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-500/40 text-[10px] font-semibold">
                     {ubicacionesFiltradas.length} coincidencia
                     {ubicacionesFiltradas.length === 1 ? "" : "s"}
                   </Badge>
@@ -2307,7 +2307,7 @@ function UbicacionesPage() {
                     setFiltroTipo("todos");
                     setBusqueda("");
                   }}
-                  className="text-xs text-blue-700 hover:text-blue-950 font-semibold underline shrink-0 cursor-pointer"
+                  className="text-xs text-blue-700 dark:text-blue-300 hover:text-blue-950 dark:hover:text-blue-100 font-semibold underline shrink-0 cursor-pointer"
                 >
                   Ver todo
                 </button>
@@ -2320,19 +2320,19 @@ function UbicacionesPage() {
       {/* BANNER DE SINCRONIZACIÓN CON SUPABASE CUANDO NO HAY FILAS EN LA BD */}
       {ubicacionesBD.length === 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 no-print">
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50/50 to-slate-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="bg-gradient-to-r from-blue-50 dark:from-blue-500/10 via-indigo-50/50 dark:via-indigo-500/10 to-muted border border-blue-200 dark:border-blue-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-lg bg-blue-600 text-white shadow-xs shrink-0">
                 <Database className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
                   <span>Base de datos Supabase conectada</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40">
                     Tablas listas (0 ubicaciones en BD)
                   </span>
                 </h4>
-                <p className="text-xs text-slate-600 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Las tablas <code>secciones</code>, <code>ubicaciones</code>, <code>stock</code> y{" "}
                   <code>palets</code> ya están creadas en tu Supabase. Puedes sincronizar la
                   topología física maestra de Leroy Merlin con un solo clic para guardar todas las
@@ -2356,75 +2356,75 @@ function UbicacionesPage() {
       {/* MÉTRICAS KPI SUPERIORES */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 no-print">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+          <div className="bg-card rounded-xl border border-border p-4 shadow-xs relative overflow-hidden">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   TOPOLOGÍA DE NAVE
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold text-slate-900">{ubicaciones.length}</span>
-                  <span className="text-xs font-medium text-slate-500">ubicaciones</span>
+                  <span className="text-2xl font-bold text-foreground">{ubicaciones.length}</span>
+                  <span className="text-xs font-medium text-muted-foreground">ubicaciones</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                   <span>4 Secciones (Nivel 0) • Pasillos • Cajas • Reserva</span>
                 </div>
               </div>
-              <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600">
+              <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                 <Building2 className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="mt-3 w-full bg-muted h-1.5 rounded-full overflow-hidden">
               <div className="bg-indigo-600 h-full rounded-full" style={{ width: "78%" }} />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+          <div className="bg-card rounded-xl border border-border p-4 shadow-xs relative overflow-hidden">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     CAPACIDAD OCUPADA
                   </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300">
                     Alerta: Pasillo B
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold text-slate-900">92%</span>
-                  <span className="text-xs font-medium text-rose-600">Capacidad crítica</span>
+                  <span className="text-2xl font-bold text-foreground">92%</span>
+                  <span className="text-xs font-medium text-rose-600 dark:text-rose-400">Capacidad crítica</span>
                 </div>
-                <p className="text-xs text-slate-600 mt-2">1,420 de 1,540 m³ volumen ocupado</p>
+                <p className="text-xs text-muted-foreground mt-2">1,420 de 1,540 m³ volumen ocupado</p>
               </div>
-              <div className="p-2.5 rounded-lg bg-purple-50 text-purple-600">
+              <div className="p-2.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <AlertTriangle className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="mt-3 w-full bg-muted h-1.5 rounded-full overflow-hidden">
               <div className="bg-purple-600 h-full rounded-full" style={{ width: "92%" }} />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+          <div className="bg-card rounded-xl border border-border p-4 shadow-xs relative overflow-hidden">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   PALETS EN RESERVA
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold text-amber-700">{palets.length}</span>
-                  <span className="text-xs font-medium text-amber-600">activos con etiqueta</span>
+                  <span className="text-2xl font-bold text-amber-700 dark:text-amber-300">{palets.length}</span>
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">activos con etiqueta</span>
                 </div>
-                <p className="text-xs text-slate-600 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Autodestrucción al vaciar por reposición
                 </p>
               </div>
-              <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600">
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Warehouse className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="mt-3 w-full bg-muted h-1.5 rounded-full overflow-hidden">
               <div className="bg-amber-600 h-full rounded-full" style={{ width: "45%" }} />
             </div>
           </div>
@@ -2433,15 +2433,15 @@ function UbicacionesPage() {
         {/* CONTENEDOR PRINCIPAL: ÁRBOL Y FORMULARIO */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="lg:col-span-8 space-y-4">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="bg-card rounded-xl border border-border shadow-xs overflow-hidden">
+              <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-muted/50">
                 <div className="flex items-center gap-2">
-                  <FolderTree className="w-4 h-4 text-blue-600" />
-                  <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                  <FolderTree className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <h2 className="text-sm font-bold text-foreground tracking-tight">
                     Estructura Física del Almacén
                   </h2>
                 </div>
-                <span className="text-xs text-slate-500 font-medium">
+                <span className="text-xs text-muted-foreground font-medium">
                   Terminal Nave Central • 3 Niveles
                 </span>
               </div>
@@ -2449,14 +2449,14 @@ function UbicacionesPage() {
               {vista === "arbol" && (
                 <div className="p-4 sm:p-5 space-y-4">
                   {seccionesFiltradas.length === 0 ? (
-                    <div className="py-12 px-4 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                    <div className="py-12 px-4 text-center bg-muted/50 rounded-xl border border-dashed border-border">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3 text-muted-foreground">
                         <Filter className="w-5 h-5" />
                       </div>
-                      <h3 className="text-sm font-bold text-slate-800">
+                      <h3 className="text-sm font-bold text-foreground">
                         No se encontraron ubicaciones
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                         No hay ninguna ubicación de tipo &quot;
                         <strong>
                           {filtroTipo === "todos"
@@ -2479,7 +2479,7 @@ function UbicacionesPage() {
                           setFiltroTipo("todos");
                           setBusqueda("");
                         }}
-                        className="mt-4 text-xs border-slate-300 text-blue-700 hover:bg-blue-50"
+                        className="mt-4 text-xs border-border text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10"
                       >
                         Restablecer filtros
                       </Button>
@@ -2494,14 +2494,14 @@ function UbicacionesPage() {
                       return (
                         <div
                           key={sec.id}
-                          className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-xs"
+                          className="rounded-xl border border-border/90 bg-card overflow-hidden shadow-xs"
                         >
                           {/* CABECERA DE SECCIÓN (NIVEL 0) */}
-                          <div className="p-3.5 bg-indigo-50/40 hover:bg-indigo-50/70 transition-colors flex items-center justify-between gap-3 border-b border-indigo-100/70">
+                          <div className="p-3.5 bg-indigo-50/40 dark:bg-indigo-500/10 hover:bg-indigo-50/70 dark:hover:bg-indigo-500/10 transition-colors flex items-center justify-between gap-3 border-b border-indigo-100/70 dark:border-indigo-500/20">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
                               <button
                                 onClick={() => toggleExpandir(sec.id)}
-                                className="p-1 rounded-md text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100/70 transition-colors"
+                                className="p-1 rounded-md text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-100 hover:bg-indigo-100/70 dark:hover:bg-indigo-500/20 transition-colors"
                               >
                                 {secAbierta ? (
                                   <ChevronDown className="w-4 h-4" />
@@ -2514,14 +2514,14 @@ function UbicacionesPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-sm text-slate-900">
+                                  <span className="font-bold text-sm text-foreground">
                                     {sec.nombre}
                                   </span>
-                                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-500/30">
                                     Nivel 0 · Sección
                                   </span>
                                 </div>
-                                <p className="text-xs text-slate-500 truncate mt-0.5">
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
                                   {sec.subtitulo}
                                 </p>
                               </div>
@@ -2535,7 +2535,7 @@ function UbicacionesPage() {
                                   setFormTipo("pasillo");
                                   toast.info(`Añadiendo Pasillo bajo sección ${sec.nombre}`);
                                 }}
-                                className="h-7 text-xs px-2.5 rounded-full border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 gap-1 font-semibold"
+                                className="h-7 text-xs px-2.5 rounded-full border-indigo-200 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 bg-card hover:bg-indigo-50 dark:hover:bg-indigo-500/10 gap-1 font-semibold"
                               >
                                 <Plus className="w-3 h-3" /> Pasillo
                               </Button>
@@ -2543,7 +2543,7 @@ function UbicacionesPage() {
                           </div>
 
                           {secAbierta && (
-                            <div className="p-3 sm:p-4 space-y-3 bg-slate-50/20">
+                            <div className="p-3 sm:p-4 space-y-3 bg-muted/20">
                               {/* PASILLOS (NIVEL 1) */}
                               {pasillos.map((pas) => {
                                 const pasAbierto = filtroActivo
@@ -2589,13 +2589,13 @@ function UbicacionesPage() {
                                 return (
                                   <div
                                     key={pas.id}
-                                    className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs"
+                                    className="rounded-lg border border-border bg-card overflow-hidden shadow-2xs"
                                   >
-                                    <div className="p-3 bg-blue-50/30 hover:bg-blue-50/50 transition-colors flex items-center justify-between gap-3 border-b border-slate-100">
+                                    <div className="p-3 bg-blue-50/30 dark:bg-blue-500/10 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 transition-colors flex items-center justify-between gap-3 border-b border-border">
                                       <div className="flex items-center gap-2 flex-1 min-w-0">
                                         <button
                                           onClick={() => toggleExpandir(pas.id)}
-                                          className="p-1 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
+                                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                         >
                                           {pasAbierto ? (
                                             <ChevronDown className="w-3.5 h-3.5" />
@@ -2603,15 +2603,15 @@ function UbicacionesPage() {
                                             <ChevronRight className="w-3.5 h-3.5" />
                                           )}
                                         </button>
-                                        <div className="p-1.5 rounded-md bg-blue-100 text-blue-700">
+                                        <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
                                           <ArrowLeftRight className="w-3.5 h-3.5" />
                                         </div>
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold text-sm text-slate-800">
+                                            <span className="font-semibold text-sm text-foreground">
                                               {pas.nombre}
                                             </span>
-                                            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-500/30">
                                               Nivel 1 · Pasillo
                                             </span>
                                           </div>
@@ -2626,7 +2626,7 @@ function UbicacionesPage() {
                                           setFormPadre(pas.id);
                                           toast.info(`Añadiendo Posición bajo ${pas.nombre}`);
                                         }}
-                                        className="h-6 text-[11px] px-2 rounded-full border-slate-200 text-slate-700 hover:bg-slate-100 gap-1"
+                                        className="h-6 text-[11px] px-2 rounded-full border-border text-foreground hover:bg-muted gap-1"
                                       >
                                         <Plus className="w-3 h-3" /> Posición
                                       </Button>
@@ -2634,9 +2634,9 @@ function UbicacionesPage() {
 
                                     {/* POSICIONES DEL PASILLO (NIVEL 2: ARMARIOS Y CROSS) */}
                                     {pasAbierto && (
-                                      <div className="p-2 sm:p-3 space-y-2 bg-white">
+                                      <div className="p-2 sm:p-3 space-y-2 bg-card">
                                         {posiciones.length === 0 ? (
-                                          <div className="p-3 text-center text-xs text-slate-400">
+                                          <div className="p-3 text-center text-xs text-muted-foreground">
                                             Sin posiciones asignadas en este pasillo.
                                           </div>
                                         ) : (
@@ -2676,11 +2676,11 @@ function UbicacionesPage() {
                                                       <div
                                                         key={pos.id}
                                                         onClick={() => abrirPanelVendedor(pos)}
-                                                        className="p-2.5 rounded-lg border border-slate-200/90 bg-white/90 hover:bg-blue-50/50 hover:border-blue-400 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group shadow-2xs"
+                                                        className="p-2.5 rounded-lg border border-border/90 bg-card/90 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group shadow-2xs"
                                                       >
                                                         <div className="flex items-center gap-2.5 min-w-0">
-                                                          <div className="w-4 h-4 flex items-center justify-center text-slate-400">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-500" />
+                                                          <div className="w-4 h-4 flex items-center justify-center text-muted-foreground">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-border group-hover:bg-blue-500" />
                                                           </div>
                                                           <div
                                                             className={`p-1.5 rounded-md ${config.badgeClass}`}
@@ -2689,7 +2689,7 @@ function UbicacionesPage() {
                                                           </div>
                                                           <div className="min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                              <span className="font-semibold text-xs text-slate-900 group-hover:text-blue-700">
+                                                              <span className="font-semibold text-xs text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300">
                                                                 {pos.nombre}
                                                               </span>
                                                               <span
@@ -2697,11 +2697,11 @@ function UbicacionesPage() {
                                                               >
                                                                 {config.label}
                                                               </span>
-                                                              <span className="text-[10px] font-mono text-slate-400">
+                                                              <span className="text-[10px] font-mono text-muted-foreground">
                                                                 [{pos.codigo}]
                                                               </span>
                                                             </div>
-                                                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                                            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                                                               {pos.subtitulo}
                                                             </p>
                                                           </div>
@@ -2715,7 +2715,7 @@ function UbicacionesPage() {
                                                               e.stopPropagation();
                                                               abrirPanelVendedor(pos);
                                                             }}
-                                                            className="h-7 text-xs px-2.5 rounded-md border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 font-semibold"
+                                                            className="h-7 text-xs px-2.5 rounded-md border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 font-semibold"
                                                           >
                                                             Ver Productos & Stock
                                                           </Button>
@@ -2727,7 +2727,7 @@ function UbicacionesPage() {
                                                               setUbicacionParaEliminar(pos);
                                                               setDialogEliminarAbierto(true);
                                                             }}
-                                                            className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
+                                                            className="h-7 w-7 p-0 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
                                                           >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                           </Button>
@@ -2751,22 +2751,22 @@ function UbicacionesPage() {
                                 <div
                                   key={caja.id}
                                   onClick={() => abrirPanelVendedor(caja)}
-                                  className="rounded-lg border border-rose-200/90 bg-rose-50/20 hover:bg-rose-50/50 p-3 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors"
+                                  className="rounded-lg border border-rose-200/90 dark:border-rose-500/30 bg-rose-50/20 dark:bg-rose-500/10 hover:bg-rose-50/50 dark:hover:bg-rose-500/10 p-3 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="p-1.5 rounded-md bg-rose-100 text-rose-700">
+                                    <div className="p-1.5 rounded-md bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300">
                                       <Package className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-semibold text-xs text-slate-900">
+                                        <span className="font-semibold text-xs text-foreground">
                                           {caja.nombre}
                                         </span>
-                                        <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                                        <span className="px-1.5 py-0.2 text-[10px] font-semibold rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-500/30">
                                           Nivel 1 · Caja Independiente
                                         </span>
                                       </div>
-                                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                                         {caja.subtitulo}
                                       </p>
                                     </div>
@@ -2779,7 +2779,7 @@ function UbicacionesPage() {
                                         e.stopPropagation();
                                         abrirPanelVendedor(caja);
                                       }}
-                                      className="h-7 text-xs px-2.5 rounded-md border-rose-200 text-rose-700 bg-white hover:bg-rose-50 font-semibold"
+                                      className="h-7 text-xs px-2.5 rounded-md border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 bg-card hover:bg-rose-50 dark:hover:bg-rose-500/10 font-semibold"
                                     >
                                       Ver Contenido
                                     </Button>
@@ -2791,7 +2791,7 @@ function UbicacionesPage() {
                               {reservas.map((res) => (
                                 <div
                                   key={res.id}
-                                  className="rounded-xl border border-amber-300 bg-amber-50/30 p-3.5 shadow-xs space-y-3"
+                                  className="rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50/30 dark:bg-amber-500/10 p-3.5 shadow-xs space-y-3"
                                 >
                                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div
@@ -2804,14 +2804,14 @@ function UbicacionesPage() {
                                       </div>
                                       <div className="min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="font-bold text-sm text-slate-900 group-hover:text-amber-800 transition-colors">
+                                          <span className="font-bold text-sm text-foreground group-hover:text-amber-800 dark:group-hover:text-amber-200 transition-colors">
                                             {res.nombre}
                                           </span>
-                                          <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                                          <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-200 dark:bg-amber-500/30 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-500/40">
                                             Nivel 1 · Reserva (Almacén de Tienda)
                                           </span>
                                         </div>
-                                        <p className="text-xs text-slate-600 truncate mt-0.5">
+                                        <p className="text-xs text-muted-foreground truncate mt-0.5">
                                           {palets.length} Palets activos con correlativo automático
                                           y etiqueta
                                         </p>
@@ -2823,7 +2823,7 @@ function UbicacionesPage() {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => abrirPanelVendedor(res)}
-                                        className="border-amber-300 text-amber-900 bg-amber-100 hover:bg-amber-200 text-xs font-semibold h-8 px-3 gap-1.5 shadow-xs"
+                                        className="border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 bg-amber-100 dark:bg-amber-500/20 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-xs font-semibold h-8 px-3 gap-1.5 shadow-xs"
                                       >
                                         <Warehouse className="w-3.5 h-3.5" />
                                         Abrir Reserva
@@ -2847,7 +2847,7 @@ function UbicacionesPage() {
                                     {palets.map((palet) => (
                                       <div
                                         key={palet.id}
-                                        className="p-3 rounded-lg border border-amber-200 bg-white shadow-2xs hover:border-amber-400 transition-all space-y-2"
+                                        className="p-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-card shadow-2xs hover:border-amber-400 dark:hover:border-amber-500/50 transition-all space-y-2"
                                       >
                                         <div className="flex items-center justify-between">
                                           <div className="flex items-center gap-1.5">
@@ -2856,15 +2856,15 @@ function UbicacionesPage() {
                                               onClick={() => abrirGestionPalet(palet)}
                                               className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
                                             >
-                                              <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs">
+                                              <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-500/40 font-bold text-xs">
                                                 Palet #{String(palet.numero_palet).padStart(3, "0")}
                                               </Badge>
                                             </button>
-                                            <span className="text-[10px] font-mono text-slate-500">
+                                            <span className="text-[10px] font-mono text-muted-foreground">
                                               [{palet.codigo_barras}]
                                             </span>
                                           </div>
-                                          <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-semibold">
+                                          <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 px-1.5 py-0.5 rounded font-semibold">
                                             {palet.productos.reduce(
                                               (acc, p) => acc + p.cantidad,
                                               0,
@@ -2873,18 +2873,18 @@ function UbicacionesPage() {
                                           </span>
                                         </div>
 
-                                        <div className="text-[11px] text-slate-600 space-y-0.5">
+                                        <div className="text-[11px] text-muted-foreground space-y-0.5">
                                           <div className="flex items-center gap-1">
-                                            <User className="w-3 h-3 text-slate-400" />
+                                            <User className="w-3 h-3 text-muted-foreground" />
                                             <span>
                                               Generado por:{" "}
-                                              <strong className="text-slate-800">
+                                              <strong className="text-foreground">
                                                 {palet.generado_por}
                                               </strong>
                                             </span>
                                           </div>
                                           <div className="flex items-center gap-1">
-                                            <Calendar className="w-3 h-3 text-slate-400" />
+                                            <Calendar className="w-3 h-3 text-muted-foreground" />
                                             <span>
                                               Fecha:{" "}
                                               {new Date(palet.generado_en).toLocaleDateString()}
@@ -2892,7 +2892,7 @@ function UbicacionesPage() {
                                           </div>
                                         </div>
 
-                                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+                                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border">
                                           {puedeExportar && (
                                             <Button
                                               variant="outline"
@@ -2901,7 +2901,7 @@ function UbicacionesPage() {
                                                 setPaletParaImprimir(palet);
                                                 setModalEtiquetaPaletAbierto(true);
                                               }}
-                                              className="flex-1 h-7 text-xs border-amber-200 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
+                                              className="flex-1 h-7 text-xs border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-500/10 gap-1 font-medium"
                                             >
                                               <Printer className="w-3 h-3" /> Imprimir Etiqueta
                                             </Button>
@@ -2911,7 +2911,7 @@ function UbicacionesPage() {
                                               variant="outline"
                                               size="sm"
                                               onClick={() => abrirInformePalet(palet)}
-                                              className="flex-1 h-7 text-xs border-amber-200 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
+                                              className="flex-1 h-7 text-xs border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-500/10 gap-1 font-medium"
                                             >
                                               <Printer className="w-3 h-3" /> Informe
                                             </Button>
@@ -2920,7 +2920,7 @@ function UbicacionesPage() {
                                             size="sm"
                                             variant="outline"
                                             onClick={() => abrirGestionPalet(palet)}
-                                            className="flex-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-50 gap-1 font-medium"
+                                            className="flex-1 h-7 text-xs border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-500/10 gap-1 font-medium"
                                           >
                                             <Package className="w-3 h-3" /> Productos
                                           </Button>
@@ -2947,9 +2947,9 @@ function UbicacionesPage() {
               )}
 
               {vista === "lista" && (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-border">
                   {ubicacionesFiltradas.length === 0 ? (
-                    <div className="py-12 text-center text-slate-500 text-sm">
+                    <div className="py-12 text-center text-muted-foreground text-sm">
                       No se encontraron ubicaciones con los filtros actuales
                     </div>
                   ) : (
@@ -2959,7 +2959,7 @@ function UbicacionesPage() {
                       return (
                         <div
                           key={item.id}
-                          className="m-3 flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-slate-50/80 md:m-0 md:flex-row md:items-center md:justify-between md:rounded-none md:border-0"
+                          className="m-3 flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/80 md:m-0 md:flex-row md:items-center md:justify-between md:rounded-none md:border-0"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`p-2 rounded-lg ${config.badgeClass}`}>
@@ -2967,7 +2967,7 @@ function UbicacionesPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-semibold text-sm text-slate-900">
+                                <span className="font-semibold text-sm text-foreground">
                                   {item.nombre}
                                 </span>
                                 <span
@@ -2975,16 +2975,16 @@ function UbicacionesPage() {
                                 >
                                   {config.label}
                                 </span>
-                                <span className="text-xs text-slate-400 font-mono">
+                                <span className="text-xs text-muted-foreground font-mono">
                                   [{item.codigo}]
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-500 mt-0.5">
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 {item.subtitulo || config.descripcion}
                               </p>
-                              <p className="mt-1 text-xs text-slate-600">
+                              <p className="mt-1 text-xs text-muted-foreground">
                                 Stock:{" "}
-                                <span className="font-semibold text-slate-900">
+                                <span className="font-semibold text-foreground">
                                   {item.productos.reduce(
                                     (sum, product) => sum + product.cantidad,
                                     0,
@@ -2993,7 +2993,7 @@ function UbicacionesPage() {
                                 </span>
                                 {" · "}
                                 Productos:{" "}
-                                <span className="font-semibold text-slate-900">
+                                <span className="font-semibold text-foreground">
                                   {item.productos.length}
                                 </span>
                               </p>
@@ -3003,7 +3003,7 @@ function UbicacionesPage() {
                             <Button
                               variant="outline"
                               onClick={() => abrirPanelVendedor(item)}
-                              className="w-full border-blue-200 bg-blue-50/50 text-xs font-semibold text-blue-700 hover:bg-blue-100 md:w-auto"
+                              className="w-full border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/10 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 md:w-auto"
                             >
                               Gestionar Productos
                             </Button>
@@ -3019,42 +3019,42 @@ function UbicacionesPage() {
 
           {/* PANEL LATERAL DE CREACIÓN DE UBICACIÓN */}
           <div className="lg:col-span-4 space-y-5 no-print">
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+            <div className="bg-card rounded-xl border border-border p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 rounded-md bg-blue-100 text-blue-700">
+                  <div className="p-1 rounded-md bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
                     <MapPin className="w-3.5 h-3.5" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm font-bold text-foreground">
                     Modal: Nueva Ubicación en Almacén
                   </h3>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
                   EDITOR
                 </span>
               </div>
 
               <form onSubmit={handleGuardarUbicacion} className="space-y-3.5">
                 <div>
-                  <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                  <Label className="text-xs font-semibold text-foreground mb-1 block">
                     Nombre de Ubicación
                   </Label>
                   <Input
                     value={formNombre}
                     onChange={(e) => setFormNombre(e.target.value)}
                     placeholder="Ej. Armario A1-04"
-                    className="h-8 text-xs bg-slate-50/60 border-slate-200"
+                    className="h-8 text-xs bg-muted/60 border-border"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                  <Label className="text-xs font-semibold text-foreground mb-1 block">
                     Tipo de Ubicación
                   </Label>
                   <select
                     value={formTipo}
                     onChange={(e) => setFormTipo(e.target.value as TipoUbicacion)}
-                    className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="w-full h-8 text-xs rounded-md border border-border bg-muted/60 px-2.5 text-foreground focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="armario">Armario (Estantería media - Nivel 2)</option>
                     <option value="cross">Cross-docking (Tránsito - Nivel 2)</option>
@@ -3067,13 +3067,13 @@ function UbicacionesPage() {
 
                 {CONFIG_JERARQUIA[formTipo].nivel === 2 && (
                   <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                    <Label className="text-xs font-semibold text-foreground mb-1 block">
                       Ubicación Padre
                     </Label>
                     <select
                       value={formPadre}
                       onChange={(e) => setFormPadre(e.target.value)}
-                      className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                      className="w-full h-8 text-xs rounded-md border border-border bg-muted/60 px-2.5 text-foreground focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     >
                       {pasillosDisponibles.map((pas) => (
                         <option key={pas.id} value={pas.id}>
@@ -3086,13 +3086,13 @@ function UbicacionesPage() {
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                    <Label className="text-xs font-semibold text-foreground mb-1 block">
                       Lateral
                     </Label>
                     <select
                       value={formLateral}
                       onChange={(e) => setFormLateral(e.target.value)}
-                      className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800"
+                      className="w-full h-8 text-xs rounded-md border border-border bg-muted/60 px-2 text-foreground"
                     >
                       <option value="derecha">Derecha</option>
                       <option value="izquierda">Izquierda</option>
@@ -3100,13 +3100,13 @@ function UbicacionesPage() {
                     </select>
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                    <Label className="text-xs font-semibold text-foreground mb-1 block">
                       Altura / Piso
                     </Label>
                     <select
                       value={formPiso}
                       onChange={(e) => setFormPiso(Number(e.target.value))}
-                      className="w-full h-8 text-xs rounded-md border border-slate-200 bg-slate-50/60 px-2 text-slate-800"
+                      className="w-full h-8 text-xs rounded-md border border-border bg-muted/60 px-2 text-foreground"
                     >
                       <option value={1}>Nivel 1 (Suelo)</option>
                       <option value={2}>Nivel 2 (Medio)</option>
@@ -3117,25 +3117,25 @@ function UbicacionesPage() {
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                    <Label className="text-xs font-semibold text-foreground mb-1 block">
                       Cap. Máx (uds)
                     </Label>
                     <Input
                       type="number"
                       value={formCapMax}
                       onChange={(e) => setFormCapMax(Number(e.target.value))}
-                      className="h-8 text-xs bg-slate-50/60 border-slate-200"
+                      className="h-8 text-xs bg-muted/60 border-border"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+                    <Label className="text-xs font-semibold text-foreground mb-1 block">
                       Peso Máx (kg)
                     </Label>
                     <Input
                       type="number"
                       value={formPesoMax}
                       onChange={(e) => setFormPesoMax(Number(e.target.value))}
-                      className="h-8 text-xs bg-slate-50/60 border-slate-200"
+                      className="h-8 text-xs bg-muted/60 border-border"
                     />
                   </div>
                 </div>
@@ -3149,7 +3149,7 @@ function UbicacionesPage() {
                       setFormNombre("");
                       toast.info("Formulario limpiado");
                     }}
-                    className="h-8 text-xs text-slate-600"
+                    className="h-8 text-xs text-muted-foreground"
                   >
                     Cancelar
                   </Button>
@@ -3165,16 +3165,16 @@ function UbicacionesPage() {
             </div>
 
             {/* MAPA NAVE EN VIVO */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 tracking-wider">
+            <div className="bg-card rounded-xl border border-border p-5 shadow-xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-border">
+                <span className="text-xs font-bold text-foreground tracking-wider">
                   MAPA NAVE A-NORTE
                 </span>
                 <Button
                   type="button"
                   variant="link"
                   onClick={() => setMapa2DAbierto(true)}
-                  className="h-auto p-0 text-xs font-semibold text-blue-600 hover:underline"
+                  className="h-auto p-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   Plano 2D
                 </Button>
@@ -3191,13 +3191,13 @@ function UbicacionesPage() {
                       onClick={() => match && abrirPanelVendedor(match)}
                       className={`p-2.5 rounded-lg border text-center transition-all cursor-pointer ${
                         match
-                          ? "bg-blue-50/70 border-blue-300 hover:bg-blue-100"
-                          : "border-slate-300 bg-slate-50/40"
+                          ? "bg-blue-50/70 dark:bg-blue-500/10 border-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/20"
+                          : "border-border bg-muted/40"
                       }`}
                     >
-                      <div className="text-[11px] font-bold text-slate-800">{slot}</div>
+                      <div className="text-[11px] font-bold text-foreground">{slot}</div>
                       <div
-                        className={`text-[10px] font-medium ${isLibre ? "text-slate-400" : "text-blue-700 font-semibold"}`}
+                        className={`text-[10px] font-medium ${isLibre ? "text-muted-foreground" : "text-blue-700 dark:text-blue-300 font-semibold"}`}
                       >
                         {isLibre ? "LIBRE" : `${match?.porcentaje_ocupacion ?? 80}%`}
                       </div>
@@ -3209,18 +3209,18 @@ function UbicacionesPage() {
                     const res = ubicaciones.find((u) => u.tipo === "reserva");
                     if (res) abrirPanelVendedor(res);
                   }}
-                  className="col-span-2 p-2.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-center transition-all cursor-pointer"
+                  className="col-span-2 p-2.5 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-center transition-all cursor-pointer"
                 >
-                  <div className="text-[11px] font-bold text-amber-900">RES-TIENDA</div>
-                  <div className="text-[10px] font-medium text-amber-700">
+                  <div className="text-[11px] font-bold text-amber-900 dark:text-amber-100">RES-TIENDA</div>
+                  <div className="text-[10px] font-medium text-amber-700 dark:text-amber-300">
                     {palets.length} PALETS
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                 <span>Último inventario físico:</span>
-                <span className="font-semibold text-slate-700">Hoy, 10:15</span>
+                <span className="font-semibold text-foreground">Hoy, 10:15</span>
               </div>
             </div>
           </div>
@@ -3233,32 +3233,32 @@ function UbicacionesPage() {
       <Sheet open={sheetVendedorAbierto} onOpenChange={setSheetVendedorAbierto}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col overflow-y-auto bg-white p-0 sm:max-w-xl md:max-w-2xl max-md:inset-x-0 max-md:inset-y-auto max-md:top-auto max-md:bottom-0 max-md:h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl"
+          className="flex w-full flex-col overflow-y-auto bg-card p-0 sm:max-w-xl md:max-w-2xl max-md:inset-x-0 max-md:inset-y-auto max-md:top-auto max-md:bottom-0 max-md:h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl"
         >
           {ubicacionSeleccionada && (
             <div className="flex-1 flex flex-col">
               {/* CABECERA INFORMATIVA */}
-              <div className="p-5 border-b border-slate-200 bg-slate-50/80 sticky top-0 z-10">
+              <div className="p-5 border-b border-border bg-muted/80 sticky top-0 z-10">
                 {/* Miga de pan informativa requerida */}
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1.5">
-                  <span className="text-indigo-600 font-semibold">{infoJerarquia.seccion}</span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-1.5">
+                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{infoJerarquia.seccion}</span>
                   <span>/</span>
-                  <span className="text-blue-600 font-semibold">{infoJerarquia.pasillo}</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold">{infoJerarquia.pasillo}</span>
                   <span>/</span>
-                  <span className="text-slate-900 font-bold">{ubicacionSeleccionada.nombre}</span>
+                  <span className="text-foreground font-bold">{ubicacionSeleccionada.nombre}</span>
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                       {ubicacionSeleccionada.nombre}
                       <Badge className={CONFIG_JERARQUIA[ubicacionSeleccionada.tipo].badgeClass}>
                         {CONFIG_JERARQUIA[ubicacionSeleccionada.tipo].label}
                       </Badge>
                     </h2>
-                    <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
                       {ubicacionSeleccionada.tipo === "reserva" ? (
-                        <span className="text-amber-800 font-medium font-sans">
+                        <span className="text-amber-800 dark:text-amber-200 font-medium font-sans">
                           Zona de Almacén · Ubicación Exclusiva para Palets Móviles
                         </span>
                       ) : (
@@ -3270,10 +3270,10 @@ function UbicacionesPage() {
                   <div className="text-right">
                     {ubicacionSeleccionada.tipo === "reserva" ? (
                       <>
-                        <span className="text-sm font-bold text-amber-900">
+                        <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
                           {palets.length} {palets.length === 1 ? "Palet activo" : "Palets activos"}
                         </span>
-                        <div className="text-[10px] text-amber-700 font-medium">
+                        <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium">
                           {palets.reduce(
                             (acc, p) => acc + p.productos.reduce((a, b) => a + b.cantidad, 0),
                             0,
@@ -3283,12 +3283,12 @@ function UbicacionesPage() {
                       </>
                     ) : (
                       <>
-                        <span className="text-sm font-bold text-slate-900">
+                        <span className="text-sm font-bold text-foreground">
                           {ubicacionSeleccionada.productos?.reduce((a, b) => a + b.cantidad, 0) ||
                             0}{" "}
                           / {ubicacionSeleccionada.capacidad_max || 100} uds
                         </span>
-                        <div className="text-[10px] text-slate-500 font-medium">
+                        <div className="text-[10px] text-muted-foreground font-medium">
                           Ocupación: {ubicacionSeleccionada.porcentaje_ocupacion || 0}%
                         </div>
                       </>
@@ -3297,7 +3297,7 @@ function UbicacionesPage() {
                 </div>
 
                 {/* BOTONES DE HERRAMIENTAS */}
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-200/80">
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/80">
                   {ubicacionSeleccionada.tipo === "reserva" ? (
                     <>
                       <Button
@@ -3313,9 +3313,9 @@ function UbicacionesPage() {
                           variant="outline"
                           size="sm"
                           onClick={abrirInformeUbicacion}
-                          className="h-8 text-xs border-amber-300 text-amber-900 hover:bg-amber-100 gap-1.5 font-medium"
+                          className="h-8 text-xs border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-500/20 gap-1.5 font-medium"
                         >
-                          <Printer className="w-3.5 h-3.5 text-amber-700" />
+                          <Printer className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
                           Informe de Reserva
                         </Button>
                       )}
@@ -3327,10 +3327,10 @@ function UbicacionesPage() {
                           variant="outline"
                           size="sm"
                           onClick={abrirInformeUbicacion}
-                          className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
+                          className="h-8 text-xs border-border text-foreground hover:bg-muted gap-1.5"
                           title="Generar informe, PDF, Excel o email de esta ubicación"
                         >
-                          <Printer className="w-3.5 h-3.5 text-blue-600" />
+                          <Printer className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                           Informe / Exportar
                         </Button>
                       )}
@@ -3339,7 +3339,7 @@ function UbicacionesPage() {
                         variant={mostrarEscaner ? "default" : "outline"}
                         size="sm"
                         onClick={() => setMostrarEscaner(!mostrarEscaner)}
-                        className={`h-8 text-xs gap-1.5 ${mostrarEscaner ? "bg-blue-600 text-white" : "border-slate-200 text-slate-700"}`}
+                        className={`h-8 text-xs gap-1.5 ${mostrarEscaner ? "bg-blue-600 text-white" : "border-border text-foreground"}`}
                       >
                         <Camera className="w-3.5 h-3.5" />
                         {mostrarEscaner ? "Ocultar Cámara" : "Escanear Código"}
@@ -3353,18 +3353,18 @@ function UbicacionesPage() {
               {ubicacionSeleccionada.tipo === "reserva" ? (
                 <div className="p-5 flex-1 space-y-4">
                   {/* BLINDAJE DE SEGURIDAD: PALETS SOLO EN RESERVA */}
-                  <div className="p-4 rounded-xl bg-amber-500/10 border-2 border-amber-300 text-amber-950 space-y-2">
-                    <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-amber-900">
-                      <Warehouse className="w-4 h-4 text-amber-700" />
+                  <div className="p-4 rounded-xl bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/40 text-amber-950 dark:text-amber-100 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-amber-900 dark:text-amber-100">
+                      <Warehouse className="w-4 h-4 text-amber-700 dark:text-amber-300" />
                       <span>Ubicación Restringida: Solo en Reserva</span>
                     </div>
-                    <p className="text-xs text-amber-800 leading-relaxed">
+                    <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
                       Por seguridad operativa y para evitar que el vendedor cree palets por error en
                       estanterías o pasillos, la creación y alojamiento de palets está{" "}
                       <strong>estrictamente blindada solo para zonas de Reserva</strong>.
                     </p>
-                    <div className="text-[11px] text-amber-800 bg-white/80 p-2.5 rounded-md border border-amber-200 flex items-center gap-2 font-medium">
-                      <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                    <div className="text-[11px] text-amber-800 dark:text-amber-200 bg-card/80 p-2.5 rounded-md border border-amber-200 dark:border-amber-500/30 flex items-center gap-2 font-medium">
+                      <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                       <span>
                         <strong>Regla de Autodestrucción:</strong> Cuando el palet salga a tienda
                         para reponer y quede vacío (0 uds), se autodestruirá automáticamente en el
@@ -3374,13 +3374,13 @@ function UbicacionesPage() {
                   </div>
 
                   {/* ACCIÓN PRINCIPAL: CREAR PALET EN ESTA RESERVA */}
-                  <div className="bg-white border border-amber-200 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="bg-card border border-amber-200 dark:border-amber-500/30 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                        <Boxes className="w-4 h-4 text-amber-600" />
+                      <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <Boxes className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                         Crear Palet en {ubicacionSeleccionada.nombre}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Asigna correlativo oficial, código PAL-XXX y genera la etiqueta oficial
                         homologada con Quién, Cuándo y Dónde.
                       </p>
@@ -3399,21 +3399,21 @@ function UbicacionesPage() {
                   {/* LISTADO DE PALETS ACTIVOS EN ESTA RESERVA */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-foreground uppercase tracking-wider">
                         Palets en esta Reserva ({palets.length} activos)
                       </span>
-                      <span className="text-xs text-amber-700 font-semibold">
+                      <span className="text-xs text-amber-700 dark:text-amber-300 font-semibold">
                         Etiquetas: Quién • Cuándo • Dónde
                       </span>
                     </div>
 
                     {palets.length === 0 ? (
-                      <div className="p-8 text-center border-2 border-dashed border-amber-200 rounded-xl bg-amber-50/20 text-slate-500 text-xs space-y-2">
+                      <div className="p-8 text-center border-2 border-dashed border-amber-200 dark:border-amber-500/30 rounded-xl bg-amber-50/20 dark:bg-amber-500/10 text-muted-foreground text-xs space-y-2">
                         <Boxes className="w-8 h-8 text-amber-400 mx-auto" />
-                        <p className="font-semibold text-slate-700">
+                        <p className="font-semibold text-foreground">
                           No hay palets en esta reserva actualmente.
                         </p>
-                        <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                        <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
                           Haz clic en "Crear Palet en Reserva" para generar el primer palet con su
                           correlativo y etiqueta física.
                         </p>
@@ -3426,7 +3426,7 @@ function UbicacionesPage() {
                           return (
                             <div
                               key={palet.id}
-                              className="p-4 rounded-xl border border-amber-200 bg-white shadow-2xs hover:border-amber-400 transition-all space-y-3"
+                              className="p-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-card shadow-2xs hover:border-amber-400 dark:hover:border-amber-500/50 transition-all space-y-3"
                             >
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-2">
@@ -3435,63 +3435,63 @@ function UbicacionesPage() {
                                     onClick={() => abrirGestionPalet(palet)}
                                     className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
                                   >
-                                    <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-xs px-2.5 py-0.5">
+                                    <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-500/40 font-bold text-xs px-2.5 py-0.5">
                                       Palet #{String(palet.numero_palet).padStart(3, "0")}
                                     </Badge>
                                   </button>
-                                  <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border">
+                                  <span className="text-xs font-mono font-bold text-foreground bg-muted px-2 py-0.5 rounded border">
                                     {palet.codigo_barras}
                                   </span>
                                 </div>
-                                <span className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">
+                                <span className="text-xs text-emerald-800 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded font-bold">
                                   {totalUds} unidades
                                 </span>
                               </div>
 
                               {/* DATOS CLAVE: QUIÉN, CUÁNDO Y DÓNDE */}
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-slate-50 rounded-lg text-xs border border-slate-200/80">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-muted rounded-lg text-xs border border-border/80">
                                 <div>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                                  <span className="text-[10px] text-muted-foreground font-bold uppercase block">
                                     DÓNDE (Ubicación)
                                   </span>
-                                  <strong className="text-amber-800 truncate block">
+                                  <strong className="text-amber-800 dark:text-amber-200 truncate block">
                                     {ubicacionSeleccionada.nombre}
                                   </strong>
                                 </div>
                                 <div>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                                  <span className="text-[10px] text-muted-foreground font-bold uppercase block">
                                     QUIÉN (Generado Por)
                                   </span>
-                                  <strong className="text-slate-800 truncate block">
+                                  <strong className="text-foreground truncate block">
                                     {palet.generado_por}
                                   </strong>
                                 </div>
                                 <div>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                                  <span className="text-[10px] text-muted-foreground font-bold uppercase block">
                                     CUÁNDO (Fecha y Hora)
                                   </span>
-                                  <span className="text-slate-700 text-[11px] block">
+                                  <span className="text-foreground text-[11px] block">
                                     {new Date(palet.generado_en).toLocaleString("es-ES")}
                                   </span>
                                 </div>
                               </div>
 
                               {/* ARTÍCULOS ASIGNADOS */}
-                              <div className="border rounded-md overflow-hidden bg-white text-xs divide-y divide-slate-100">
+                              <div className="border rounded-md overflow-hidden bg-card text-xs divide-y divide-border">
                                 {palet.productos.map((prod) => (
                                   <div
                                     key={prod.id}
                                     className="p-2 flex items-center justify-between"
                                   >
                                     <div className="min-w-0 pr-2">
-                                      <div className="font-semibold text-slate-900 truncate">
+                                      <div className="font-semibold text-foreground truncate">
                                         {prod.nombre}
                                       </div>
-                                      <div className="text-[10px] text-slate-500 font-mono">
+                                      <div className="text-[10px] text-muted-foreground font-mono">
                                         SKU: {prod.sku}
                                       </div>
                                     </div>
-                                    <span className="font-bold text-slate-800 shrink-0">
+                                    <span className="font-bold text-foreground shrink-0">
                                       {prod.cantidad} uds
                                     </span>
                                   </div>
@@ -3499,7 +3499,7 @@ function UbicacionesPage() {
                               </div>
 
                               {/* ACCIONES: IMPRIMIR ETIQUETA Y REPONER EN TIENDA */}
-                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border">
                                 {puedeExportar && (
                                   <Button
                                     variant="outline"
@@ -3508,9 +3508,9 @@ function UbicacionesPage() {
                                       setPaletParaImprimir(palet);
                                       setModalEtiquetaPaletAbierto(true);
                                     }}
-                                    className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
+                                    className="flex-1 h-8 text-xs border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 gap-1.5 font-bold shadow-2xs"
                                   >
-                                    <Printer className="w-3.5 h-3.5 text-amber-700" />
+                                    <Printer className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
                                     Imprimir Etiqueta
                                   </Button>
                                 )}
@@ -3520,9 +3520,9 @@ function UbicacionesPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => abrirInformePalet(palet)}
-                                    className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
+                                    className="flex-1 h-8 text-xs border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 gap-1.5 font-bold shadow-2xs"
                                   >
-                                    <Printer className="w-3.5 h-3.5 text-amber-700" />
+                                    <Printer className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
                                     Informe
                                   </Button>
                                 )}
@@ -3531,9 +3531,9 @@ function UbicacionesPage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => abrirGestionPalet(palet)}
-                                  className="flex-1 h-8 text-xs border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 gap-1.5 font-bold shadow-2xs"
+                                  className="flex-1 h-8 text-xs border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 gap-1.5 font-bold shadow-2xs"
                                 >
-                                  <Package className="w-3.5 h-3.5 text-amber-700" />
+                                  <Package className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
                                   Productos
                                 </Button>
 
@@ -3558,7 +3558,7 @@ function UbicacionesPage() {
                 <>
                   {/* LECTOR CON CÁMARA (SI ESTÁ ACTIVO) */}
                   {mostrarEscaner && (
-                    <div className="p-4 bg-slate-900 text-white border-b border-slate-800">
+                    <div className="p-4 bg-sidebar text-white border-b border-border">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold flex items-center gap-1.5">
                           <Barcode className="w-4 h-4 text-emerald-400" />
@@ -3568,7 +3568,7 @@ function UbicacionesPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setMostrarEscaner(false)}
-                          className="h-6 text-xs text-slate-400 hover:text-white"
+                          className="h-6 text-xs text-muted-foreground hover:text-white"
                         >
                           Cerrar
                         </Button>
@@ -3594,13 +3594,13 @@ function UbicacionesPage() {
                   )}
 
                   {/* BUSCADOR CON LISTA DESPLEGABLE CON FLECHAS PARA INCLUIR ARTÍCULO */}
-                  <div className="p-5 border-b border-slate-200 bg-white space-y-3">
+                  <div className="p-5 border-b border-border bg-card space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Plus className="w-3.5 h-3.5 text-blue-600" />
+                      <Label className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         Incluir Artículo en este Armario
                       </Label>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-muted-foreground">
                         Navega con flechas ↑ / ↓ y pulsa Enter
                       </span>
                     </div>
@@ -3608,7 +3608,7 @@ function UbicacionesPage() {
                     <div className="relative">
                       <div className="flex gap-2">
                         <div className="relative flex-1">
-                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                           <Input
                             value={busquedaProducto}
                             onChange={(e) => {
@@ -3619,7 +3619,7 @@ function UbicacionesPage() {
                             onFocus={() => setDropdownAbierto(true)}
                             onKeyDown={handleKeyDownBuscador}
                             placeholder="Buscar por nombre o SKU (ej. Látex, LAT-4001)..."
-                            className="pl-8 text-xs h-9 bg-slate-50 border-slate-200"
+                            className="pl-8 text-xs h-9 bg-muted border-border"
                           />
                         </div>
                         <div className="w-24">
@@ -3630,7 +3630,7 @@ function UbicacionesPage() {
                             onChange={(e) =>
                               setCantidadParaIncluir(Math.max(1, Number(e.target.value)))
                             }
-                            className="text-xs h-9 text-center bg-slate-50 border-slate-200"
+                            className="text-xs h-9 text-center bg-muted border-border"
                             title="Cantidad a añadir"
                           />
                         </div>
@@ -3646,7 +3646,7 @@ function UbicacionesPage() {
 
                       {/* DESPLEGABLE PREDICTIVO CON FLECHAS */}
                       {dropdownAbierto && sugerenciasCatalogo.length > 0 && (
-                        <div className="absolute top-full left-0 right-28 mt-1 bg-white rounded-lg border border-slate-200 shadow-lg z-30 max-h-56 overflow-y-auto">
+                        <div className="absolute top-full left-0 right-28 mt-1 bg-card rounded-lg border border-border shadow-lg z-30 max-h-56 overflow-y-auto">
                           {sugerenciasCatalogo.map((prod, idx) => (
                             <div
                               key={prod.id}
@@ -3655,19 +3655,19 @@ function UbicacionesPage() {
                                 setBusquedaProducto(`${prod.nombre} (${prod.sku})`);
                                 setDropdownAbierto(false);
                               }}
-                              className={`p-2.5 text-xs cursor-pointer border-b border-slate-100 last:border-0 flex items-center justify-between ${
+                              className={`p-2.5 text-xs cursor-pointer border-b border-border last:border-0 flex items-center justify-between ${
                                 idx === indiceSugerencia
-                                  ? "bg-blue-50 text-blue-900 font-semibold"
-                                  : "hover:bg-slate-50 text-slate-800"
+                                  ? "bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-100 font-semibold"
+                                  : "hover:bg-muted text-foreground"
                               }`}
                             >
                               <div>
                                 <div className="font-medium">{prod.nombre}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">
+                                <div className="text-[10px] text-muted-foreground font-mono">
                                   SKU: {prod.sku} • {prod.categoria}
                                 </div>
                               </div>
-                              <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                              <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                                 Catálogo
                               </span>
                             </div>
@@ -3677,12 +3677,12 @@ function UbicacionesPage() {
                     </div>
 
                     {productoParaIncluir && (
-                      <div className="p-2.5 rounded-md bg-blue-50/70 border border-blue-200 text-xs flex items-center justify-between text-blue-900">
+                      <div className="p-2.5 rounded-md bg-blue-50/70 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 text-xs flex items-center justify-between text-blue-900 dark:text-blue-100">
                         <div>
                           <span>
                             Seleccionado: <strong>{productoParaIncluir.nombre}</strong>
                           </span>
-                          <span className="block text-[10px] text-blue-700 font-mono">
+                          <span className="block text-[10px] text-blue-700 dark:text-blue-300 font-mono">
                             SKU: {productoParaIncluir.sku}
                           </span>
                         </div>
@@ -3693,7 +3693,7 @@ function UbicacionesPage() {
                             setProductoParaIncluir(null);
                             setBusquedaProducto("");
                           }}
-                          className="h-6 w-6 p-0 text-blue-700 hover:text-blue-900"
+                          className="h-6 w-6 p-0 text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100"
                         >
                           <X className="w-3.5 h-3.5" />
                         </Button>
@@ -3704,43 +3704,43 @@ function UbicacionesPage() {
                   {/* LISTADO DE PRODUCTOS ACTUALMENTE EN LA UBICACIÓN */}
                   <div className="p-5 flex-1 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      <span className="text-xs font-bold text-foreground uppercase tracking-wider">
                         Contenido del Armario ({ubicacionSeleccionada.productos?.length || 0}{" "}
                         artículos)
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-muted-foreground">
                         Regla de Oro: Registro auditado en tabla movimientos
                       </span>
                     </div>
 
                     {!ubicacionSeleccionada.productos ||
                     ubicacionSeleccionada.productos.length === 0 ? (
-                      <div className="p-8 text-center border border-dashed rounded-lg text-slate-400 text-xs">
+                      <div className="p-8 text-center border border-dashed rounded-lg text-muted-foreground text-xs">
                         Esta ubicación no contiene artículos en este momento. Utiliza el buscador o
                         escáner superior para incluir productos.
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-150 border rounded-lg bg-white overflow-hidden shadow-2xs">
+                      <div className="divide-y divide-border border rounded-lg bg-card overflow-hidden shadow-2xs">
                         {ubicacionSeleccionada.productos.map((prod) => {
                           const bajoStock = prod.cantidad <= prod.stock_minimo;
 
                           return (
                             <div
                               key={prod.id}
-                              className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
+                              className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/60 transition-colors"
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-xs text-slate-900">
+                                  <span className="font-semibold text-xs text-foreground">
                                     {prod.nombre}
                                   </span>
                                   {bajoStock && (
-                                    <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] font-bold">
+                                    <Badge className="bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-500/30 text-[10px] font-bold">
                                       Bajo Stock
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                                <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
                                   SKU: {prod.sku} • {prod.categoria} • Mínimo: {prod.stock_minimo}{" "}
                                   uds
                                 </div>
@@ -3748,10 +3748,10 @@ function UbicacionesPage() {
 
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
-                                  <span className="text-base font-bold text-slate-900">
+                                  <span className="text-base font-bold text-foreground">
                                     {prod.cantidad}
                                   </span>
-                                  <span className="text-xs text-slate-400 ml-1">uds</span>
+                                  <span className="text-xs text-muted-foreground ml-1">uds</span>
                                 </div>
 
                                 {/* BOTONES INTERACTIVOS: QUITAR (-), AÑADIR (+), AJUSTAR CON DIALOG DE CONFIRMACIÓN */}
@@ -3766,7 +3766,7 @@ function UbicacionesPage() {
                                       setMotivoOperacion("Venta o reposición en tienda");
                                       setAlertOperacionAbierta(true);
                                     }}
-                                    className="h-7 w-7 p-0 text-rose-600 border-rose-200 hover:bg-rose-50"
+                                    className="h-7 w-7 p-0 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                                     title="Quitar unidades (Salida)"
                                   >
                                     <Minus className="w-3.5 h-3.5" />
@@ -3782,7 +3782,7 @@ function UbicacionesPage() {
                                       setMotivoOperacion("Reposición de existencias");
                                       setAlertOperacionAbierta(true);
                                     }}
-                                    className="h-7 w-7 p-0 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                    className="h-7 w-7 p-0 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
                                     title="Añadir unidades (Entrada)"
                                   >
                                     <Plus className="w-3.5 h-3.5" />
@@ -3798,7 +3798,7 @@ function UbicacionesPage() {
                                       setMotivoOperacion("Ajuste por recuento físico");
                                       setAlertOperacionAbierta(true);
                                     }}
-                                    className="h-7 text-xs px-2 text-slate-600 hover:text-blue-600 font-medium"
+                                    className="h-7 text-xs px-2 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                                   >
                                     Ajuste
                                   </Button>
@@ -3813,20 +3813,20 @@ function UbicacionesPage() {
                                         setMotivoEliminarProd("");
                                         setAlertEliminarProdAbierto(true);
                                       }}
-                                      className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/70 rounded-md transition-colors shadow-2xs"
+                                      className="h-7 w-7 p-0 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-rose-200/70 dark:border-rose-500/30 rounded-md transition-colors shadow-2xs"
                                       title="Eliminar producto del armario (stock en 0)"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                      <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                                     </Button>
                                   ) : (
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       disabled
-                                      className="h-7 w-7 p-0 text-slate-300 border border-slate-100 rounded-md cursor-not-allowed opacity-50"
+                                      className="h-7 w-7 p-0 text-muted-foreground border border-border rounded-md cursor-not-allowed opacity-50"
                                       title={`No se puede eliminar: el producto tiene existencias (${prod.cantidad} uds). Ajusta el stock a 0 primero.`}
                                     >
-                                      <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
                                     </Button>
                                   )}
                                 </div>
@@ -3850,25 +3850,25 @@ function UbicacionesPage() {
       <AlertDialog open={alertOperacionAbierta} onOpenChange={setAlertOperacionAbierta}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <AlertDialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
               {tipoOperacion === "quitar" ? (
                 <>
-                  <ShieldAlert className="w-5 h-5 text-rose-600" />
+                  <ShieldAlert className="w-5 h-5 text-rose-600 dark:text-rose-400" />
                   Confirmar Salida de Stock
                 </>
               ) : tipoOperacion === "anadir" ? (
                 <>
-                  <Plus className="w-5 h-5 text-emerald-600" />
+                  <Plus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   Confirmar Entrada de Stock
                 </>
               ) : (
                 <>
-                  <SlidersHorizontal className="w-5 h-5 text-amber-600" />
+                  <SlidersHorizontal className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                   Ajuste Directo de Conteo Físico
                 </>
               )}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-slate-600">
+            <AlertDialogDescription className="text-xs text-muted-foreground">
               Esta operación registrará una mutación en la tabla <strong>movimientos</strong> y
               actualizará el stock de <strong>{productoEnOperacion?.nombre}</strong> en{" "}
               <strong>{ubicacionSeleccionada?.nombre}</strong>.
@@ -3877,7 +3877,7 @@ function UbicacionesPage() {
 
           <div className="space-y-3 py-2 text-xs">
             <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+              <Label className="text-xs font-semibold text-foreground mb-1 block">
                 {tipoOperacion === "ajuste"
                   ? "Nueva Cantidad Exacta (uds)"
                   : "Cantidad a Procesar (uds)"}
@@ -3891,7 +3891,7 @@ function UbicacionesPage() {
               />
             </div>
             <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">
+              <Label className="text-xs font-semibold text-foreground mb-1 block">
                 Motivo / Justificación
               </Label>
               <Input
@@ -3927,13 +3927,13 @@ function UbicacionesPage() {
       <AlertDialog open={alertEliminarProdAbierto} onOpenChange={setAlertEliminarProdAbierto}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+            <AlertDialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
                 <Trash2 className="w-4 h-4" />
               </div>
               <span>Eliminar Producto del Armario</span>
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-slate-600">
+            <AlertDialogDescription className="text-xs text-muted-foreground">
               ¿Estás seguro de que deseas retirar este producto de la ubicación{" "}
               <strong>{ubicacionSeleccionada?.nombre}</strong>?
             </AlertDialogDescription>
@@ -3941,26 +3941,26 @@ function UbicacionesPage() {
 
           <div className="space-y-3 py-2 text-xs">
             {productoParaEliminar && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1.5">
+              <div className="rounded-lg border border-border bg-muted p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-900 text-xs">
+                  <span className="font-semibold text-foreground text-xs">
                     {productoParaEliminar.nombre}
                   </span>
                   <Badge
                     variant="outline"
-                    className="border-slate-300 text-slate-700 font-mono text-[10px]"
+                    className="border-border text-foreground font-mono text-[10px]"
                   >
                     0 uds
                   </Badge>
                 </div>
-                <div className="text-[11px] text-slate-500 font-mono">
+                <div className="text-[11px] text-muted-foreground font-mono">
                   SKU: {productoParaEliminar.sku} • {productoParaEliminar.categoria}
                 </div>
               </div>
             )}
 
-            <div className="rounded-md bg-amber-50 border border-amber-200/80 p-2.5 text-[11px] text-amber-900 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-200/80 dark:border-amber-500/30 p-2.5 text-[11px] text-amber-900 dark:text-amber-100 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
                 Esta acción retirará la asignación del producto en este armario. Solo se permite
                 porque el producto tiene actualmente <strong>0 existencias</strong>.
@@ -3968,8 +3968,8 @@ function UbicacionesPage() {
             </div>
 
             <div>
-              <Label className="text-xs font-semibold text-slate-700 mb-1 block">
-                Motivo de la retirada (obligatorio) <span className="text-rose-500">*</span>
+              <Label className="text-xs font-semibold text-foreground mb-1 block">
+                Motivo de la retirada (obligatorio) <span className="text-rose-500 dark:text-rose-400">*</span>
               </Label>
               <Input
                 value={motivoEliminarProd}
@@ -3978,7 +3978,7 @@ function UbicacionesPage() {
                 className="h-8 text-xs focus-visible:ring-rose-500"
                 autoFocus
               />
-              <span className="text-[10px] text-slate-400 mt-0.5 block">
+              <span className="text-[10px] text-muted-foreground mt-0.5 block">
                 Indica la justificación de inventario para el registro de auditoría.
               </span>
             </div>
@@ -4020,8 +4020,8 @@ function UbicacionesPage() {
       <Dialog open={modalCrearPaletAbierto} onOpenChange={setModalCrearPaletAbierto}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-slate-900">
-              <Boxes className="h-5 w-5 text-amber-600" />
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <Boxes className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               Crear Palet en Reserva
             </DialogTitle>
             <DialogDescription>
@@ -4031,7 +4031,7 @@ function UbicacionesPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-950">
+            <div className="rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
               <div className="font-semibold">Reserva</div>
               <div className="mt-1">
                 {ubicacionesBD.find((ubicacion) => ubicacion.id === idReservaParaCrearPalet)
@@ -4040,36 +4040,36 @@ function UbicacionesPage() {
             </div>
 
             {cargandoSesion && (
-              <p className="text-sm text-slate-600">Cargando la sesión del usuario...</p>
+              <p className="text-sm text-muted-foreground">Cargando la sesión del usuario...</p>
             )}
             {!idReservaParaCrearPalet && (
-              <p className="text-sm text-rose-700">
+              <p className="text-sm text-rose-700 dark:text-rose-300">
                 No hay una reserva real seleccionada. Selecciona una reserva disponible para
                 continuar.
               </p>
             )}
             {!cargandoSesion && !usuarioNombre && (
-              <p className="text-sm text-rose-700">
+              <p className="text-sm text-rose-700 dark:text-rose-300">
                 No se pudo obtener el nombre ni el correo del usuario autenticado.
               </p>
             )}
 
             {cargandoPrevisualizacionPalet ? (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400" />
                 Calculando el código previsto...
               </div>
             ) : errorPrevisualizacionPalet ? (
-              <p className="text-sm text-rose-700">
+              <p className="text-sm text-rose-700 dark:text-rose-300">
                 No se pudo calcular la previsualización: {errorPrevisualizacionPalet}
               </p>
             ) : codigoPaletPrevisto ? (
               <div className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Código previsto</span>
+                <span className="text-sm font-medium text-foreground">Código previsto</span>
                 <div>
                   <Badge
                     variant="outline"
-                    className="border-amber-300 bg-amber-50 font-mono text-amber-900"
+                    className="border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 font-mono text-amber-900 dark:text-amber-100"
                   >
                     {codigoPaletPrevisto}
                   </Badge>
@@ -4123,13 +4123,13 @@ function UbicacionesPage() {
       {/* 🏷️ MODAL DE ETIQUETA IMPRIMIBLE DE PALET (HOMOLOGADA) */}
       {/* ========================================================================= */}
       <Dialog open={modalEtiquetaPaletAbierto} onOpenChange={setModalEtiquetaPaletAbierto}>
-        <DialogContent className="print-target max-w-md bg-white p-6">
+        <DialogContent className="print-target max-w-md bg-card p-6">
           <DialogHeader className="no-print">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <Barcode className="h-5 w-5 text-amber-600" />
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Barcode className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               Etiqueta Oficial de Palet
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               Formato homologado para imprimir y colocar sobre el palet físico en Reserva.
             </DialogDescription>
           </DialogHeader>
@@ -4199,18 +4199,18 @@ function UbicacionesPage() {
           if (!open) setPaletSeleccionadoParaGestion(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto bg-white p-6">
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto bg-card p-6">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Warehouse className="w-5 h-5 text-amber-600" />
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Warehouse className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               Reponer desde Palet #{paletSeleccionadoParaGestion?.numero_palet}
               {paletSeleccionadoParaGestion && (
-                <Badge variant="outline" className="font-mono text-amber-900">
+                <Badge variant="outline" className="font-mono text-amber-900 dark:text-amber-100">
                   {paletSeleccionadoParaGestion.codigo_barras}
                 </Badge>
               )}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               Cada línea seleccionada se traslada en una transacción desde el palet a la ubicación
               elegida. El stock se actualiza mediante movimientos y el trigger de base de datos.
             </DialogDescription>
@@ -4277,19 +4277,19 @@ function UbicacionesPage() {
                   </SelectContent>
                 </Select>
                 {ubicacionesDestinoDisponibles.length === 0 && (
-                  <p className="text-xs text-rose-700">
+                  <p className="text-xs text-rose-700 dark:text-rose-300">
                     No hay ubicaciones activas para los filtros seleccionados.
                   </p>
                 )}
               </div>
 
               {productosPaletQuery.isLoading ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-600">
-                  <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                  <RefreshCw className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400" />
                   Cargando productos del palet...
                 </div>
               ) : productosPaletQuery.error ? (
-                <p className="rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                <p className="rounded border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
                   No se pudieron cargar los productos:{" "}
                   {productosPaletQuery.error instanceof Error
                     ? productosPaletQuery.error.message
@@ -4298,7 +4298,7 @@ function UbicacionesPage() {
               ) : productosPaletQuery.data?.length ? (
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="bg-amber-50 text-xs font-semibold uppercase text-amber-950">
+                    <thead className="bg-amber-50 dark:bg-amber-500/10 text-xs font-semibold uppercase text-amber-950 dark:text-amber-100">
                       <tr>
                         <th className="p-3">Producto</th>
                         <th className="p-3">SKU</th>
@@ -4344,7 +4344,7 @@ function UbicacionesPage() {
                                   [producto.id_producto]: producto.cantidad,
                                 }))
                               }
-                              className="border-amber-300 text-amber-900 hover:bg-amber-50"
+                              className="border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 hover:bg-amber-50 dark:hover:bg-amber-500/10"
                             >
                               Todo
                             </Button>
@@ -4355,13 +4355,13 @@ function UbicacionesPage() {
                   </table>
                 </div>
               ) : (
-                <p className="rounded border border-dashed border-amber-300 bg-amber-50/50 p-6 text-center text-sm text-slate-600">
+                <p className="rounded border border-dashed border-amber-300 dark:border-amber-500/40 bg-amber-50/50 dark:bg-amber-500/10 p-6 text-center text-sm text-muted-foreground">
                   Este palet no tiene productos disponibles para reponer.
                 </p>
               )}
 
               {productosPaletQuery.data && (
-                <p className="text-right text-sm font-semibold text-amber-950">
+                <p className="text-right text-sm font-semibold text-amber-950 dark:text-amber-100">
                   Total disponible:{" "}
                   {productosPaletQuery.data.reduce(
                     (total, producto) => total + producto.cantidad,
@@ -4370,7 +4370,7 @@ function UbicacionesPage() {
                   unidades
                 </p>
               )}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 Usa 0 para excluir una línea. Cada cantidad debe ser igual o menor que las unidades
                 disponibles en el palet.
               </p>
@@ -4419,10 +4419,10 @@ function UbicacionesPage() {
       <AlertDialog open={dialogEliminarAbierto} onOpenChange={setDialogEliminarAbierto}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base text-slate-900 font-bold">
+            <AlertDialogTitle className="text-base text-foreground font-bold">
               ¿Eliminar ubicación "{ubicacionParaEliminar?.nombre}"?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-slate-500">
+            <AlertDialogDescription className="text-xs text-muted-foreground">
               Esta acción eliminará la ubicación del mapa del almacén. Solo se puede realizar si la
               ubicación no tiene productos con stock físico activo.
             </AlertDialogDescription>

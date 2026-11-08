@@ -150,13 +150,13 @@ export function ModalInformeInventario({
   return (
     <Dialog open={abierto} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-0">
-        <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-4">
+        <div className="border-b border-border bg-muted/80 px-5 py-4">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <Printer className="h-5 w-5 text-blue-600" aria-hidden="true" />
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Printer className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
               {informe.titulo}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               {informe.subtitulo} · {new Date(informe.fecha).toLocaleString("es-ES")}
             </DialogDescription>
           </DialogHeader>
@@ -189,7 +189,7 @@ export function ModalInformeInventario({
                 onClick={descargarExcel}
                 className="h-8 gap-1.5 text-xs"
               >
-                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                 Excel
               </Button>
               {puedeEnviarEmail && (
@@ -200,10 +200,10 @@ export function ModalInformeInventario({
                   onClick={() => setVista("email")}
                   className={cn(
                     "h-8 gap-1.5 text-xs",
-                    vista === "email" && "border-amber-300 bg-amber-50 text-amber-900",
+                    vista === "email" && "border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 text-amber-900 dark:text-amber-100",
                   )}
                 >
-                  <Mail className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+                  <Mail className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                   Enviar por email
                 </Button>
               )}
@@ -218,8 +218,8 @@ export function ModalInformeInventario({
             <form onSubmit={enviar} className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Enviar informe por email</h3>
-                  <p className="text-xs text-slate-500">
+                  <h3 className="text-sm font-bold text-foreground">Enviar informe por email</h3>
+                  <p className="text-xs text-muted-foreground">
                     Se adjuntará el PDF del informe. Límite de adjunto: 1 MB.
                   </p>
                 </div>
@@ -243,11 +243,11 @@ export function ModalInformeInventario({
                     value={destinatario}
                     onChange={(event) => setDestinatario(event.target.value)}
                     readOnly={!esAdmin}
-                    className={!esAdmin ? "bg-slate-50 text-slate-500" : undefined}
+                    className={!esAdmin ? "bg-muted text-muted-foreground" : undefined}
                     required
                   />
                   {!esAdmin && (
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-muted-foreground">
                       Solo puedes enviarte el informe a tu propia cuenta.
                     </p>
                   )}
@@ -276,8 +276,8 @@ export function ModalInformeInventario({
                 />
               </div>
 
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                <Mail className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted p-3 text-xs text-muted-foreground">
+                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span>
                   Adjunto: <strong>{nombreArchivo}.pdf</strong>
                 </span>
@@ -286,7 +286,7 @@ export function ModalInformeInventario({
               {adjuntoDemasiadoGrande && (
                 <div
                   role="alert"
-                  className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"
+                  className="flex items-start gap-2 rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-3 text-xs text-rose-800 dark:text-rose-200"
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   El PDF supera el límite de 1 MB. Descárgalo y envíalo manualmente.
@@ -320,7 +320,7 @@ export function ModalInformeInventario({
           )}
         </div>
 
-        <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-5 py-3">
+        <DialogFooter className="border-t border-border bg-muted/80 px-5 py-3">
           <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>

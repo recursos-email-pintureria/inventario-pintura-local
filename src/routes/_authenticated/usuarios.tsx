@@ -314,8 +314,8 @@ function Usuarios() {
 
               {/* Advertencia visual para el propio usuario */}
               {editando.id === miPerfil?.id && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                  <p className="text-xs text-amber-800 font-medium">
+                <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-md">
+                  <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
                     ⚠️ Estás editando tu propia cuenta. No puedes quitarte el rol de admin ni el
                     permiso de gestionar usuarios.
                   </p>

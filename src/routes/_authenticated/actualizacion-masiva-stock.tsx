@@ -265,21 +265,21 @@ function ActualizacionMasivaStockPage() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       {/* Cabecera */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-50 to-orange-50/60 p-5 rounded-2xl border border-amber-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-50 dark:from-amber-500/10 to-orange-50/60 dark:to-orange-500/10 p-5 rounded-2xl border border-amber-200/80 dark:border-amber-500/30 shadow-xs">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
             <FileSpreadsheet className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black text-gray-900 tracking-tight">
+              <h1 className="text-xl font-black text-foreground tracking-tight">
                 Actualización Masiva de Stock
               </h1>
-              <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-xs">
+              <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-500/40 text-xs">
                 {VERSION_PLANTILLA_EXCEL}
               </Badge>
             </div>
-            <p className="text-xs text-amber-900/80 mt-0.5">
+            <p className="text-xs text-amber-900/80 dark:text-amber-100 mt-0.5">
               Flujo "Exportar, Editar e Importar" para inventarios físicos con validación estricta y
               auditoría.
             </p>
@@ -292,10 +292,10 @@ function ActualizacionMasivaStockPage() {
               variant="outline"
               size="sm"
               onClick={() => setModalRevertirAbierto(true)}
-              className="text-xs h-9 gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-50"
+              className="text-xs h-9 gap-1.5 border-border text-foreground hover:bg-muted"
               title="Auditar y revertir importaciones previas"
             >
-              <History className="w-4 h-4 text-amber-600" />
+              <History className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>Historial y Reversión</span>
             </Button>
           )}
@@ -304,9 +304,9 @@ function ActualizacionMasivaStockPage() {
             variant="outline"
             size="sm"
             onClick={() => navigate({ to: "/ubicaciones" })}
-            className="text-xs h-9 gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-50"
+            className="text-xs h-9 gap-1.5 border-border text-foreground hover:bg-muted"
           >
-            <Boxes className="w-4 h-4 text-gray-500" />
+            <Boxes className="w-4 h-4 text-muted-foreground" />
             <span>Volver a Ubicaciones</span>
           </Button>
         </div>
@@ -329,16 +329,16 @@ function ActualizacionMasivaStockPage() {
                 activo
                   ? "bg-amber-600 text-white border-amber-600 shadow-xs"
                   : completado
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                    : "bg-white text-gray-400 border-gray-200"
+                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-500/30"
+                    : "bg-card text-muted-foreground border-border"
               }`}
             >
               {completado ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <span
                   className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                    activo ? "bg-white text-amber-700" : "bg-gray-100 text-gray-500"
+                    activo ? "bg-card text-amber-700 dark:text-amber-300" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {p.num}
@@ -354,26 +354,26 @@ function ActualizacionMasivaStockPage() {
       {/* PASO 1: FILTROS Y DESCARGA DE PLANTILLA                                */}
       {/* ====================================================================== */}
       {paso === 1 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6 shadow-2xs">
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-2xs">
           <div>
-            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <Filter className="w-4 h-4 text-amber-600" />
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Filter className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>Paso 1: Configurar y Descargar Plantilla Oficial</span>
             </h2>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Filtra las combinaciones de producto-ubicación que deseas inventariar o descarga el
               catálogo completo.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50/70 border border-gray-200 rounded-xl text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/70 border border-border rounded-xl text-xs">
             {/* Filtro por ubicación */}
             <div className="space-y-1.5">
-              <label className="font-semibold text-gray-700">Filtrar por Ubicación:</label>
+              <label className="font-semibold text-foreground">Filtrar por Ubicación:</label>
               <select
                 value={filtroUbi}
                 onChange={(e) => setFiltroUbi(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-800"
+                className="w-full bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground"
               >
                 <option value="todas">Todas las ubicaciones ({ubicaciones.length})</option>
                 {ubicaciones.map((u) => (
@@ -386,11 +386,11 @@ function ActualizacionMasivaStockPage() {
 
             {/* Filtro por categoría */}
             <div className="space-y-1.5">
-              <label className="font-semibold text-gray-700">Filtrar por Categoría:</label>
+              <label className="font-semibold text-foreground">Filtrar por Categoría:</label>
               <select
                 value={filtroCat}
                 onChange={(e) => setFiltroCat(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-800"
+                className="w-full bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground"
               >
                 <option value="todas">Todas las categorías</option>
                 {categoriasUnicas.map((cat) => (
@@ -403,12 +403,12 @@ function ActualizacionMasivaStockPage() {
 
             {/* Checkbox solo con stock */}
             <div className="space-y-1.5 flex flex-col justify-end">
-              <label className="inline-flex items-center gap-2 cursor-pointer text-gray-700 py-1.5">
+              <label className="inline-flex items-center gap-2 cursor-pointer text-foreground py-1.5">
                 <input
                   type="checkbox"
                   checked={soloConStock}
                   onChange={(e) => setSoloConStock(e.target.checked)}
-                  className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  className="rounded border-border text-amber-600 dark:text-amber-400 focus:ring-amber-500"
                 />
                 <span className="font-medium">Solo combinaciones con stock &gt; 0</span>
               </label>
@@ -416,12 +416,12 @@ function ActualizacionMasivaStockPage() {
           </div>
 
           {/* Información de instrucciones de plantilla */}
-          <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
-            <div className="font-bold flex items-center gap-1.5 text-amber-900">
-              <HelpCircle className="w-4 h-4 text-amber-700" />
+          <div className="p-4 bg-amber-50/60 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl space-y-2 text-xs text-amber-950 dark:text-amber-100">
+            <div className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100">
+              <HelpCircle className="w-4 h-4 text-amber-700 dark:text-amber-300" />
               <span>Instrucciones para el Excel:</span>
             </div>
-            <ul className="list-disc pl-5 space-y-1 text-amber-900/90 text-[11px]">
+            <ul className="list-disc pl-5 space-y-1 text-amber-900/90 dark:text-amber-100 text-[11px]">
               <li>Las columnas de identificación (A-G) son de sólo lectura para tu referencia.</li>
               <li>
                 Escribe el nuevo stock físico en la columna <strong>cantidad_nueva</strong>.
@@ -435,7 +435,7 @@ function ActualizacionMasivaStockPage() {
             </ul>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-2 border-t border-border">
             <Button
               onClick={handleDescargarPlantilla}
               disabled={cargandoDatos}
@@ -457,7 +457,7 @@ function ActualizacionMasivaStockPage() {
             <Button
               variant="outline"
               onClick={() => setPaso(2)}
-              className="text-xs h-9 gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-50"
+              className="text-xs h-9 gap-1.5 border-border text-foreground hover:bg-muted"
             >
               <span>Ya tengo el archivo completado</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -470,13 +470,13 @@ function ActualizacionMasivaStockPage() {
       {/* PASO 2: SUBIR ARCHIVO                                                  */}
       {/* ====================================================================== */}
       {paso === 2 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6 shadow-2xs">
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-6 shadow-2xs">
           <div>
-            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <UploadCloud className="w-4 h-4 text-amber-600" />
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <UploadCloud className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>Paso 2: Subir Archivo Excel o CSV con el Conteo</span>
             </h2>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Arrastra o selecciona el archivo con la columna 'cantidad_nueva' cumplimentada.
             </p>
           </div>
@@ -490,7 +490,7 @@ function ActualizacionMasivaStockPage() {
                 handleArchivoCargado(e.dataTransfer.files[0]);
               }
             }}
-            className="border-2 border-dashed border-amber-300 hover:border-amber-500 rounded-2xl p-10 text-center bg-amber-50/20 hover:bg-amber-50/40 transition-colors flex flex-col items-center justify-center gap-3 cursor-pointer"
+            className="border-2 border-dashed border-amber-300 dark:border-amber-500/40 hover:border-amber-500 rounded-2xl p-10 text-center bg-amber-50/20 dark:bg-amber-500/10 hover:bg-amber-50/40 dark:hover:bg-amber-500/10 transition-colors flex flex-col items-center justify-center gap-3 cursor-pointer"
             onClick={() => document.getElementById("input-archivo-stock")?.click()}
           >
             <input
@@ -505,7 +505,7 @@ function ActualizacionMasivaStockPage() {
               }}
             />
 
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center">
               {analizandoArchivo ? (
                 <Loader2 className="w-7 h-7 animate-spin" />
               ) : (
@@ -514,12 +514,12 @@ function ActualizacionMasivaStockPage() {
             </div>
 
             <div>
-              <p className="font-bold text-sm text-gray-900">
+              <p className="font-bold text-sm text-foreground">
                 {analizandoArchivo
                   ? "Analizando y validando estructura del archivo..."
                   : "Arrastra aquí tu archivo o haz clic para seleccionarlo"}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Admite formatos .xlsx, .xls y .csv (máximo 10 MB y 10.000 filas).
               </p>
             </div>
@@ -529,16 +529,16 @@ function ActualizacionMasivaStockPage() {
               variant="outline"
               size="sm"
               disabled={analizandoArchivo}
-              className="text-xs border-amber-300 text-amber-900 bg-white hover:bg-amber-50 mt-1"
+              className="text-xs border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-100 bg-card hover:bg-amber-50 dark:hover:bg-amber-500/10 mt-1"
             >
               Explorar archivos en mi equipo
             </Button>
           </div>
 
           {resultadoParser && !resultadoParser.exito && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 text-xs text-rose-800">
-              <div className="font-bold flex items-center gap-1.5 text-rose-900">
-                <AlertTriangle className="w-4 h-4 text-rose-600" />
+            <div className="p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl space-y-1.5 text-xs text-rose-800 dark:text-rose-200">
+              <div className="font-bold flex items-center gap-1.5 text-rose-900 dark:text-rose-100">
+                <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
                 <span>No se pudo procesar el archivo:</span>
               </div>
               <ul className="list-disc pl-5 space-y-0.5">
@@ -549,7 +549,7 @@ function ActualizacionMasivaStockPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-2 border-t border-border">
             <Button
               variant="outline"
               size="sm"
@@ -570,37 +570,37 @@ function ActualizacionMasivaStockPage() {
         <div className="space-y-4">
           {/* Tarjetas KPI de resumen */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="p-3 bg-white border border-gray-200 rounded-xl shadow-2xs">
-              <span className="text-[10px] font-bold text-gray-400 uppercase block">
+            <div className="p-3 bg-card border border-border rounded-xl shadow-2xs">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase block">
                 Total Filas
               </span>
-              <span className="text-xl font-black text-gray-900">{resumen.total}</span>
+              <span className="text-xl font-black text-foreground">{resumen.total}</span>
             </div>
 
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-              <span className="text-[10px] font-bold text-emerald-700 uppercase block">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl">
+              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase block">
                 A Modificar
               </span>
-              <span className="text-xl font-black text-emerald-800">{resumen.modificables}</span>
+              <span className="text-xl font-black text-emerald-800 dark:text-emerald-200">{resumen.modificables}</span>
             </div>
 
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-              <span className="text-[10px] font-bold text-gray-500 uppercase block">
+            <div className="p-3 bg-muted border border-border rounded-xl">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase block">
                 Sin Cambios
               </span>
-              <span className="text-xl font-black text-gray-700">{resumen.sinCambios}</span>
+              <span className="text-xl font-black text-foreground">{resumen.sinCambios}</span>
             </div>
 
-            <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">
-              <span className="text-[10px] font-bold text-orange-700 uppercase block">
+            <div className="p-3 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-xl">
+              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300 uppercase block">
                 Conflictos
               </span>
-              <span className="text-xl font-black text-orange-800">{resumen.conflictos}</span>
+              <span className="text-xl font-black text-orange-800 dark:text-orange-200">{resumen.conflictos}</span>
             </div>
 
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
-              <span className="text-[10px] font-bold text-rose-700 uppercase block">Errores</span>
-              <span className="text-xl font-black text-rose-800">{resumen.errores}</span>
+            <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl">
+              <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300 uppercase block">Errores</span>
+              <span className="text-xl font-black text-rose-800 dark:text-rose-200">{resumen.errores}</span>
             </div>
           </div>
 
@@ -611,7 +611,7 @@ function ActualizacionMasivaStockPage() {
           />
 
           {/* Barra de acción inferior */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
             <Button
               variant="outline"
               size="sm"
@@ -640,33 +640,33 @@ function ActualizacionMasivaStockPage() {
       {/* PASO 4: RESULTADO Y AUDITORÍA FINAL                                    */}
       {/* ====================================================================== */}
       {paso === 4 && resultadoFinal && (
-        <div className="bg-white border border-emerald-200 rounded-2xl p-8 text-center space-y-4 shadow-sm max-w-xl mx-auto">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+        <div className="bg-card border border-emerald-200 dark:border-emerald-500/30 rounded-2xl p-8 text-center space-y-4 shadow-sm max-w-xl mx-auto">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8" />
           </div>
 
           <div>
-            <h2 className="text-xl font-black text-gray-900">¡Actualización Masiva Aplicada!</h2>
-            <p className="text-xs text-gray-600 mt-1">
+            <h2 className="text-xl font-black text-foreground">¡Actualización Masiva Aplicada!</h2>
+            <p className="text-xs text-muted-foreground mt-1">
               Se han registrado los movimientos correspondientes y el stock se ha sincronizado de
               forma atómica.
             </p>
           </div>
 
-          <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs space-y-2 text-left">
-            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-              <span className="text-gray-500 font-semibold">Identificador de Lote:</span>
-              <strong className="font-mono text-gray-900">{resultadoFinal.batch_id}</strong>
+          <div className="p-4 bg-muted border border-border rounded-xl text-xs space-y-2 text-left">
+            <div className="flex justify-between items-center border-b border-border pb-2">
+              <span className="text-muted-foreground font-semibold">Identificador de Lote:</span>
+              <strong className="font-mono text-foreground">{resultadoFinal.batch_id}</strong>
             </div>
-            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-              <span className="text-gray-500 font-semibold">Filas modificadas:</span>
-              <strong className="text-emerald-700 font-bold">
+            <div className="flex justify-between items-center border-b border-border pb-2">
+              <span className="text-muted-foreground font-semibold">Filas modificadas:</span>
+              <strong className="text-emerald-700 dark:text-emerald-300 font-bold">
                 {resultadoFinal.filas} productos
               </strong>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-semibold">Tipo de movimiento:</span>
-              <strong className="text-gray-900">Ajuste de inventario</strong>
+              <span className="text-muted-foreground font-semibold">Tipo de movimiento:</span>
+              <strong className="text-foreground">Ajuste de inventario</strong>
             </div>
           </div>
 
@@ -690,7 +690,7 @@ function ActualizacionMasivaStockPage() {
             <Button
               size="sm"
               onClick={() => navigate({ to: "/ubicaciones" })}
-              className="bg-slate-900 hover:bg-slate-800 text-white text-xs h-9 px-4 gap-1.5 font-bold"
+              className="bg-sidebar hover:bg-sidebar text-white text-xs h-9 px-4 gap-1.5 font-bold"
             >
               <Boxes className="w-4 h-4" />
               <span>Ir a Ubicaciones</span>
@@ -701,22 +701,22 @@ function ActualizacionMasivaStockPage() {
 
       {/* Modal crítico de confirmación antes de aplicar */}
       <AlertDialog open={confirmarEjecucionAbierto} onOpenChange={setConfirmarEjecucionAbierto}>
-        <AlertDialogContent className="bg-white border-amber-200">
+        <AlertDialogContent className="bg-card border-amber-200 dark:border-amber-500/30">
           <AlertDialogHeader>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-1">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 flex items-center justify-center mb-1">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <AlertDialogTitle className="text-base font-bold text-gray-900">
+            <AlertDialogTitle className="text-base font-bold text-foreground">
               ¿Confirmar actualización de stock?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-gray-600 space-y-2">
+            <AlertDialogDescription className="text-xs text-muted-foreground space-y-2">
               <p>
                 Vas a modificar <strong>{filasParaAplicar.length} filas</strong> en una única
                 transacción atómica. Se generarán movimientos de tipo ajuste trazables con un
                 identificador de lote de importación.
               </p>
               {resumen && resumen.conflictos > 0 && (
-                <div className="p-2.5 bg-orange-50 border border-orange-200 rounded text-orange-900 font-medium">
+                <div className="p-2.5 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded text-orange-900 dark:text-orange-100 font-medium">
                   Se aplicarán las resoluciones seleccionadas para los {resumen.conflictos}{" "}
                   conflictos concurrentes detectados.
                 </div>

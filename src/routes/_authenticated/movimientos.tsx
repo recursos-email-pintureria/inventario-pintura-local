@@ -65,26 +65,26 @@ const TIPO_INFO: Record<
   entrada: {
     label: "Entrada",
     signo: "+",
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    texto: "text-emerald-600",
+    badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30",
+    texto: "text-emerald-600 dark:text-emerald-400",
   },
   salida: {
     label: "Salida",
     signo: "-",
-    badge: "bg-rose-50 text-rose-700 border-rose-200",
-    texto: "text-rose-600",
+    badge: "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30",
+    texto: "text-rose-600 dark:text-rose-400",
   },
   ajuste: {
     label: "Ajuste",
     signo: "=",
-    badge: "bg-amber-50 text-amber-800 border-amber-200",
-    texto: "text-amber-700",
+    badge: "bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-500/30",
+    texto: "text-amber-700 dark:text-amber-300",
   },
   reposicion: {
     label: "Reposición (fija stock)",
     signo: "=",
-    badge: "bg-blue-50 text-blue-700 border-blue-200",
-    texto: "text-blue-600",
+    badge: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30",
+    texto: "text-blue-600 dark:text-blue-400",
   },
 };
 
@@ -353,13 +353,13 @@ function MovimientosPage() {
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-16">
+    <div className="min-h-screen bg-background pb-16">
       {/* HEADER */}
-      <div className="border-b bg-white">
+      <div className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                 <span>INVENTARIO LM</span>
                 <span>/</span>
                 <span>OPERACIONES</span>
@@ -367,12 +367,12 @@ function MovimientosPage() {
                 <span className="text-[#D24D09] font-semibold">MOVIMIENTOS</span>
               </div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                   Historial de Movimientos
                 </h1>
                 <Badge
                   variant="outline"
-                  className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5"
+                  className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                   Tiempo Real
@@ -387,18 +387,18 @@ function MovimientosPage() {
                     variant="outline"
                     size="sm"
                     onClick={exportarPDF}
-                    className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
+                    className="text-xs h-9 px-3.5 border-border text-foreground hover:bg-muted gap-1.5"
                   >
-                    <FileDown className="w-4 h-4 text-slate-500" />
+                    <FileDown className="w-4 h-4 text-muted-foreground" />
                     Exportar PDF
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={exportarCSV}
-                    className="text-xs h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-100 gap-1.5"
+                    className="text-xs h-9 px-3.5 border-border text-foreground hover:bg-muted gap-1.5"
                   >
-                    <Download className="w-4 h-4 text-slate-500" />
+                    <Download className="w-4 h-4 text-muted-foreground" />
                     Exportar CSV
                   </Button>
                 </>
@@ -425,9 +425,9 @@ function MovimientosPage() {
         </div>
 
         {/* FILTROS */}
-        <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap items-center gap-2.5">
+        <div className="bg-card p-3 rounded-xl border border-border flex flex-wrap items-center gap-2.5">
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               value={busqueda}
               onChange={(e) => {
@@ -435,7 +435,7 @@ function MovimientosPage() {
                 setPagina(1);
               }}
               placeholder="Buscar SKU, producto o responsable..."
-              className="pl-9 h-10 bg-white border-slate-200 text-sm"
+              className="pl-9 h-10 bg-card border-border text-sm"
             />
           </div>
 
@@ -446,7 +446,7 @@ function MovimientosPage() {
               setPagina(1);
             }}
           >
-            <SelectTrigger className="w-[150px] h-10 bg-white border-slate-200 text-sm">
+            <SelectTrigger className="w-[150px] h-10 bg-card border-border text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -465,7 +465,7 @@ function MovimientosPage() {
               setPagina(1);
             }}
           >
-            <SelectTrigger className="w-[160px] h-10 bg-white border-slate-200 text-sm">
+            <SelectTrigger className="w-[160px] h-10 bg-card border-border text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -480,7 +480,7 @@ function MovimientosPage() {
             variant="ghost"
             size="sm"
             onClick={limpiarFiltros}
-            className="text-xs text-slate-600 gap-1.5"
+            className="text-xs text-muted-foreground gap-1.5"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Limpiar
@@ -488,46 +488,46 @@ function MovimientosPage() {
         </div>
 
         {/* TABLA */}
-        <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white md:block">
+        <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
           <Table>
-            <TableHeader className="bg-slate-50/80 border-b border-slate-200">
+            <TableHeader className="bg-muted/80 border-b border-border">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Fecha / Hora
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Tipo
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Producto & SKU
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Cantidad
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Ubicación
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Usuario
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Motivo
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-slate-600 text-right">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
                   Acciones
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
+            <TableBody className="divide-y divide-border">
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-slate-500">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     Cargando movimientos desde Supabase...
                   </TableCell>
                 </TableRow>
               ) : paginados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-slate-500">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     No hay movimientos con los filtros seleccionados.
                   </TableCell>
                 </TableRow>
@@ -535,13 +535,13 @@ function MovimientosPage() {
                 paginados.map((m) => {
                   const info = TIPO_INFO[m.tipo];
                   return (
-                    <TableRow key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                    <TableRow key={m.id} className="hover:bg-muted/80 transition-colors">
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="text-xs font-bold text-slate-800">
+                          <span className="text-xs font-bold text-foreground">
                             {fmtHora(m.fecha)}
                           </span>
-                          <span className="text-[11px] text-slate-500">{fmtFecha(m.fecha)}</span>
+                          <span className="text-[11px] text-muted-foreground">{fmtFecha(m.fecha)}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -551,10 +551,10 @@ function MovimientosPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-semibold text-slate-800 truncate max-w-[220px]">
+                          <span className="text-xs font-semibold text-foreground truncate max-w-[220px]">
                             {m.producto?.nombre ?? "Producto eliminado"}
                           </span>
-                          <span className="text-[11px] font-mono text-slate-500">
+                          <span className="text-[11px] font-mono text-muted-foreground">
                             {m.producto?.sku ?? "—"}
                           </span>
                         </div>
@@ -565,13 +565,13 @@ function MovimientosPage() {
                           {m.cantidad}
                         </span>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-700">
+                      <TableCell className="text-xs text-foreground">
                         {m.ubicacion?.codigo ?? "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-700">
+                      <TableCell className="text-xs text-foreground">
                         {m.usuario?.nombre ?? "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600 max-w-[180px] truncate">
+                      <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate">
                         {m.motivo ?? "—"}
                       </TableCell>
                       <TableCell className="text-right">
@@ -579,7 +579,7 @@ function MovimientosPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setDetalle(m)}
-                          className="h-8 w-8 p-0 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
                           title="Ver detalle"
                         >
                           <Eye className="w-4 h-4" />
@@ -594,11 +594,11 @@ function MovimientosPage() {
         </div>
         <div className="space-y-3 md:hidden">
           {isLoading ? (
-            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border bg-card p-5 text-center text-sm text-muted-foreground">
               Cargando movimientos...
             </div>
           ) : paginados.length === 0 ? (
-            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border bg-card p-5 text-center text-sm text-muted-foreground">
               No hay movimientos con los filtros seleccionados.
             </div>
           ) : (
@@ -671,17 +671,17 @@ function MovimientosPage() {
         </div>
 
         {/* PAGINACIÓN */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>
             Mostrando{" "}
-            <strong className="text-slate-800">
+            <strong className="text-foreground">
               {movimientosFiltrados.length === 0 ? 0 : (pagina - 1) * porPagina + 1}
             </strong>{" "}
             a{" "}
-            <strong className="text-slate-800">
+            <strong className="text-foreground">
               {Math.min(pagina * porPagina, movimientosFiltrados.length)}
             </strong>{" "}
-            de <strong className="text-slate-800">{movimientosFiltrados.length}</strong> movimientos
+            de <strong className="text-foreground">{movimientosFiltrados.length}</strong> movimientos
           </span>
 
           <div className="flex items-center gap-1.5">
@@ -692,7 +692,7 @@ function MovimientosPage() {
                 setPagina(1);
               }}
             >
-              <SelectTrigger className="w-[70px] h-8 bg-white border-slate-200 text-xs">
+              <SelectTrigger className="w-[70px] h-8 bg-card border-border text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -707,7 +707,7 @@ function MovimientosPage() {
               size="sm"
               onClick={() => setPagina((p) => Math.max(1, p - 1))}
               disabled={pagina === 1}
-              className="h-8 text-xs border-slate-200"
+              className="h-8 text-xs border-border"
             >
               Anterior
             </Button>
@@ -722,7 +722,7 @@ function MovimientosPage() {
                   className={`h-8 w-8 p-0 text-xs font-semibold ${
                     pagina === n
                       ? "bg-[#D24D09] hover:bg-[#b83f05] text-white border-transparent"
-                      : "border-slate-200 text-slate-700"
+                      : "border-border text-foreground"
                   }`}
                 >
                   {n}
@@ -733,7 +733,7 @@ function MovimientosPage() {
               size="sm"
               onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
               disabled={pagina === totalPaginas}
-              className="h-8 text-xs border-slate-200"
+              className="h-8 text-xs border-border"
             >
               Siguiente
             </Button>
@@ -745,12 +745,12 @@ function MovimientosPage() {
       <Dialog open={modalNuevo} onOpenChange={setModalNuevo}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">
+            <DialogTitle className="text-base font-bold text-foreground">
               Registrar Movimiento
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               El stock se actualizará automáticamente mediante el trigger{" "}
-              <code className="bg-slate-100 px-1 rounded">actualizar_stock</code>. Nunca se escribe
+              <code className="bg-muted px-1 rounded">actualizar_stock</code>. Nunca se escribe
               directamente en la tabla stock.
             </DialogDescription>
           </DialogHeader>
@@ -758,7 +758,7 @@ function MovimientosPage() {
           <form onSubmit={handleCrear} className="space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Tipo *</Label>
+                <Label className="text-xs font-semibold text-foreground">Tipo *</Label>
                 <Select
                   value={formTipo}
                   onValueChange={(v) => setFormTipo(v as MovimientoDetallado["tipo"])}
@@ -775,7 +775,7 @@ function MovimientosPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">
+                <Label className="text-xs font-semibold text-foreground">
                   {formTipo === "ajuste" || formTipo === "reposicion"
                     ? "Stock objetivo *"
                     : "Cantidad *"}
@@ -800,7 +800,7 @@ function MovimientosPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Producto *</Label>
+              <Label className="text-xs font-semibold text-foreground">Producto *</Label>
               <Select value={formProducto} onValueChange={setFormProducto}>
                 <SelectTrigger className="h-9 text-xs">
                   <SelectValue placeholder="Selecciona producto" />
@@ -816,7 +816,7 @@ function MovimientosPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Ubicación *</Label>
+              <Label className="text-xs font-semibold text-foreground">Ubicación *</Label>
               <Select value={formUbicacion} onValueChange={setFormUbicacion}>
                 <SelectTrigger className="h-9 text-xs">
                   <SelectValue placeholder="Selecciona ubicación" />
@@ -832,7 +832,7 @@ function MovimientosPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Motivo</Label>
+              <Label className="text-xs font-semibold text-foreground">Motivo</Label>
               <Input
                 value={formMotivo}
                 onChange={(e) => setFormMotivo(e.target.value)}
@@ -867,55 +867,55 @@ function MovimientosPage() {
       <Dialog open={Boolean(detalle)} onOpenChange={(open) => !open && setDetalle(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900">
+            <DialogTitle className="text-base font-bold text-foreground">
               Detalle del Movimiento
             </DialogTitle>
           </DialogHeader>
           {detalle && (
             <div className="space-y-2.5 text-xs">
-              <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500">Tipo</span>
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground">Tipo</span>
                 <Badge variant="outline" className={`${TIPO_INFO[detalle.tipo].badge} text-xs`}>
                   {TIPO_INFO[detalle.tipo].label}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500">Cantidad</span>
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground">Cantidad</span>
                 <span className={`font-bold ${TIPO_INFO[detalle.tipo].texto}`}>
                   {TIPO_INFO[detalle.tipo].signo}
                   {detalle.cantidad}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500">Fecha</span>
-                <span className="font-semibold text-slate-800">
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground">Fecha</span>
+                <span className="font-semibold text-foreground">
                   {fmtFecha(detalle.fecha)} · {fmtHora(detalle.fecha)}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500">Producto</span>
-                <span className="font-semibold text-slate-800 text-right">
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground">Producto</span>
+                <span className="font-semibold text-foreground text-right">
                   {detalle.producto?.nombre ?? "—"}
-                  <span className="block font-mono text-[10px] text-slate-500">
+                  <span className="block font-mono text-[10px] text-muted-foreground">
                     {detalle.producto?.sku ?? ""}
                   </span>
                 </span>
               </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500">Ubicación</span>
-                <span className="font-semibold text-slate-800">
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground">Ubicación</span>
+                <span className="font-semibold text-foreground">
                   {detalle.ubicacion?.codigo ?? "—"}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500">Usuario</span>
-                <span className="font-semibold text-slate-800">
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground">Usuario</span>
+                <span className="font-semibold text-foreground">
                   {detalle.usuario?.nombre ?? "—"}
                 </span>
               </div>
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/50">
-                <span className="text-slate-500 block mb-1">Motivo</span>
-                <span className="font-semibold text-slate-800">{detalle.motivo ?? "—"}</span>
+              <div className="p-2.5 rounded-lg border border-border bg-muted/50">
+                <span className="text-muted-foreground block mb-1">Motivo</span>
+                <span className="font-semibold text-foreground">{detalle.motivo ?? "—"}</span>
               </div>
             </div>
           )}

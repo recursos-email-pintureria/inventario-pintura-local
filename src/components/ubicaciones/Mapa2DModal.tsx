@@ -432,8 +432,8 @@ export function Mapa2DModal({
               <span className="flex items-center gap-1 text-indigo-700 dark:text-indigo-300">
                 <Building2 className="h-3.5 w-3.5" /> Sección
               </span>
-              <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                Pasillo + <Archive className="h-3.5 w-3.5 text-emerald-600" /> armarios
+              <span className="flex items-center gap-1 text-foreground dark:text-slate-300">
+                Pasillo + <Archive className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> armarios
               </span>
               <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
                 <Layers className="h-3.5 w-3.5" /> Alto
@@ -448,16 +448,16 @@ export function Mapa2DModal({
             >
               <span className="font-medium text-foreground">Stock:</span>
               <span className="flex items-center gap-1">
-                <i className="h-3 w-3 rounded-sm bg-emerald-200" /> Normal (&gt;20%)
+                <i className="h-3 w-3 rounded-sm bg-emerald-200 dark:bg-emerald-500/30" /> Normal (&gt;20%)
               </span>
               <span className="flex items-center gap-1">
-                <i className="h-3 w-3 rounded-sm bg-amber-200" /> Medio (10–20%)
+                <i className="h-3 w-3 rounded-sm bg-amber-200 dark:bg-amber-500/30" /> Medio (10–20%)
               </span>
               <span className="flex items-center gap-1">
-                <i className="h-3 w-3 rounded-sm bg-rose-200" /> Crítico (&lt;10%)
+                <i className="h-3 w-3 rounded-sm bg-rose-200 dark:bg-rose-500/30" /> Crítico (&lt;10%)
               </span>
               <span className="flex items-center gap-1">
-                <i className="h-3 w-3 rounded-sm bg-slate-300" /> Sin stock / inactivo
+                <i className="h-3 w-3 rounded-sm bg-border" /> Sin stock / inactivo
               </span>
               <span className="ml-auto">Clic: detalle · Doble clic: gestión completa</span>
             </div>
@@ -580,7 +580,7 @@ export function Mapa2DModal({
                     </p>
                   </div>
                 ) : detailLocation.tipo === "reserva" ? (
-                  <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+                  <p className="rounded-md bg-amber-50 dark:bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
                     Las reservas pueden contener stock de palets; gestiona esos movimientos desde el
                     módulo de palets.
                   </p>

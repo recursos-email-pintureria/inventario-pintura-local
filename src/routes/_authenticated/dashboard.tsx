@@ -51,29 +51,29 @@ const tipoMovimientoConfig = {
   entrada: {
     label: "Entrada",
     icon: <ArrowDownRight className="h-3 w-3" />,
-    badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    cantidad: "text-emerald-700",
+    badge: "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-500/30",
+    cantidad: "text-emerald-700 dark:text-emerald-300",
     prefijo: "+",
   },
   salida: {
     label: "Salida",
     icon: <ArrowUpRight className="h-3 w-3" />,
-    badge: "bg-rose-100 text-rose-800 border-rose-200",
-    cantidad: "text-rose-700",
+    badge: "bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-500/30",
+    cantidad: "text-rose-700 dark:text-rose-300",
     prefijo: "-",
   },
   reposicion: {
     label: "Reposición",
     icon: <RefreshCw className="h-3 w-3" />,
-    badge: "bg-blue-100 text-blue-800 border-blue-200",
-    cantidad: "text-blue-700",
+    badge: "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-500/30",
+    cantidad: "text-blue-700 dark:text-blue-300",
     prefijo: "=",
   },
   ajuste: {
     label: "Ajuste",
     icon: <Edit3 className="h-3 w-3" />,
-    badge: "bg-amber-100 text-amber-800 border-amber-200",
-    cantidad: "text-amber-700",
+    badge: "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-500/30",
+    cantidad: "text-amber-700 dark:text-amber-300",
     prefijo: "",
   },
 };
@@ -176,8 +176,8 @@ function DashboardComponent() {
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-500">{getFechaFormateada()}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{getFechaFormateada()}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -208,10 +208,10 @@ function DashboardComponent() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">
+                <CardTitle className="text-lg font-semibold text-foreground">
                   Actividad Últimos 7 Días
                 </CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Flujo de entradas y salidas de almacén
                 </p>
               </div>
@@ -253,12 +253,12 @@ function DashboardComponent() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">
+                <CardTitle className="text-lg font-semibold text-foreground">
                   Top 5 Ubicaciones
                 </CardTitle>
-                <p className="mt-1 text-sm text-slate-500">Zonas con mayor volumen de stock</p>
+                <p className="mt-1 text-sm text-muted-foreground">Zonas con mayor volumen de stock</p>
               </div>
-              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+              <Badge variant="outline" className="border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200">
                 Capacidad
               </Badge>
             </div>
@@ -267,12 +267,12 @@ function DashboardComponent() {
             {ubicacionesDisplay.map((ubicacion) => (
               <div key={ubicacion.nombre} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-700">{ubicacion.nombre}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="font-medium text-foreground">{ubicacion.nombre}</span>
+                  <span className="text-xs text-muted-foreground">
                     {ubicacion.stock_total} {ubicacion.unidad} ({ubicacion.porcentaje}%)
                   </span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-500 transition-all"
                     style={{ width: `${ubicacion.porcentaje}%` }}
@@ -282,8 +282,8 @@ function DashboardComponent() {
             ))}
             <Separator className="my-2" />
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Promedio Ocupación General</span>
-              <span className="font-semibold text-amber-700">{promedioOcupacion}% Óptimo</span>
+              <span className="text-muted-foreground">Promedio Ocupación General</span>
+              <span className="font-semibold text-amber-700 dark:text-amber-300">{promedioOcupacion}% Óptimo</span>
             </div>
           </CardContent>
         </Card>
@@ -293,12 +293,12 @@ function DashboardComponent() {
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-amber-700" />
+              <Clock className="h-5 w-5 text-amber-700 dark:text-amber-300" />
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900">
+                <CardTitle className="text-lg font-semibold text-foreground">
                   Movimientos Recientes
                 </CardTitle>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   Auditoría continua de despacho y recepción
                 </p>
               </div>
@@ -311,7 +311,7 @@ function DashboardComponent() {
                   size="sm"
                   onClick={() => setFiltroTipo(tipo)}
                   className={
-                    filtroTipo === tipo ? "bg-amber-700 hover:bg-amber-800" : "border-slate-200"
+                    filtroTipo === tipo ? "bg-amber-700 hover:bg-amber-800" : "border-border"
                   }
                 >
                   {tipo === "todos" ? "Todos" : tipoMovimientoConfig[tipo].label}
@@ -322,8 +322,8 @@ function DashboardComponent() {
         </CardHeader>
         <CardContent>
           {isMovLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-              <Loader2 className="h-8 w-8 animate-spin text-amber-700 mb-2" />
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-amber-700 dark:text-amber-300 mb-2" />
               <p className="text-sm">Cargando movimientos desde Supabase...</p>
             </div>
           ) : (
@@ -331,23 +331,23 @@ function DashboardComponent() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-slate-200 bg-slate-50/50">
-                      <TableHead className="text-xs font-semibold uppercase text-slate-500">
+                    <TableRow className="border-b border-border bg-muted/50">
+                      <TableHead className="text-xs font-semibold uppercase text-muted-foreground">
                         Fecha
                       </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase text-slate-500">
+                      <TableHead className="text-xs font-semibold uppercase text-muted-foreground">
                         Producto & Cód.
                       </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase text-slate-500">
+                      <TableHead className="text-xs font-semibold uppercase text-muted-foreground">
                         Tipo
                       </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase text-slate-500 text-right">
+                      <TableHead className="text-xs font-semibold uppercase text-muted-foreground text-right">
                         Cantidad
                       </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase text-slate-500">
+                      <TableHead className="text-xs font-semibold uppercase text-muted-foreground">
                         Ubicación
                       </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase text-slate-500">
+                      <TableHead className="text-xs font-semibold uppercase text-muted-foreground">
                         Usuario
                       </TableHead>
                     </TableRow>
@@ -359,19 +359,19 @@ function DashboardComponent() {
                         return (
                           <TableRow
                             key={mov.id}
-                            className="border-b border-slate-100 transition-colors hover:bg-amber-50/50"
+                            className="border-b border-border transition-colors hover:bg-amber-50/50 dark:hover:bg-amber-500/10"
                           >
-                            <TableCell className="font-mono text-xs text-slate-500">
+                            <TableCell className="font-mono text-xs text-muted-foreground">
                               {mov.fecha}, {mov.hora?.slice(0, 5)}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
                                   {mov.usuarioInicial}
                                 </div>
                                 <div>
-                                  <p className="font-medium text-slate-900">{mov.producto}</p>
-                                  <p className="font-mono text-xs text-slate-500">
+                                  <p className="font-medium text-foreground">{mov.producto}</p>
+                                  <p className="font-mono text-xs text-muted-foreground">
                                     Cód.: {mov.sku}
                                   </p>
                                 </div>
@@ -384,21 +384,21 @@ function DashboardComponent() {
                               {config.prefijo}
                               {mov.cantidad} {mov.unidad}
                             </TableCell>
-                            <TableCell className="text-sm text-slate-600">
+                            <TableCell className="text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3 text-slate-400" />
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
                                 {mov.ubicacion}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <span className="text-sm text-slate-700">{mov.usuario}</span>
+                              <span className="text-sm text-foreground">{mov.usuario}</span>
                             </TableCell>
                           </TableRow>
                         );
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No se encontraron movimientos.
                         </TableCell>
                       </TableRow>
@@ -406,10 +406,10 @@ function DashboardComponent() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm">
-                <span className="text-slate-600">
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-sm">
+                <span className="text-muted-foreground">
                   Mostrando{" "}
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-foreground">
                     {movimientosFiltrados.length}
                   </span>{" "}
                   movimientos
@@ -417,7 +417,7 @@ function DashboardComponent() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                  className="text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 hover:text-amber-800 dark:hover:text-amber-200"
                 >
                   Ver todos los movimientos <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>

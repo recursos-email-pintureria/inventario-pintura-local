@@ -111,28 +111,28 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
 
         <div className="space-y-4 py-4">
           {/* ⚠️ Qué SÍ se elimina */}
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-amber-900 text-sm mb-2">
+                <p className="font-semibold text-amber-900 dark:text-amber-100 text-sm mb-2">
                   Esto se eliminará (irreversible):
                 </p>
-                <ul className="space-y-1.5 text-xs text-amber-800">
+                <ul className="space-y-1.5 text-xs text-amber-800 dark:text-amber-200">
                   <li className="flex items-start gap-2">
-                    <span className="text-amber-600 mt-0.5">•</span>
+                    <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
                     <span>
                       Movimientos de importación CSV anteriores a <strong>{dias} días</strong> (antes del {fechaCorteFormateada})
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-amber-600 mt-0.5">•</span>
+                    <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
                     <span>
-                      Registros con notas tipo <code className="bg-amber-100 px-1 rounded">"Importación CSV Lote: ..."</code>
+                      Registros con notas tipo <code className="bg-amber-100 dark:bg-amber-500/20 px-1 rounded">"Importación CSV Lote: ..."</code>
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-amber-600 mt-0.5">•</span>
+                    <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
                     <span>El historial de movimientos de esos lotes se perderá permanentemente</span>
                   </li>
                 </ul>
@@ -141,28 +141,28 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
           </div>
 
           {/* ✅ Qué NO se elimina (garantía de la base de datos) */}
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+          <div className="rounded-lg border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/10 p-4">
             <div className="flex items-start gap-3">
-              <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-green-900 text-sm mb-2">
+                <p className="font-semibold text-green-900 dark:text-green-100 text-sm mb-2">
                   Protegido por la base de datos (no se modifica):
                 </p>
-                <ul className="space-y-1.5 text-xs text-green-800">
+                <ul className="space-y-1.5 text-xs text-green-800 dark:text-green-200">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">✓</span>
+                    <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
                     <span><strong>Productos</strong> - La función SQL nunca toca la tabla productos</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">✓</span>
+                    <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
                     <span><strong>Categorías</strong> - No se ven afectadas</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">✓</span>
+                    <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
                     <span><strong>Stock actual</strong> - El trigger actualizar_stock solo se dispara en INSERT, no en DELETE</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-0.5">✓</span>
+                    <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
                     <span><strong>Movimientos no-CSV</strong> - Solo se borran movimientos de importación CSV</span>
                   </li>
                 </ul>
@@ -193,7 +193,7 @@ export function ModalLimpiarLotes({ open, onOpenChange }: ModalLimpiarLotesProps
           </div>
 
           {/* 🔒 Nota de seguridad */}
-          <div className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+          <div className="rounded-md bg-muted border border-border p-3 text-xs text-muted-foreground">
             <p className="font-medium mb-1">🔒 Seguridad:</p>
             <p>
               Esta operación está protegida a nivel de base de datos. Solo usuarios con rol <strong>admin</strong> 

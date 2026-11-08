@@ -41,23 +41,23 @@ interface TablaVistaPreviaArmarioProps {
 const ESTILOS_ESTADO: Record<EstadoFilaVistaPrevia, { etiqueta: string; clase: string }> = {
   correcta: {
     etiqueta: "Correcta",
-    clase: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    clase: "border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
   },
   aviso: {
     etiqueta: "Aviso",
-    clase: "border-amber-200 bg-amber-50 text-amber-800",
+    clase: "border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200",
   },
   error: {
     etiqueta: "Error",
-    clase: "border-rose-200 bg-rose-50 text-rose-800",
+    clase: "border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-200",
   },
   omitida: {
     etiqueta: "Omitida",
-    clase: "border-slate-200 bg-slate-100 text-slate-700",
+    clase: "border-border bg-muted text-foreground",
   },
   conflicto: {
     etiqueta: "Conflicto",
-    clase: "border-rose-300 bg-rose-100 text-rose-900",
+    clase: "border-rose-300 dark:border-rose-500/40 bg-rose-100 dark:bg-rose-500/20 text-rose-900 dark:text-rose-100",
   },
 };
 
@@ -125,7 +125,7 @@ export function TablaVistaPreviaArmario({
       {bloqueado && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900"
+          className="flex items-start gap-2 rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm text-rose-900 dark:text-rose-100"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
@@ -250,10 +250,10 @@ function Contador({
   tono: "emerald" | "rose" | "slate" | "amber";
 }) {
   const clases = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    rose: "border-rose-200 bg-rose-50 text-rose-800",
-    slate: "border-slate-200 bg-slate-50 text-slate-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    emerald: "border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
+    rose: "border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-200",
+    slate: "border-border bg-muted text-foreground",
+    amber: "border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200",
   }[tono];
 
   return (

@@ -631,7 +631,7 @@ function ThemeChoice({
       onClick={() => onSelect(value)}
       className={`flex min-h-20 items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent ${
         selected
-          ? "border-indigo-600 bg-indigo-50 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100"
+          ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100"
           : ""
       }`}
     >

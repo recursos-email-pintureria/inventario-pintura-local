@@ -55,18 +55,18 @@ const CONTENT_X = 32;
 const TITLE_Y = 26;
 
 const STOCK_CLASSES: Record<StockVisualSummary["nivel"], string> = {
-  normal: "fill-emerald-100 stroke-emerald-500 dark:fill-emerald-950 dark:stroke-emerald-700",
-  medio: "fill-amber-100 stroke-amber-500 dark:fill-amber-950 dark:stroke-amber-700",
-  critico: "fill-rose-100 stroke-rose-500 dark:fill-rose-950 dark:stroke-rose-700",
-  vacio: "fill-gray-100 stroke-gray-400 dark:fill-gray-800 dark:stroke-gray-600",
-  inactivo: "fill-gray-200 stroke-gray-500 dark:fill-gray-700 dark:stroke-gray-500",
+  normal: "fill-emerald-100 stroke-emerald-500 dark:stroke-emerald-400 dark:fill-emerald-950 dark:stroke-emerald-700",
+  medio: "fill-amber-100 stroke-amber-500 dark:stroke-amber-400 dark:fill-amber-950 dark:stroke-amber-700",
+  critico: "fill-rose-100 stroke-rose-500 dark:stroke-rose-400 dark:fill-rose-950 dark:stroke-rose-700",
+  vacio: "fill-muted-foreground stroke-muted-foreground dark:fill-gray-800 dark:stroke-gray-600",
+  inactivo: "fill-muted-foreground stroke-muted-foreground dark:fill-gray-700 dark:stroke-gray-500",
 };
 
 const FIXED_TYPE_CLASSES: Partial<Record<MapaTipoUbicacion, string>> = {
   pasillo: "fill-blue-50 stroke-blue-300 dark:fill-blue-950 dark:stroke-blue-700",
   reserva: "fill-orange-50 stroke-orange-300 dark:fill-orange-950 dark:stroke-orange-700",
   cross: "fill-purple-50 stroke-purple-300 dark:fill-purple-950 dark:stroke-purple-700",
-  perimetral: "fill-gray-50 stroke-gray-300 dark:fill-gray-800 dark:stroke-gray-600",
+  perimetral: "fill-muted-foreground stroke-muted-foreground dark:fill-gray-800 dark:stroke-gray-600",
 };
 
 export function LocationIcon({ type }: { type: MapaTipoUbicacion }) {
@@ -228,14 +228,14 @@ export function Mapa2D({
         : `${location.nombre} · ${TYPE_LABELS[visualType]} · ${summary?.total ?? 0} uds`;
     const textColor =
       visualType === "perimetral"
-        ? "fill-gray-800 dark:fill-gray-100"
+        ? "fill-foreground dark:fill-gray-100"
         : visualType === "pasillo"
           ? "fill-blue-950 dark:fill-blue-100"
           : visualType === "reserva"
             ? "fill-orange-950 dark:fill-orange-100"
             : visualType === "cross"
               ? "fill-purple-950 dark:fill-purple-100"
-              : "fill-gray-900 dark:fill-gray-100";
+              : "fill-foreground dark:fill-gray-100";
 
     return (
       <g
@@ -411,7 +411,7 @@ export function Mapa2D({
               textAnchor="middle"
               fontSize={Math.min(12, size * 0.32)}
               fontWeight="700"
-              className="fill-gray-900 dark:fill-gray-100"
+              className="fill-foreground dark:fill-gray-100"
               pointerEvents="none"
             >
               {label}
@@ -422,7 +422,7 @@ export function Mapa2D({
                 y={y + size / 2 + 13}
                 textAnchor="middle"
                 fontSize="9"
-                className="fill-gray-700 dark:fill-gray-200"
+                className="fill-foreground dark:fill-gray-200"
                 pointerEvents="none"
               >
                 {pallet.stockTotal} uds
@@ -510,7 +510,7 @@ export function Mapa2D({
   const showPerimeterAndReserve = view !== "pasillos";
 
   return (
-    <div className="h-full min-h-[220px] flex-1 overflow-auto rounded-lg border bg-gray-50 dark:bg-gray-950">
+    <div className="h-full min-h-[220px] flex-1 overflow-auto rounded-lg border bg-muted dark:bg-gray-950">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
@@ -529,7 +529,7 @@ export function Mapa2D({
             <path
               d="M 24 0 L 0 0 0 24"
               fill="none"
-              className="stroke-gray-200 dark:stroke-gray-800"
+              className="stroke-muted-foreground dark:stroke-gray-800"
               strokeWidth="0.7"
             />
           </pattern>
@@ -537,7 +537,7 @@ export function Mapa2D({
         <rect
           width={layout.width}
           height={layout.height}
-          className="fill-gray-50 dark:fill-gray-950"
+          className="fill-muted-foreground dark:fill-gray-950"
         />
         <rect width={layout.width} height={layout.height} fill="url(#mapa-grid)" />
         <g
@@ -550,7 +550,7 @@ export function Mapa2D({
             fontSize="18"
             fontWeight="700"
             letterSpacing="1"
-            className="fill-gray-800 dark:fill-gray-100"
+            className="fill-foreground dark:fill-gray-100"
           >
             {mapTitle}
           </text>
@@ -564,7 +564,7 @@ export function Mapa2D({
                   width={layout.width - CONTENT_X * 2}
                   height={layout.perimeterHeight}
                   rx="10"
-                  className="fill-gray-50 stroke-gray-300 dark:fill-gray-900 dark:stroke-gray-700"
+                  className="fill-muted-foreground stroke-muted-foreground dark:fill-gray-900 dark:stroke-gray-700"
                   strokeWidth="1.5"
                 />
                 <text
@@ -572,7 +572,7 @@ export function Mapa2D({
                   y={layout.perimeterY + 25}
                   fontSize="14"
                   fontWeight="700"
-                  className="fill-gray-800 dark:fill-gray-100"
+                  className="fill-foreground dark:fill-gray-100"
                 >
                   {layout.perimeterAisle?.nombre ?? "PERIMETRAL · ZONA TRANSVERSAL"}
                 </text>
@@ -607,7 +607,7 @@ export function Mapa2D({
                     y={layout.perimeterY + 64}
                     textAnchor="middle"
                     fontSize="12"
-                    className="fill-gray-600 dark:fill-gray-300"
+                    className="fill-muted-foreground dark:fill-gray-300"
                   >
                     Sin ubicaciones asociadas
                   </text>
@@ -693,7 +693,7 @@ export function Mapa2D({
               y={layout.height / 2}
               textAnchor="middle"
               fontSize="16"
-              className="fill-gray-600 dark:fill-gray-300"
+              className="fill-muted-foreground dark:fill-gray-300"
             >
               No hay pasillos ni reservas para mostrar.
             </text>

@@ -304,15 +304,15 @@ export function ModalRevertirLote({ abierto, onOpenChange }: ModalRevertirLotePr
   return (
     <>
       <Dialog open={abierto} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl bg-white border-gray-200 shadow-xl">
+        <DialogContent className="max-w-2xl bg-card border-border shadow-xl">
           <DialogHeader>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-1">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 flex items-center justify-center mb-1">
               <History className="w-5 h-5" />
             </div>
-            <DialogTitle className="text-base font-bold text-gray-900">
+            <DialogTitle className="text-base font-bold text-foreground">
               Historial y Reversión de Lotes de Importación
             </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               Solo administradores. Permite auditar y deshacer de forma atómica una actualización
               masiva previa devolviendo el stock a su valor anterior.
             </DialogDescription>
@@ -320,12 +320,12 @@ export function ModalRevertirLote({ abierto, onOpenChange }: ModalRevertirLotePr
 
           <div className="py-2 space-y-3">
             {isLoading ? (
-              <div className="py-10 text-center text-xs text-gray-500 flex flex-col items-center justify-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
+              <div className="py-10 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-amber-600 dark:text-amber-400" />
                 <span>Consultando historial de lotes en base de datos...</span>
               </div>
             ) : lotes.length === 0 ? (
-              <div className="py-8 text-center text-xs text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-lg">
+              <div className="py-8 text-center text-xs text-muted-foreground bg-muted border border-dashed border-border rounded-lg">
                 No hay lotes de importación masiva registrados aún en el sistema.
               </div>
             ) : (
@@ -333,30 +333,30 @@ export function ModalRevertirLote({ abierto, onOpenChange }: ModalRevertirLotePr
                 {lotes.map((lote) => (
                   <div
                     key={lote.batch_id}
-                    className="p-3 bg-white border border-gray-200 hover:border-amber-300 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs transition-all"
+                    className="p-3 bg-card border border-border hover:border-amber-300 dark:hover:border-amber-500/40 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs transition-all"
                   >
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border">
+                        <span className="font-mono text-[11px] font-bold text-foreground bg-muted px-1.5 py-0.5 rounded border">
                           LOTE {lote.batch_id.slice(0, 8)}...
                         </span>
                         {lote.ya_revertido ? (
-                          <Badge className="bg-gray-100 text-gray-600 border-gray-200 text-[10px]">
+                          <Badge className="bg-muted text-muted-foreground border-border text-[10px]">
                             Revertido
                           </Badge>
                         ) : (
-                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
+                          <Badge className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 text-[10px]">
                             Activo ({lote.total_movimientos} movimientos)
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <Calendar className="w-3 h-3 text-muted-foreground" />
                           {new Date(lote.fecha).toLocaleString("es-ES")}
                         </span>
                         <span className="flex items-center gap-1">
-                          <User className="w-3 h-3 text-gray-400" />
+                          <User className="w-3 h-3 text-muted-foreground" />
                           {lote.realizado_por_email}
                         </span>
                       </div>
@@ -367,10 +367,10 @@ export function ModalRevertirLote({ abierto, onOpenChange }: ModalRevertirLotePr
                         variant="outline"
                         size="sm"
                         onClick={() => descargarAuditoriaLote(lote)}
-                        className="text-xs h-7 gap-1 border-gray-200 text-gray-700 hover:bg-gray-50"
+                        className="text-xs h-7 gap-1 border-border text-foreground hover:bg-muted"
                         title="Descargar archivo Excel con los cambios realizados por este lote"
                       >
-                        <Download className="w-3 h-3 text-gray-500" />
+                        <Download className="w-3 h-3 text-muted-foreground" />
                         <span>Auditoría</span>
                       </Button>
 
@@ -380,10 +380,10 @@ export function ModalRevertirLote({ abierto, onOpenChange }: ModalRevertirLotePr
                           size="sm"
                           onClick={() => iniciarReversion(lote)}
                           disabled={comprobandoConflictos}
-                          className="text-xs h-7 gap-1 border-rose-200 text-rose-700 bg-rose-50/50 hover:bg-rose-100"
+                          className="text-xs h-7 gap-1 border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 bg-rose-50/50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20"
                           title="Deshacer todos los cambios de este lote"
                         >
-                          <RotateCcw className="w-3 h-3 text-rose-600" />
+                          <RotateCcw className="w-3 h-3 text-rose-600 dark:text-rose-400" />
                           <span>Revertir Lote</span>
                         </Button>
                       )}
@@ -410,32 +410,32 @@ export function ModalRevertirLote({ abierto, onOpenChange }: ModalRevertirLotePr
 
       {/* Confirmación crítica de reversión */}
       <AlertDialog open={confirmarAbierto} onOpenChange={setConfirmarAbierto}>
-        <AlertDialogContent className="bg-white border-rose-200">
+        <AlertDialogContent className="bg-card border-rose-200 dark:border-rose-500/30">
           <AlertDialogHeader>
-            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-1">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 flex items-center justify-center mb-1">
               <RotateCcw className="w-5 h-5" />
             </div>
-            <AlertDialogTitle className="text-base font-bold text-gray-900">
+            <AlertDialogTitle className="text-base font-bold text-foreground">
               ¿Confirmar reversión del Lote {loteSeleccionado?.batch_id.slice(0, 8)}?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-gray-600 space-y-2">
+            <AlertDialogDescription className="text-xs text-muted-foreground space-y-2">
               <p>
                 Esta acción creará movimientos compensatorios de tipo ajuste devolviendo los
                 productos al stock previo a la importación. Solo se puede realizar una vez por lote.
               </p>
 
               {conflictosDetectados.length > 0 && (
-                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-950 space-y-1 mt-2">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
-                    <AlertTriangle className="w-4 h-4 text-amber-700" />
+                <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/40 rounded-lg text-amber-950 dark:text-amber-100 space-y-1 mt-2">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-100 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-300" />
                     <span>¡Atención! Se detectaron cambios concurrentes posteriores:</span>
                   </div>
-                  <ul className="list-disc pl-4 text-[11px] space-y-0.5 text-amber-900 max-h-32 overflow-y-auto">
+                  <ul className="list-disc pl-4 text-[11px] space-y-0.5 text-amber-900 dark:text-amber-100 max-h-32 overflow-y-auto">
                     {conflictosDetectados.map((c, i) => (
                       <li key={i}>{c}</li>
                     ))}
                   </ul>
-                  <p className="text-[10px] text-amber-800 font-medium pt-1">
+                  <p className="text-[10px] text-amber-800 dark:text-amber-200 font-medium pt-1">
                     Si confirmas, se sobreescribirá el stock actual con el valor anterior al lote.
                   </p>
                 </div>

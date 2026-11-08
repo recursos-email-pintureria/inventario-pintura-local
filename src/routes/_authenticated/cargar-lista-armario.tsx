@@ -150,10 +150,10 @@ function adaptarMapeoGuardado(guardado: MapeoSugerido, cabeceras: string[]): Map
 
 function claseEstado(estado: string | undefined): string {
   if (estado === "error" || estado === "conflicto")
-    return "border-danger-line bg-danger-subtle text-danger-ink";
-  if (estado === "omitida") return "border-border bg-muted text-foreground";
-  if (estado === "aviso") return "border-reserva-line bg-reserva-subtle text-reserva-ink";
-  return "border-success-line bg-success-subtle text-success-ink";
+    return "border-destructive/30 bg-destructive/10 text-foreground";
+  if (estado === "omitida") return "border-border bg-muted text-muted-foreground";
+  if (estado === "aviso") return "border-amber-200 bg-amber-50 text-amber-900 dark:text-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200";
+  return "border-success/30 bg-success/10 text-foreground";
 }
 
 function CargarListaArmarioPage() {
@@ -597,9 +597,9 @@ function CargarListaArmarioPage() {
                   aria-current={activo ? "step" : undefined}
                   className={`flex min-h-14 items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                     activo
-                      ? "border-reserva-solid bg-reserva-subtle text-reserva-ink"
+                      ? "border-primary bg-primary/10 text-foreground"
                       : terminado
-                        ? "border-success-line bg-success-subtle text-success-ink"
+                        ? "border-success/30 bg-success/10 text-foreground"
                         : "bg-card text-muted-foreground"
                   }`}
                 >
@@ -714,7 +714,7 @@ function CargarListaArmarioPage() {
                 <div className="flex justify-end">
                   <Button
                     type="button"
-                    className="min-h-11 bg-reserva-solid text-solid-foreground hover:bg-reserva-solid-hover"
+                    className="min-h-11 bg-primary text-primary-foreground hover:bg-primary/90"
                     disabled={!armarioId || armariosQuery.isPending || armariosQuery.isError}
                     onClick={() => setPaso(2)}
                   >
@@ -745,10 +745,10 @@ function CargarListaArmarioPage() {
                   onDragLeave={() => setArrastrando(false)}
                   onDrop={soltarArchivo}
                   className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-10 ${
-                    arrastrando ? "border-reserva-solid bg-reserva-subtle" : "border-muted-foreground/30"
+                    arrastrando ? "border-primary bg-primary/10" : "border-muted-foreground/30"
                   }`}
                 >
-                  <FileUp className="mx-auto h-10 w-10 text-reserva-solid" aria-hidden="true" />
+                  <FileUp className="mx-auto h-10 w-10 text-primary" aria-hidden="true" />
                   <p className="mt-3 font-medium">Arrastra el CSV aquí</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     o selecciónalo desde tu equipo
@@ -842,7 +842,7 @@ function CargarListaArmarioPage() {
                 </Button>
                 <Button
                   type="button"
-                  className="min-h-11 bg-reserva-solid text-solid-foreground hover:bg-reserva-solid-hover"
+                  className="min-h-11 bg-primary text-primary-foreground hover:bg-primary/90"
                   disabled={fasePaso2 !== "mapeo" || !archivo || !mapeoValido || procesando}
                   onClick={() => void confirmarMapeo()}
                 >
@@ -925,9 +925,9 @@ function CargarListaArmarioPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {resultadoImportacion.aplicado ? (
-                    <CheckCircle2 className="h-6 w-6 text-success-solid" aria-hidden="true" />
+                    <CheckCircle2 className="h-6 w-6 text-success" aria-hidden="true" />
                   ) : (
-                    <AlertCircle className="h-6 w-6 text-danger-solid" aria-hidden="true" />
+                    <AlertCircle className="h-6 w-6 text-destructive" aria-hidden="true" />
                   )}
                   {resultadoImportacion.aplicado
                     ? "Importación completada"
@@ -1004,7 +1004,7 @@ function CargarListaArmarioPage() {
                   )}
                   <Button
                     type="button"
-                    className="min-h-11 bg-reserva-solid text-solid-foreground hover:bg-reserva-solid-hover"
+                    className="min-h-11 bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={() => {
                       setPaso(1);
                       reiniciarArchivo();
@@ -1026,7 +1026,7 @@ function CargarListaArmarioPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Info className="h-4 w-4 text-seccion-solid" aria-hidden="true" />
+                <Info className="h-4 w-4 text-primary" aria-hidden="true" />
                 Reglas de la importación
               </CardTitle>
             </CardHeader>
@@ -1120,7 +1120,7 @@ function OpcionRadio({
 function Regla({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-seccion-solid" aria-hidden="true" />
+      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
       <span>{children}</span>
     </li>
   );

@@ -140,7 +140,7 @@ export function PanelMapeoColumnas({
         </p>
 
         {desdeGuardado && (
-          <Alert className="bg-info-subtle text-info-strong border-info-line">
+          <Alert className="border-border bg-muted text-foreground">
             <Info className="h-4 w-4" />
             <AlertDescription>
               Mapeo aplicado de una importación anterior. Puedes modificarlo.
@@ -156,7 +156,7 @@ export function PanelMapeoColumnas({
 
             return (
               <div key={key} className="space-y-2">
-                <Label htmlFor={idControl} className={esInvalido ? "text-danger-strong" : ""}>
+                <Label htmlFor={idControl} className={esInvalido ? "text-destructive" : ""}>
                   {label}
                   {obligatorio && <span aria-hidden="true"> *</span>}
                 </Label>
@@ -164,7 +164,7 @@ export function PanelMapeoColumnas({
                   value={valorActual ?? SIN_COLUMNA}
                   onValueChange={(val) => handleSelectChange(key, val)}
                 >
-                  <SelectTrigger id={idControl} className={esInvalido ? "border-danger-line" : ""}>
+                  <SelectTrigger id={idControl} className={esInvalido ? "border-destructive/50" : ""}>
                     <SelectValue placeholder="Seleccionar columna..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -210,8 +210,8 @@ export function PanelMapeoColumnas({
       )}
 
       {eanCientifico && (
-        <Alert className="bg-reserva-subtle text-reserva-strong border-reserva-line">
-          <AlertCircle className="h-4 w-4 text-reserva-solid" />
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:text-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <AlertCircle className="h-4 w-4 text-primary dark:text-amber-400" />
           <AlertDescription>
             La columna EAN parece venir en notación científica (por ejemplo 8,41E+12): Excel ha
             perdido dígitos. Vuelve a exportar el archivo con esa columna como texto.
@@ -220,8 +220,8 @@ export function PanelMapeoColumnas({
       )}
 
       {!mapeo.nombre && (
-        <Alert className="bg-reserva-subtle text-reserva-strong border-reserva-line">
-          <AlertCircle className="h-4 w-4 text-reserva-solid" />
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:text-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <AlertCircle className="h-4 w-4 text-primary dark:text-amber-400" />
           <AlertDescription>
             El campo &quot;NOMBRE&quot; no está mapeado. Los productos nuevos se crearán sin
             descripción.
@@ -230,8 +230,8 @@ export function PanelMapeoColumnas({
       )}
 
       {validacion.esValido && (
-        <Alert className="bg-success-subtle text-success-strong border-success-line">
-          <CheckCircle2 className="h-4 w-4" />
+        <Alert className="border-success/30 bg-success/10 text-foreground">
+          <CheckCircle2 className="h-4 w-4 text-success" />
           <AlertDescription>Mapeo válido. Puedes continuar con la vista previa.</AlertDescription>
         </Alert>
       )}
