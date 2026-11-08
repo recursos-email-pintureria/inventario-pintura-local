@@ -436,12 +436,12 @@ export function ModalProductosPalet({
                       Palet #{String(palet.numero_palet).padStart(3, "0")}
                     </span>
                     {palet.posicion_en_reserva && palet.total_en_reserva && (
-                      <Badge className="bg-white/15 text-white border-amber-400/60 text-[10px] font-semibold">
+                      <Badge className="bg-card/15 text-white border-amber-400/60 dark:border-amber-500/50 text-[10px] font-semibold">
                         Palet {palet.posicion_en_reserva} de {palet.total_en_reserva}
                       </Badge>
                     )}
                     {totalUnidades === 0 && (
-                      <Badge className="bg-amber-100 text-amber-900 border-none text-[10px] font-bold">
+                      <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-100 border-none text-[10px] font-bold">
                         Stock 0
                       </Badge>
                     )}
@@ -459,10 +459,10 @@ export function ModalProductosPalet({
                       size="sm"
                       variant="secondary"
                       onClick={() => setModo("etiqueta")}
-                      className="bg-white text-amber-900 hover:bg-amber-50 h-8 text-xs font-semibold gap-1 shadow-2xs"
+                      className="bg-card text-amber-900 dark:text-amber-100 hover:bg-amber-50 dark:hover:bg-amber-500/10 h-8 text-xs font-semibold gap-1 shadow-2xs"
                       title="Generar e imprimir etiqueta"
                     >
-                      <Printer className="w-3.5 h-3.5 text-amber-700" />
+                      <Printer className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
                       <span>Imprimir etiqueta</span>
                     </Button>
 
@@ -470,10 +470,10 @@ export function ModalProductosPalet({
                       size="sm"
                       variant="secondary"
                       onClick={abrirInformePalet}
-                      className="bg-white text-amber-900 hover:bg-amber-50 h-8 text-xs font-semibold gap-1 shadow-2xs"
+                      className="bg-card text-amber-900 dark:text-amber-100 hover:bg-amber-50 dark:hover:bg-amber-500/10 h-8 text-xs font-semibold gap-1 shadow-2xs"
                       title="Generar informe del palet"
                     >
-                      <Printer className="w-3.5 h-3.5 text-amber-700" />
+                      <Printer className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
                       <span>Informe / Exportar</span>
                     </Button>
                   </>
@@ -534,7 +534,7 @@ export function ModalProductosPalet({
               <>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 no-print">
                   <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                     <Input
                       placeholder="Filtrar por nombre, SKU o código..."
                       value={busqueda}
@@ -544,7 +544,7 @@ export function ModalProductosPalet({
                     {busqueda && (
                       <button
                         onClick={() => setBusqueda("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -566,10 +566,10 @@ export function ModalProductosPalet({
                 </div>
 
                 {editandoItem && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2 animate-in fade-in no-print">
-                    <div className="flex justify-between items-center text-xs font-semibold text-amber-950">
+                  <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-3 space-y-2 animate-in fade-in no-print">
+                    <div className="flex justify-between items-center text-xs font-semibold text-amber-950 dark:text-amber-100">
                       <span>Editar cantidad: {editandoItem.nombre}</span>
-                      <span className="font-mono text-gray-600">SKU: {editandoItem.sku}</span>
+                      <span className="font-mono text-muted-foreground">SKU: {editandoItem.sku}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Input
@@ -580,7 +580,7 @@ export function ModalProductosPalet({
                         onChange={(e) =>
                           setCantidadEdicion(e.target.value === "" ? "" : parseInt(e.target.value))
                         }
-                        className="w-32 bg-white text-xs h-8"
+                        className="w-32 bg-card text-xs h-8"
                       />
                       <Button
                         size="sm"
@@ -594,7 +594,7 @@ export function ModalProductosPalet({
                         size="sm"
                         variant="ghost"
                         onClick={() => setEditandoItem(null)}
-                        className="h-8 text-xs text-gray-600"
+                        className="h-8 text-xs text-muted-foreground"
                       >
                         Cancelar
                       </Button>
@@ -603,19 +603,19 @@ export function ModalProductosPalet({
                 )}
 
                 {cargandoProductos ? (
-                  <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-gray-500">
-                    <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+                  <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400" />
                     <span>Consultando existencias...</span>
                   </div>
                 ) : errorProductos ? (
-                  <p className="rounded border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                  <p className="rounded border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-300">
                     No se pudieron consultar los productos del palet:{" "}
                     {errorProductos instanceof Error ? errorProductos.message : "Error desconocido"}
                   </p>
                 ) : productosFiltrados.length === 0 ? (
-                  <div className="py-10 border-2 border-dashed border-gray-200 rounded-lg text-center p-6 space-y-2 bg-gray-50/50">
-                    <Package className="w-8 h-8 text-gray-400 mx-auto" />
-                    <p className="text-sm font-semibold text-gray-700">
+                  <div className="py-10 border-2 border-dashed border-border rounded-lg text-center p-6 space-y-2 bg-muted/50">
+                    <Package className="w-8 h-8 text-muted-foreground mx-auto" />
+                    <p className="text-sm font-semibold text-foreground">
                       {busqueda ? "Sin resultados" : "Palet vacío"}
                     </p>
                     {!busqueda && (
@@ -630,9 +630,9 @@ export function ModalProductosPalet({
                     )}
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden shadow-2xs">
-                    <table className="w-full text-left text-xs divide-y divide-gray-200">
-                      <thead className="bg-gray-100/90 text-gray-600 uppercase text-[10px] font-semibold tracking-wider">
+                  <div className="border border-border rounded-lg overflow-hidden shadow-2xs">
+                    <table className="w-full text-left text-xs divide-y divide-border">
+                      <thead className="bg-muted/90 text-muted-foreground uppercase text-[10px] font-semibold tracking-wider">
                         <tr>
                           <th className="py-2.5 px-3">Código</th>
                           <th className="py-2.5 px-3">SKU</th>
@@ -641,20 +641,20 @@ export function ModalProductosPalet({
                           <th className="py-2.5 px-3 text-right no-print">Acciones</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
+                      <tbody className="divide-y divide-border bg-card">
                         {productosFiltrados.map((item) => (
                           <tr
                             key={item.id_producto}
-                            className="hover:bg-amber-50/40 transition-colors"
+                            className="hover:bg-amber-50/40 dark:hover:bg-amber-500/10 transition-colors"
                           >
-                            <td className="py-2.5 px-3 font-mono text-gray-600">
+                            <td className="py-2.5 px-3 font-mono text-muted-foreground">
                               {item.codigo_barras || "-"}
                             </td>
-                            <td className="py-2.5 px-3 font-mono font-semibold text-gray-800">
+                            <td className="py-2.5 px-3 font-mono font-semibold text-foreground">
                               {item.sku || "-"}
                             </td>
-                            <td className="py-2.5 px-3 font-medium text-gray-900">{item.nombre}</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-amber-900">
+                            <td className="py-2.5 px-3 font-medium text-foreground">{item.nombre}</td>
+                            <td className="py-2.5 px-3 text-right font-bold text-amber-900 dark:text-amber-100">
                               {item.cantidad} uds
                             </td>
                             <td className="py-2.5 px-3 text-right no-print">
@@ -666,7 +666,7 @@ export function ModalProductosPalet({
                                     setEditandoItem(item);
                                     setCantidadEdicion(item.cantidad);
                                   }}
-                                  className="h-7 w-7 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                  className="h-7 w-7 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-500/10"
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                 </Button>
@@ -674,7 +674,7 @@ export function ModalProductosPalet({
                                   size="icon"
                                   variant="ghost"
                                   onClick={() => handleEliminarProductoDirecto(item)}
-                                  className="h-7 w-7 text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                                  className="h-7 w-7 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-200 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -691,19 +691,19 @@ export function ModalProductosPalet({
 
             {/* VISTA 2: AÑADIR PRODUCTO */}
             {modo === "anadir" && (
-              <div className="space-y-4 border border-amber-200 bg-amber-50/40 rounded-lg p-4 no-print">
+              <div className="space-y-4 border border-amber-200 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-500/10 rounded-lg p-4 no-print">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => setModo("lista")}
-                      className="h-7 px-2 text-xs text-gray-600 hover:text-gray-900"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                     >
                       <ArrowLeft className="w-3.5 h-3.5 mr-1" />
                       <span>Volver</span>
                     </Button>
-                    <span className="text-xs font-bold text-gray-800">Añadir mercancía</span>
+                    <span className="text-xs font-bold text-foreground">Añadir mercancía</span>
                   </div>
                 </div>
 
@@ -711,7 +711,7 @@ export function ModalProductosPalet({
                   <div className="relative">
                     <Label
                       htmlFor="buscar-catalogo"
-                      className="text-xs font-semibold text-gray-700"
+                      className="text-xs font-semibold text-foreground"
                     >
                       Buscar en catálogo:
                     </Label>
@@ -722,15 +722,15 @@ export function ModalProductosPalet({
                         placeholder="Escribe al menos 2 letras..."
                         value={inputBusquedaCatalogo}
                         onChange={(e) => setInputBusquedaCatalogo(e.target.value)}
-                        className="text-xs bg-white"
+                        className="text-xs bg-card"
                       />
                       {buscandoCatalogo && (
-                        <Loader2 className="w-4 h-4 animate-spin text-amber-600 absolute right-3 top-1/2 -translate-y-1/2" />
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-600 dark:text-amber-400 absolute right-3 top-1/2 -translate-y-1/2" />
                       )}
                     </div>
 
                     {catalogoSugerencias.length > 0 && !productoSeleccionado && (
-                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto divide-y divide-gray-100">
+                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto divide-y divide-border">
                         {catalogoSugerencias.map((prod) => (
                           <div
                             key={prod.id}
@@ -739,13 +739,13 @@ export function ModalProductosPalet({
                               setInputBusquedaCatalogo(prod.nombre);
                               setCatalogoSugerencias([]);
                             }}
-                            className="p-2.5 hover:bg-amber-50 cursor-pointer flex items-center justify-between text-xs"
+                            className="p-2.5 hover:bg-amber-50 dark:hover:bg-amber-500/10 cursor-pointer flex items-center justify-between text-xs"
                           >
                             <div className="truncate">
-                              <div className="font-semibold text-gray-900 truncate">
+                              <div className="font-semibold text-foreground truncate">
                                 {prod.nombre}
                               </div>
-                              <div className="text-[10px] text-gray-500 font-mono">
+                              <div className="text-[10px] text-muted-foreground font-mono">
                                 SKU: {prod.sku} · {prod.codigo_barras || "-"}
                               </div>
                             </div>
@@ -763,10 +763,10 @@ export function ModalProductosPalet({
                   </div>
 
                   {productoSeleccionado && (
-                    <div className="p-3 bg-white border border-emerald-300 rounded-md space-y-2">
+                    <div className="p-3 bg-card border border-emerald-300 dark:border-emerald-500/40 rounded-md space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           <span>Seleccionado:</span>
                         </div>
                         <Button
@@ -776,15 +776,15 @@ export function ModalProductosPalet({
                             setProductoSeleccionado(null);
                             setInputBusquedaCatalogo("");
                           }}
-                          className="h-6 text-[10px] text-gray-500"
+                          className="h-6 text-[10px] text-muted-foreground"
                         >
                           Cambiar
                         </Button>
                       </div>
-                      <div className="text-sm font-semibold text-gray-900">
+                      <div className="text-sm font-semibold text-foreground">
                         {productoSeleccionado.nombre}
                       </div>
-                      <div className="text-xs text-gray-600 font-mono">
+                      <div className="text-xs text-muted-foreground font-mono">
                         SKU: {productoSeleccionado.sku} · Código:{" "}
                         {productoSeleccionado.codigo_barras || "-"}
                       </div>
@@ -793,7 +793,7 @@ export function ModalProductosPalet({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <div>
-                      <Label htmlFor="cant-nueva" className="text-xs font-semibold text-gray-700">
+                      <Label htmlFor="cant-nueva" className="text-xs font-semibold text-foreground">
                         Cantidad:
                       </Label>
                       <Input
@@ -804,7 +804,7 @@ export function ModalProductosPalet({
                         onChange={(e) =>
                           setCantidadNueva(e.target.value === "" ? "" : parseInt(e.target.value))
                         }
-                        className="mt-1 bg-white text-xs"
+                        className="mt-1 bg-card text-xs"
                       />
                     </div>
                     <div className="flex items-end">
@@ -834,7 +834,7 @@ export function ModalProductosPalet({
                     size="sm"
                     variant="ghost"
                     onClick={() => setModo("lista")}
-                    className="h-7 px-2 text-xs text-gray-600"
+                    className="h-7 px-2 text-xs text-muted-foreground"
                   >
                     <ArrowLeft className="w-3.5 h-3.5 mr-1" />
                     <span>Volver</span>
@@ -868,7 +868,7 @@ export function ModalProductosPalet({
             )}
           </div>
 
-          <DialogFooter className="bg-gray-50 p-3 rounded-b-lg border-t border-gray-200 no-print">
+          <DialogFooter className="bg-muted p-3 rounded-b-lg border-t border-border no-print">
             <Button
               type="button"
               variant="outline"
@@ -895,16 +895,16 @@ export function ModalProductosPalet({
       <AlertDialog open={confirmarBajaManual} onOpenChange={setConfirmarBajaManual}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-rose-700">
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
+            <AlertDialogTitle className="flex items-center gap-2 text-rose-700 dark:text-rose-300">
+              <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
               <span>¿Dar de baja el palet {palet.codigo_barras}?</span>
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs space-y-2 text-gray-600">
+            <AlertDialogDescription className="text-xs space-y-2 text-muted-foreground">
               <p>
                 Esta acción desactivará el palet de la reserva. Esta operación es segura y conserva
                 el historial (baja lógica).
               </p>
-              <p className="font-semibold text-gray-800">
+              <p className="font-semibold text-foreground">
                 Confirmación requerida: El palet actualmente no tiene stock pendiente.
               </p>
             </AlertDialogDescription>
@@ -938,16 +938,16 @@ export function ModalProductosPalet({
       <AlertDialog open={confirmarAutodestruccion} onOpenChange={setConfirmarAutodestruccion}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-700">
-              <Boxes className="w-5 h-5 text-amber-600" />
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+              <Boxes className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <span>Palet sin existencias (Stock = 0)</span>
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs space-y-2 text-gray-600">
+            <AlertDialogDescription className="text-xs space-y-2 text-muted-foreground">
               <p>
                 Se han retirado todos los productos de <strong>{palet.codigo_barras}</strong>.
               </p>
               <p>Según la regla de negocio, un palet vacío puede darse de baja automáticamente.</p>
-              <p className="font-semibold text-gray-800">
+              <p className="font-semibold text-foreground">
                 ¿Deseas dar de baja este palet ahora o conservarlo vacío?
               </p>
             </AlertDialogDescription>

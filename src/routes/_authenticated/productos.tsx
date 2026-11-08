@@ -510,14 +510,14 @@ function ProductosPage() {
       {/* 1. HEADER & BREADCRUMB */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-gray-400 mb-1">
+          <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-muted-foreground mb-1">
             <span>INVENTARIO LM</span>
-            <span className="text-gray-300">/</span>
+            <span className="text-muted-foreground">/</span>
             <span>CATÁLOGO</span>
-            <span className="text-gray-300">/</span>
-            <span className="text-orange-700 font-bold">EXISTENCIAS</span>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-orange-700 dark:text-orange-300 font-bold">EXISTENCIAS</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
             Catálogo de Productos
           </h1>
         </div>
@@ -531,7 +531,7 @@ function ProductosPage() {
               </Link>
             </Button>
           )}
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-medium shadow-2xs">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50/90 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-200/80 dark:border-orange-500/30 text-xs font-medium shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
             <span>
               {cargandoProductos
@@ -543,10 +543,10 @@ function ProductosPage() {
       </div>
 
       {/* 2. BARRA DE HERRAMIENTAS / FILTROS */}
-      <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-card p-3 rounded-xl border border-border shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               value={busqueda}
               onChange={(e) => {
@@ -554,7 +554,7 @@ function ProductosPage() {
                 setPaginaActual(1);
               }}
               placeholder="Buscar por nombre, SKU o código..."
-              className="pl-9 h-10 bg-white border-gray-300 rounded-lg text-sm focus:border-orange-600 focus:ring-orange-600"
+              className="pl-9 h-10 bg-card border-border rounded-lg text-sm focus:border-orange-600 focus:ring-orange-600"
             />
           </div>
 
@@ -566,7 +566,7 @@ function ProductosPage() {
                 setPaginaActual(1);
               }}
             >
-              <SelectTrigger className="h-10 border-gray-300 bg-white text-gray-700 rounded-lg text-sm">
+              <SelectTrigger className="h-10 border-border bg-card text-foreground rounded-lg text-sm">
                 <SelectValue placeholder="Todas las categorías" />
               </SelectTrigger>
               <SelectContent>
@@ -588,7 +588,7 @@ function ProductosPage() {
                 setPaginaActual(1);
               }}
             >
-              <SelectTrigger className="h-10 border-gray-300 bg-white text-gray-700 rounded-lg text-sm">
+              <SelectTrigger className="h-10 border-border bg-card text-foreground rounded-lg text-sm">
                 <SelectValue placeholder="Todos los estados" />
               </SelectTrigger>
               <SelectContent>
@@ -606,9 +606,9 @@ function ProductosPage() {
             <Button
               variant="outline"
               onClick={exportarCSV}
-              className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
+              className="h-10 border-border text-foreground hover:bg-muted rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
             >
-              <Download className="w-3.5 h-3.5 text-gray-500" />
+              <Download className="w-3.5 h-3.5 text-muted-foreground" />
               <span>Exportar CSV</span>
             </Button>
           )}
@@ -616,9 +616,9 @@ function ProductosPage() {
           <Button
             variant="outline"
             onClick={() => setScannerOpen(true)}
-            className="h-10 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
+            className="h-10 border-border text-foreground hover:bg-muted rounded-lg text-xs font-semibold gap-1.5 shadow-2xs"
           >
-            <Camera className="w-3.5 h-3.5 text-gray-500" />
+            <Camera className="w-3.5 h-3.5 text-muted-foreground" />
             <span>Escanear</span>
           </Button>
 
@@ -641,10 +641,10 @@ function ProductosPage() {
 
       {/* 4. TABLA PRINCIPAL */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
           <span>{seleccionados.size} seleccionados</span>
           <div className="flex items-center gap-1.5 font-medium">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
             <span>
               {cargandoProductos
                 ? "Cargando..."
@@ -653,9 +653,9 @@ function ProductosPage() {
           </div>
         </div>
 
-        <div className="hidden rounded-xl border border-gray-200 bg-white shadow-2xs md:block">
+        <div className="hidden rounded-xl border border-border bg-card shadow-2xs md:block">
           <Table>
-            <TableHeader className="bg-gray-50/80 border-b border-gray-200">
+            <TableHeader className="bg-muted/80 border-b border-border">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[48px] px-4">
                   <Checkbox
@@ -667,36 +667,36 @@ function ProductosPage() {
                     aria-label="Seleccionar todos"
                   />
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   PRODUCTO & SKU
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   CATEGORÍA
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   UBICACIÓN
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   STOCK & ESTADO
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600 text-right">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
                   PRECIO UNITARIO
                 </TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider text-gray-600 text-right w-[100px]">
+                <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-right w-[100px]">
                   ACCIONES
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="divide-y divide-gray-100">
+            <TableBody className="divide-y divide-border">
               {cargandoProductos ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-gray-500">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     Cargando productos desde Supabase...
                   </TableCell>
                 </TableRow>
               ) : productosPaginados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-gray-500">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     No se encontraron productos con los filtros seleccionados.
                   </TableCell>
                 </TableRow>
@@ -710,7 +710,7 @@ function ProductosPage() {
                     <TableRow
                       key={p.id}
                       className={`transition-colors ${
-                        estaSeleccionado ? "bg-white" : "hover:bg-gray-50/80"
+                        estaSeleccionado ? "bg-card" : "hover:bg-muted/80"
                       }`}
                     >
                       <TableCell className="px-4">
@@ -724,23 +724,23 @@ function ProductosPage() {
                       <TableCell className="py-3">
                         <div className="flex items-center gap-3">
                           <div
-                            className="w-8 h-8 rounded-full border border-gray-200 shrink-0 flex items-center justify-center shadow-2xs"
+                            className="w-8 h-8 rounded-full border border-border shrink-0 flex items-center justify-center shadow-2xs"
                             style={{
                               backgroundColor: p.swatchColor || "#f1f5f9",
                             }}
                           >
                             {p.iconoTipo === "herramienta" ? (
-                              <Paintbrush className="w-4 h-4 text-gray-600" />
+                              <Paintbrush className="w-4 h-4 text-muted-foreground" />
                             ) : p.iconoTipo === "solvente" ? (
-                              <FlaskConical className="w-4 h-4 text-blue-600" />
+                              <FlaskConical className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             ) : null}
                           </div>
 
                           <div className="flex flex-col min-w-0">
-                            <span className="font-semibold text-sm text-gray-900 truncate">
+                            <span className="font-semibold text-sm text-foreground truncate">
                               {p.nombre}
                             </span>
-                            <span className="text-xs font-mono text-gray-500 tracking-tight">
+                            <span className="text-xs font-mono text-muted-foreground tracking-tight">
                               SKU: {p.sku || "—"}
                             </span>
                           </div>
@@ -748,14 +748,14 @@ function ProductosPage() {
                       </TableCell>
 
                       <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-800 border border-orange-100">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-200 border border-orange-100 dark:border-orange-500/20">
                           {p.categoria || "Sin categoría"}
                         </span>
                       </TableCell>
 
                       <TableCell>
-                        <div className="inline-flex items-center gap-1.5 text-xs text-gray-700 font-medium">
-                          <Warehouse className="w-3.5 h-3.5 text-gray-400" />
+                        <div className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium">
+                          <Warehouse className="w-3.5 h-3.5 text-muted-foreground" />
                           <span>{p.ubicacion || "Sin asignar"}</span>
                         </div>
                       </TableCell>
@@ -765,27 +765,27 @@ function ProductosPage() {
                           <span
                             className={`font-bold text-xs ${
                               esAgotado
-                                ? "text-rose-600"
+                                ? "text-rose-600 dark:text-rose-400"
                                 : esBajo
-                                  ? "text-orange-800"
-                                  : "text-gray-900"
+                                  ? "text-orange-800 dark:text-orange-200"
+                                  : "text-foreground"
                             }`}
                           >
                             {p.stock_actual} {p.unidad || "unid"}
                           </span>
 
                           {esAgotado ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                               Agotado
                             </span>
                           ) : esBajo ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-200">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-500/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                               Bajo
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                               Normal
                             </span>
@@ -793,7 +793,7 @@ function ProductosPage() {
                         </div>
                       </TableCell>
 
-                      <TableCell className="text-right font-medium text-xs text-gray-800">
+                      <TableCell className="text-right font-medium text-xs text-foreground">
                         ${(p.precio || 0).toLocaleString("es-CL")}
                       </TableCell>
 
@@ -803,7 +803,7 @@ function ProductosPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setProductoVer(p)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
                             title="Ver detalles"
                           >
                             <Eye className="w-4 h-4" />
@@ -814,7 +814,7 @@ function ProductosPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
                               >
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
@@ -824,15 +824,15 @@ function ProductosPage() {
                                 onClick={() => abrirModalEditar(p)}
                                 className="gap-2 text-xs font-medium cursor-pointer"
                               >
-                                <Pencil className="w-3.5 h-3.5 text-orange-600" />
+                                <Pencil className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                                 <span>Editar producto</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => setProductoADesactivar(p)}
-                                className="gap-2 text-xs font-medium text-rose-600 cursor-pointer"
+                                className="gap-2 text-xs font-medium text-rose-600 dark:text-rose-400 cursor-pointer"
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                                 <span>{p.activo ? "Desactivar" : "Activar"}</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -848,11 +848,11 @@ function ProductosPage() {
         </div>
         <div className="space-y-3 md:hidden">
           {cargandoProductos ? (
-            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border bg-card p-5 text-center text-sm text-muted-foreground">
               Cargando productos...
             </div>
           ) : productosPaginados.length === 0 ? (
-            <div className="rounded-xl border bg-white p-5 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border bg-card p-5 text-center text-sm text-muted-foreground">
               No se encontraron productos.
             </div>
           ) : (
@@ -880,10 +880,10 @@ function ProductosPage() {
                     <span
                       className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${
                         agotado
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          ? "border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300"
                           : bajo
-                            ? "border-amber-200 bg-amber-50 text-amber-800"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            ? "border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                            : "border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                       }`}
                     >
                       {agotado ? "Agotado" : bajo ? "Stock bajo" : "Normal"}
@@ -952,17 +952,17 @@ function ProductosPage() {
       </div>
 
       {/* 5. FOOTER & PAGINACIÓN */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 pt-1">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground pt-1">
         <div>
           Mostrando{" "}
-          <strong className="text-gray-800">
+          <strong className="text-foreground">
             {productosFiltrados.length === 0 ? 0 : (paginaActual - 1) * elementosPorPagina + 1}
           </strong>{" "}
           a{" "}
-          <strong className="text-gray-800">
+          <strong className="text-foreground">
             {Math.min(paginaActual * elementosPorPagina, productosFiltrados.length)}
           </strong>{" "}
-          de <strong className="text-gray-800">{productosFiltrados.length}</strong> productos
+          de <strong className="text-foreground">{productosFiltrados.length}</strong> productos
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -971,7 +971,7 @@ function ProductosPage() {
             size="sm"
             onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
             disabled={paginaActual === 1}
-            className="h-8 text-xs font-medium border-gray-300"
+            className="h-8 text-xs font-medium border-border"
           >
             Anterior
           </Button>
@@ -985,7 +985,7 @@ function ProductosPage() {
               className={`h-8 w-8 p-0 text-xs font-semibold ${
                 paginaActual === num
                   ? "bg-orange-600 hover:bg-orange-700 text-white border-transparent"
-                  : "border-gray-300 text-gray-700"
+                  : "border-border text-foreground"
               }`}
             >
               {num}
@@ -997,7 +997,7 @@ function ProductosPage() {
             size="sm"
             onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
             disabled={paginaActual === totalPaginas}
-            className="h-8 text-xs font-medium border-gray-300 text-orange-900 border-orange-200 hover:bg-orange-50"
+            className="h-8 text-xs font-medium border-border text-orange-900 dark:text-orange-100 border-orange-200 dark:border-orange-500/30 hover:bg-orange-50 dark:hover:bg-orange-500/10"
           >
             Siguiente
           </Button>
@@ -1009,29 +1009,29 @@ function ProductosPage() {
 
       {/* MODAL: NUEVO PRODUCTO */}
       <Dialog open={modalNuevoAbierto} onOpenChange={setModalNuevoAbierto}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-orange-900">
+            <DialogTitle className="text-lg font-bold text-orange-900 dark:text-orange-100">
               Registrar Nuevo Producto
             </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500">
+            <DialogDescription className="text-xs text-muted-foreground">
               Introduce la información del nuevo producto para darlo de alta en el catálogo.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleGuardarNuevo} className="space-y-4 py-2">
             {/* 1. INFORMACIÓN BÁSICA */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center gap-2 mb-3">
-                <Package className="h-5 w-5 text-orange-600" />
+                <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Información Básica</h3>
-                  <p className="text-xs text-gray-500">Datos principales del producto</p>
+                  <h3 className="font-semibold text-foreground text-sm">Información Básica</h3>
+                  <p className="text-xs text-muted-foreground">Datos principales del producto</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="nuevo-nombre" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="nuevo-nombre" className="text-xs font-medium text-foreground">
                     Nombre *
                   </Label>
                   <Input
@@ -1043,7 +1043,7 @@ function ProductosPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-sku" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="nuevo-sku" className="text-xs font-medium text-foreground">
                     SKU *
                   </Label>
                   <Input
@@ -1062,7 +1062,7 @@ function ProductosPage() {
                 <div className="space-y-1">
                   <Label
                     htmlFor="nuevo-codigo-barras"
-                    className="text-xs font-medium text-gray-700"
+                    className="text-xs font-medium text-foreground"
                   >
                     Código de Barras
                   </Label>
@@ -1090,19 +1090,19 @@ function ProductosPage() {
             </div>
 
             {/* 2. CATEGORIZACIÓN */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 text-orange-600" />
+                  <FolderOpen className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm">Categorización</h3>
-                    <p className="text-xs text-gray-500">Clasificación del producto</p>
+                    <h3 className="font-semibold text-foreground text-sm">Categorización</h3>
+                    <p className="text-xs text-muted-foreground">Clasificación del producto</p>
                   </div>
                 </div>
                 {(!formCategoria || formCategoria === "Sin categoría") && (
                   <Badge
                     variant="outline"
-                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs font-normal"
+                    className="bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/30 text-xs font-normal"
                   >
                     Sin categoría
                   </Badge>
@@ -1110,7 +1110,7 @@ function ProductosPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="nuevo-cat" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="nuevo-cat" className="text-xs font-medium text-foreground">
                     Categoría *
                   </Label>
                   <Select value={formCategoria} onValueChange={setFormCategoria}>
@@ -1131,17 +1131,17 @@ function ProductosPage() {
             </div>
 
             {/* 3. DESCRIPCIÓN */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-5 w-5 text-orange-600" />
+                <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Descripción</h3>
-                  <p className="text-xs text-gray-500">Detalles adicionales del producto</p>
+                  <h3 className="font-semibold text-foreground text-sm">Descripción</h3>
+                  <p className="text-xs text-muted-foreground">Detalles adicionales del producto</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="nuevo-descripcion" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="nuevo-descripcion" className="text-xs font-medium text-foreground">
                     Descripción
                   </Label>
                   <Textarea
@@ -1156,17 +1156,17 @@ function ProductosPage() {
             </div>
 
             {/* 4. PRECIO */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="h-5 w-5 text-orange-600" />
+                <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Precio</h3>
-                  <p className="text-xs text-gray-500">Valor por unidad</p>
+                  <h3 className="font-semibold text-foreground text-sm">Precio</h3>
+                  <p className="text-xs text-muted-foreground">Valor por unidad</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="nuevo-precio" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="nuevo-precio" className="text-xs font-medium text-foreground">
                     Precio Unitario ($)
                   </Label>
                   <Input
@@ -1210,27 +1210,27 @@ function ProductosPage() {
         open={Boolean(productoEditar)}
         onOpenChange={(open) => !open && setProductoEditar(null)}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-orange-900">Editar Producto</DialogTitle>
-            <DialogDescription className="text-xs text-gray-500">
+            <DialogTitle className="text-lg font-bold text-orange-900 dark:text-orange-100">Editar Producto</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
               Modifica los detalles del producto en el catálogo.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleGuardarEdicion} className="space-y-4 py-2">
             {/* 1. INFORMACIÓN BÁSICA */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center gap-2 mb-3">
-                <Package className="h-5 w-5 text-orange-600" />
+                <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Información Básica</h3>
-                  <p className="text-xs text-gray-500">Datos principales del producto</p>
+                  <h3 className="font-semibold text-foreground text-sm">Información Básica</h3>
+                  <p className="text-xs text-muted-foreground">Datos principales del producto</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="edit-nombre" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="edit-nombre" className="text-xs font-medium text-foreground">
                     Nombre del Producto *
                   </Label>
                   <Input
@@ -1243,7 +1243,7 @@ function ProductosPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-sku" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="edit-sku" className="text-xs font-medium text-foreground">
                     SKU *
                   </Label>
                   <Input
@@ -1264,14 +1264,14 @@ function ProductosPage() {
                   <div className="flex items-center justify-between">
                     <Label
                       htmlFor="edit-codigo-barras"
-                      className="text-xs font-medium text-gray-700"
+                      className="text-xs font-medium text-foreground"
                     >
                       Código de Barras
                     </Label>
                     <button
                       type="button"
                       onClick={() => setScannerOpen(true)}
-                      className="text-[11px] text-orange-700 hover:text-orange-800 flex items-center gap-1 font-medium"
+                      className="text-[11px] text-orange-700 dark:text-orange-300 hover:text-orange-800 dark:hover:text-orange-200 flex items-center gap-1 font-medium"
                     >
                       <Camera className="h-3 w-3" />
                       Escanear
@@ -1290,19 +1290,19 @@ function ProductosPage() {
             </div>
 
             {/* 2. CATEGORIZACIÓN */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 text-orange-600" />
+                  <FolderOpen className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm">Categorización</h3>
-                    <p className="text-xs text-gray-500">Clasificación del producto</p>
+                    <h3 className="font-semibold text-foreground text-sm">Categorización</h3>
+                    <p className="text-xs text-muted-foreground">Clasificación del producto</p>
                   </div>
                 </div>
                 {(!formCategoria || formCategoria === "Sin categoría") && (
                   <Badge
                     variant="outline"
-                    className="bg-orange-50 text-orange-700 border-orange-200 text-xs font-normal"
+                    className="bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-500/30 text-xs font-normal"
                   >
                     Sin categoría
                   </Badge>
@@ -1310,7 +1310,7 @@ function ProductosPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="edit-cat" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="edit-cat" className="text-xs font-medium text-foreground">
                     Categoría
                   </Label>
                   <Select value={formCategoria} onValueChange={setFormCategoria}>
@@ -1331,17 +1331,17 @@ function ProductosPage() {
             </div>
 
             {/* 3. DESCRIPCIÓN */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-5 w-5 text-orange-600" />
+                <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Descripción</h3>
-                  <p className="text-xs text-gray-500">Detalles adicionales del producto</p>
+                  <h3 className="font-semibold text-foreground text-sm">Descripción</h3>
+                  <p className="text-xs text-muted-foreground">Detalles adicionales del producto</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="edit-descripcion" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="edit-descripcion" className="text-xs font-medium text-foreground">
                     Descripción
                   </Label>
                   <Textarea
@@ -1356,17 +1356,17 @@ function ProductosPage() {
             </div>
 
             {/* 4. PRECIO */}
-            <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+            <div className="border border-border rounded-lg p-4 shadow-sm bg-card">
               <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="h-5 w-5 text-orange-600" />
+                <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Precio</h3>
-                  <p className="text-xs text-gray-500">Valor por unidad</p>
+                  <h3 className="font-semibold text-foreground text-sm">Precio</h3>
+                  <p className="text-xs text-muted-foreground">Valor por unidad</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="edit-precio" className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="edit-precio" className="text-xs font-medium text-foreground">
                     Precio Unitario ($)
                   </Label>
                   <Input
@@ -1410,30 +1410,30 @@ function ProductosPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold">
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted text-foreground font-semibold">
                 {productoVer?.sku}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 font-medium border border-orange-100">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-200 font-medium border border-orange-100 dark:border-orange-500/20">
                 {productoVer?.categoria}
               </span>
             </div>
-            <DialogTitle className="text-base font-bold text-orange-900">
+            <DialogTitle className="text-base font-bold text-orange-900 dark:text-orange-100">
               {productoVer?.nombre}
             </DialogTitle>
           </DialogHeader>
 
           {productoVer && (
             <div className="space-y-3 py-2 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-orange-50/50 p-3 rounded-lg border border-orange-200">
+              <div className="grid grid-cols-2 gap-2 bg-orange-50/50 dark:bg-orange-500/10 p-3 rounded-lg border border-orange-200 dark:border-orange-500/30">
                 <div>
-                  <span className="text-gray-500 block">Código de Barras:</span>
-                  <span className="font-mono text-xs font-semibold text-gray-900">
+                  <span className="text-muted-foreground block">Código de Barras:</span>
+                  <span className="font-mono text-xs font-semibold text-foreground">
                     {(productoVer as any).codigo_barras || productoVer.sku || "-"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-500 block">Precio Unitario:</span>
-                  <span className="font-semibold text-gray-800">
+                  <span className="text-muted-foreground block">Precio Unitario:</span>
+                  <span className="font-semibold text-foreground">
                     $
                     {(
                       productoVer.precio ||
@@ -1445,21 +1445,21 @@ function ProductosPage() {
               </div>
 
               {(productoVer as any).descripcion && (
-                <div className="bg-white p-3 rounded-lg border border-orange-200">
-                  <span className="text-gray-500 block text-[11px] mb-1 font-medium">
+                <div className="bg-card p-3 rounded-lg border border-orange-200 dark:border-orange-500/30">
+                  <span className="text-muted-foreground block text-[11px] mb-1 font-medium">
                     Descripción:
                   </span>
-                  <p className="text-gray-700 text-xs">{(productoVer as any).descripcion}</p>
+                  <p className="text-foreground text-xs">{(productoVer as any).descripcion}</p>
                 </div>
               )}
 
-              <div className="flex items-center justify-between p-2 rounded border border-orange-200 bg-orange-50">
-                <span className="text-gray-600">Estado del producto:</span>
+              <div className="flex items-center justify-between p-2 rounded border border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10">
+                <span className="text-muted-foreground">Estado del producto:</span>
                 <span
                   className={`px-2 py-0.5 rounded-full font-semibold ${
                     productoVer.activo
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                      ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30"
+                      : "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30"
                   }`}
                 >
                   {productoVer.activo ? "Activo" : "Inactivo"}

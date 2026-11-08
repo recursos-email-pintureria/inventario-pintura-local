@@ -41,7 +41,7 @@ export function CambioPasswordObligatorio() {
     <main className="flex min-h-dvh items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md space-y-5 p-6">
         <div className="space-y-2">
-          <KeyRound className="h-6 w-6 text-amber-600" aria-hidden="true" />
+          <KeyRound className="h-6 w-6 text-amber-600 dark:text-amber-400" aria-hidden="true" />
           <h1 className="text-xl font-semibold">Cambia tu contraseña</h1>
           <p className="text-sm text-muted-foreground">
             El administrador ha restablecido tu contraseña. Elige una nueva para continuar.

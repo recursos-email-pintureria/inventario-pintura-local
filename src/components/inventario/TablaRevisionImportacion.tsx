@@ -99,35 +99,35 @@ export function TablaRevisionImportacion({
     switch (estado) {
       case "correcta":
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded">
             <CheckCircle2 className="w-3 h-3" />
             Válida
           </span>
         );
       case "aviso":
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
-            <AlertTriangle className="w-3 h-3 text-amber-600" />
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/40 px-2 py-0.5 rounded">
+            <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
             Aviso
           </span>
         );
       case "conflicto":
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-800 bg-orange-50 border border-orange-300 px-2 py-0.5 rounded">
-            <AlertCircle className="w-3 h-3 text-orange-600" />
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-800 dark:text-orange-200 bg-orange-50 dark:bg-orange-500/10 border border-orange-300 dark:border-orange-500/40 px-2 py-0.5 rounded">
+            <AlertCircle className="w-3 h-3 text-orange-600 dark:text-orange-400" />
             Conflicto
           </span>
         );
       case "error":
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 px-2 py-0.5 rounded">
             <XCircle className="w-3 h-3" />
             Error
           </span>
         );
       case "sin_cambios":
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded">
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded">
             <MinusCircle className="w-3 h-3" />
             Sin cambios
           </span>
@@ -136,9 +136,9 @@ export function TablaRevisionImportacion({
   };
 
   return (
-    <div className="space-y-3 bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
+    <div className="space-y-3 bg-card border border-border rounded-xl p-4 shadow-2xs">
       {/* Barra superior de pestañas de filtrado */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
@@ -148,8 +148,8 @@ export function TablaRevisionImportacion({
             }}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
               filtroEstado === "todos"
-                ? "bg-slate-900 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-sidebar text-white"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             Todas ({contadores.todos})
@@ -164,7 +164,7 @@ export function TablaRevisionImportacion({
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
               filtroEstado === "modificables"
                 ? "bg-amber-600 text-white"
-                : "bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200"
+                : "bg-amber-50 dark:bg-amber-500/10 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30"
             }`}
           >
             A modificar ({contadores.modificables})
@@ -180,7 +180,7 @@ export function TablaRevisionImportacion({
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                 filtroEstado === "conflicto"
                   ? "bg-orange-600 text-white"
-                  : "bg-orange-50 text-orange-900 hover:bg-orange-100 border border-orange-200"
+                  : "bg-orange-50 dark:bg-orange-500/10 text-orange-900 dark:text-orange-100 hover:bg-orange-100 dark:hover:bg-orange-500/20 border border-orange-200 dark:border-orange-500/30"
               }`}
             >
               Conflictos ({contadores.conflicto})
@@ -197,7 +197,7 @@ export function TablaRevisionImportacion({
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                 filtroEstado === "aviso"
                   ? "bg-amber-500 text-white"
-                  : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                  : "bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-500/20"
               }`}
             >
               Avisos ({contadores.aviso})
@@ -214,7 +214,7 @@ export function TablaRevisionImportacion({
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                 filtroEstado === "error"
                   ? "bg-rose-600 text-white"
-                  : "bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200"
+                  : "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30"
               }`}
             >
               Errores ({contadores.error})
@@ -229,8 +229,8 @@ export function TablaRevisionImportacion({
             }}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
               filtroEstado === "sin_cambios"
-                ? "bg-gray-700 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-sidebar text-white"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             }`}
           >
             Sin cambios ({contadores.sin_cambios})
@@ -241,17 +241,17 @@ export function TablaRevisionImportacion({
           variant="outline"
           size="sm"
           onClick={descargarInforme}
-          className="text-xs h-8 gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-50"
+          className="text-xs h-8 gap-1.5 border-border text-foreground hover:bg-muted"
           title="Descargar informe completo en Excel con todas las discrepancias"
         >
-          <Download className="w-3.5 h-3.5 text-gray-500" />
+          <Download className="w-3.5 h-3.5 text-muted-foreground" />
           <span>Descargar Informe Excel</span>
         </Button>
       </div>
 
       {/* Buscador interno */}
       <div className="relative">
-        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
         <Input
           placeholder="Filtrar por producto, SKU, ubicación o mensaje de error..."
           value={busqueda}
@@ -259,15 +259,15 @@ export function TablaRevisionImportacion({
             setBusqueda(e.target.value);
             setPagina(1);
           }}
-          className="pl-9 text-xs h-8 bg-gray-50/70 border-gray-200"
+          className="pl-9 text-xs h-8 bg-muted/70 border-border"
         />
       </div>
 
       {/* Tabla de filas */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="border border-border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50/90 border-b border-gray-200 text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
+            <thead className="bg-muted/90 border-b border-border text-muted-foreground font-semibold uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-2.5 px-3 w-12 text-center">Fila</th>
                 <th className="py-2.5 px-3">Estado</th>
@@ -280,10 +280,10 @@ export function TablaRevisionImportacion({
                 <th className="py-2.5 px-3">Observaciones / Incidencia</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-border">
               {filasPaginadas.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-500 text-xs">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground text-xs">
                     No hay filas que coincidan con los filtros seleccionados.
                   </td>
                 </tr>
@@ -291,57 +291,57 @@ export function TablaRevisionImportacion({
                 filasPaginadas.map((f) => {
                   const difClass =
                     f.diferencia > 0
-                      ? "text-emerald-700 font-bold"
+                      ? "text-emerald-700 dark:text-emerald-300 font-bold"
                       : f.diferencia < 0
-                        ? "text-rose-700 font-bold"
-                        : "text-gray-400";
+                        ? "text-rose-700 dark:text-rose-300 font-bold"
+                        : "text-muted-foreground";
 
                   return (
                     <tr
                       key={f.numeroFila}
-                      className={`hover:bg-amber-50/40 transition-colors ${
+                      className={`hover:bg-amber-50/40 dark:hover:bg-amber-500/10 transition-colors ${
                         f.estado === "error"
-                          ? "bg-rose-50/20"
+                          ? "bg-rose-50/20 dark:bg-rose-500/10"
                           : f.estado === "conflicto"
-                            ? "bg-orange-50/20"
+                            ? "bg-orange-50/20 dark:bg-orange-500/10"
                             : f.estado === "aviso"
-                              ? "bg-amber-50/20"
+                              ? "bg-amber-50/20 dark:bg-amber-500/10"
                               : ""
                       }`}
                     >
-                      <td className="py-2 px-3 text-center text-gray-400 font-mono text-[11px]">
+                      <td className="py-2 px-3 text-center text-muted-foreground font-mono text-[11px]">
                         {f.numeroFila}
                       </td>
                       <td className="py-2 px-3">{getBadgeEstado(f.estado)}</td>
                       <td className="py-2 px-3">
                         <div
-                          className="font-semibold text-gray-900 truncate max-w-[220px]"
+                          className="font-semibold text-foreground truncate max-w-[220px]"
                           title={f.nombreProductoResuelto}
                         >
                           {f.nombreProductoResuelto}
                         </div>
-                        <div className="font-mono text-[10px] text-gray-500">
+                        <div className="font-mono text-[10px] text-muted-foreground">
                           {f.codigo_producto || "Sin SKU"}
                         </div>
                       </td>
                       <td className="py-2 px-3">
-                        <span className="font-bold text-gray-800 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-[11px]">
+                        <span className="font-bold text-foreground bg-muted border border-border px-1.5 py-0.5 rounded text-[11px]">
                           {f.nombreUbicacionResuelta}
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-medium text-gray-700">
+                      <td className="py-2 px-3 text-right font-mono font-medium text-foreground">
                         {f.stockActualEnBD} ud
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-gray-500">
+                      <td className="py-2 px-3 text-right font-mono text-muted-foreground">
                         {f.cantidad_actual} ud
                       </td>
                       <td className="py-2 px-3 text-right">
                         {f.cantidad_nueva !== null && !isNaN(f.cantidad_nueva) ? (
-                          <span className="font-mono font-bold text-gray-900 bg-white border border-gray-300 px-2 py-0.5 rounded shadow-2xs">
+                          <span className="font-mono font-bold text-foreground bg-card border border-border px-2 py-0.5 rounded shadow-2xs">
                             {f.cantidad_nueva} ud
                           </span>
                         ) : (
-                          <span className="text-gray-400 italic">Sin cambio</span>
+                          <span className="text-muted-foreground italic">Sin cambio</span>
                         )}
                       </td>
                       <td className={`py-2 px-3 text-right font-mono text-xs ${difClass}`}>
@@ -354,11 +354,11 @@ export function TablaRevisionImportacion({
                       <td className="py-2 px-3">
                         {f.estado === "conflicto" ? (
                           <div className="space-y-1.5">
-                            <p className="text-[11px] text-orange-800 font-medium">
+                            <p className="text-[11px] text-orange-800 dark:text-orange-200 font-medium">
                               {f.mensajes[0]}
                             </p>
                             <div className="flex items-center gap-1.5">
-                              <label className="text-[10px] font-bold text-gray-600">
+                              <label className="text-[10px] font-bold text-muted-foreground">
                                 Resolución:
                               </label>
                               <select
@@ -369,7 +369,7 @@ export function TablaRevisionImportacion({
                                     e.target.value as ResolucionConflicto,
                                   )
                                 }
-                                className="text-[11px] bg-white border border-orange-300 rounded px-1.5 py-0.5 font-medium text-orange-950 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                className="text-[11px] bg-card border border-orange-300 dark:border-orange-500/40 rounded px-1.5 py-0.5 font-medium text-orange-950 dark:text-orange-100 focus:outline-none focus:ring-1 focus:ring-orange-400"
                               >
                                 <option value="aplicar_archivo">
                                   Aplicar Excel ({f.cantidad_nueva} ud)
@@ -381,16 +381,16 @@ export function TablaRevisionImportacion({
                             </div>
                           </div>
                         ) : f.mensajes.length > 0 ? (
-                          <div className="text-[11px] text-gray-600 max-w-[280px]">
+                          <div className="text-[11px] text-muted-foreground max-w-[280px]">
                             {f.mensajes.map((m, i) => (
                               <p
                                 key={i}
                                 className={
                                   f.estado === "error"
-                                    ? "text-rose-700 font-medium"
+                                    ? "text-rose-700 dark:text-rose-300 font-medium"
                                     : f.estado === "aviso"
-                                      ? "text-amber-800 font-medium"
-                                      : "text-gray-500"
+                                      ? "text-amber-800 dark:text-amber-200 font-medium"
+                                      : "text-muted-foreground"
                                 }
                               >
                                 {m}
@@ -398,7 +398,7 @@ export function TablaRevisionImportacion({
                             ))}
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-[11px] italic">
+                          <span className="text-muted-foreground text-[11px] italic">
                             {f.observaciones || "Ajuste ordinario"}
                           </span>
                         )}
@@ -412,7 +412,7 @@ export function TablaRevisionImportacion({
         </div>
 
         {/* Paginador */}
-        <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
+        <div className="flex items-center justify-between px-3 py-2 bg-muted border-t border-border text-xs text-muted-foreground">
           <span>
             Mostrando {filasFiltradas.length > 0 ? (pagina - 1) * elementosPorPagina + 1 : 0} a{" "}
             {Math.min(pagina * elementosPorPagina, filasFiltradas.length)} de{" "}
