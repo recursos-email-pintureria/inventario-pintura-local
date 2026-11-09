@@ -24,13 +24,13 @@
 //
 // It never throws. A bootstrap that can crash is the bug it exists to remove.
 
-import { existsSync, readFileSync, realpathSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { createHash } from "node:crypto";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { existsSync, readFileSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
-const PACKAGE = "@ericrisco/rsc";
+const PACKAGE = '@ericrisco/rsc';
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9a-z.-]+)?$/i;
 
 /**
@@ -43,21 +43,7 @@ const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9a-z.-]+)?$/i;
  * nothing checks is just drift with a head start.
  */
 export const PROJECT_OPT_OUTS = [
-  "audit",
-  "auto-update",
-  "claudemd-check",
-  "copy-guard",
-  "danger-guard",
-  "feature-gate",
-  "ftd-close",
-  "ftd-nudge",
-  "gitmoji",
-  "knowledge-sync",
-  "ship-guard",
-  "trunk-guard",
-  "trunk-open",
-  "worktree-cleanup",
-  "worktree-isolation",
+  'asdd-gate', 'audit', 'auto-update', 'claudemd-check', 'copy-guard', 'danger-guard', 'feature-gate', 'ftd-close', 'ftd-nudge', 'gitmoji', 'knowledge-sync', 'ship-guard', 'trunk-guard', 'trunk-open', 'worktree-cleanup', 'worktree-isolation',
 ];
 
 /**
@@ -68,29 +54,29 @@ export const PROJECT_OPT_OUTS = [
  * skips it is the one nobody remembers writing. Checking again where the string is used costs one
  * regex and removes the possibility entirely.
  */
-const safeVersion = (v) => (typeof v === "string" && SEMVER.test(v) ? v : null);
+const safeVersion = (v) => (typeof v === 'string' && SEMVER.test(v) ? v : null);
 
 /**
  * What the project declares, as a value — never as an exception.
  * A corrupt manifest is a state we report, not a crash we propagate (spec AC#20).
  */
 export function readManifest(root) {
-  const path = join(root, ".rsc.json");
-  if (!existsSync(path)) return { state: "absent" };
+  const path = join(root, '.rsc.json');
+  if (!existsSync(path)) return { state: 'absent' };
   let raw;
   try {
-    raw = readFileSync(path, "utf8");
+    raw = readFileSync(path, 'utf8');
   } catch (err) {
-    return { state: "unreadable", reason: err?.code ?? "unreadable" };
+    return { state: 'unreadable', reason: err?.code ?? 'unreadable' };
   }
   let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { state: "unreadable", reason: "not valid JSON" };
+    return { state: 'unreadable', reason: 'not valid JSON' };
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { state: "unreadable", reason: "not an object" };
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { state: 'unreadable', reason: 'not an object' };
   }
   // Ids, and only ids. `skills: [{id:"orient"}]` is valid JSON and used to throw inside `join()` —
   // before the delegate ran, so a mounted and perfectly healthy harness lost its whole always-on layer
@@ -106,40 +92,28 @@ export function readManifest(root) {
   // None of that is what a skill id is. A skill id is a short lowercase name, so that is all that is
   // accepted, and anything else is simply not there.
   const ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-  const ids = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && ID.test(x)) : []);
+  const ids = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && ID.test(x)) : []);
   // Retired skills read as their successors. Canonical map: scripts/lib/retired-skills.js — inlined
   // because this file cannot import anything, and tests/retired-skills.test.js holds the two equal.
-  const RETIRED = {
-    eli5: "orient",
-    "show-me": "orient",
-    bro: "unslop",
-    "design-loop": "design",
-    "design-dna": "design",
-    "motion-craft": "design",
-    "ui-engineering": "ux",
-  };
-  const skills = [
-    ...new Set(ids(parsed.skills).map((id) => (Object.hasOwn(RETIRED, id) ? RETIRED[id] : id))),
-  ];
+  const RETIRED = { eli5: 'orient', 'show-me': 'orient', bro: 'unslop', 'design-loop': 'design', 'design-dna': 'design', 'motion-craft': 'design', 'ui-engineering': 'ux', sdd: 'asdd', 'secure-coding': 'security-audit', 'security-scan': 'security-audit' };
+  const skills = [...new Set(ids(parsed.skills).map((id) => (Object.hasOwn(RETIRED, id) ? RETIRED[id] : id)))];
   const own = ids(parsed.ownSkills);
   // A manifest with nothing declared is not a clone waiting to be equipped; there is nothing to offer.
-  if (!skills.length && !own.length) return { state: "absent" };
+  if (!skills.length && !own.length) return { state: 'absent' };
   return {
-    state: "declared",
+    state: 'declared',
     skills,
     own,
     // Same reasoning, and it matters more here: this string is pasted into the command we tell a
     // person to run *exactly*. A version, or nothing — "no version pinned" is a true and harmless
     // thing to say, and it is what an unusable value becomes.
-    catalogVersion: SEMVER.test(String(parsed.catalogVersion ?? "")) ? parsed.catalogVersion : null,
+    catalogVersion: SEMVER.test(String(parsed.catalogVersion ?? '')) ? parsed.catalogVersion : null,
     targets: Array.isArray(parsed.targets) ? parsed.targets : [],
     // Same allowlist, same reason, and it bites harder here: these names are pasted into the
     // notice a model reads. A switch is a plain lowercase name or it is not a switch — and only
     // the ones the team is allowed to decide for everybody get through at all.
-    optOuts: ids(parsed.optOuts)
-      .filter((n) => PROJECT_OPT_OUTS.includes(n))
-      .sort(),
-    tier: ["balanced", "heavy"].includes(parsed.tier) ? parsed.tier : null,
+    optOuts: ids(parsed.optOuts).filter((n) => PROJECT_OPT_OUTS.includes(n)).sort(),
+    tier: ['balanced', 'heavy'].includes(parsed.tier) ? parsed.tier : null,
   };
 }
 
@@ -155,18 +129,12 @@ export function readManifest(root) {
  * assuming otherwise. When it cannot be told apart, it is left alone.
  */
 export function evaluateHarness(root, manifest) {
-  if (manifest.state !== "declared") {
-    return {
-      verdict: "unknown",
-      missing: [],
-      ownMissing: [],
-      optOutsMissing: [],
-      tierDiffers: null,
-    };
+  if (manifest.state !== 'declared') {
+    return { verdict: 'unknown', missing: [], ownMissing: [], optOutsMissing: [], tierDiffers: null };
   }
   // Catalog skills: `.rsc/skills/<id>` is where their content lands, and it is the same on all
   // seventeen assistants — the per-target directories are links into it.
-  const fromCatalog = (id) => existsSync(join(root, ".rsc", "skills", id));
+  const fromCatalog = (id) => existsSync(join(root, '.rsc', 'skills', id));
   // Own skills are a different thing in a different place, and conflating them is how a healthy
   // project ends up nagged every session about work that is already correct. `.rsc/skills/` is filled
   // by copying FROM THE CATALOG, and an own skill is by definition not in the catalog, so it can never
@@ -174,18 +142,9 @@ export function evaluateHarness(root, manifest) {
   // could never fix it. They live where their assistant keeps skills, which is what this repo's own
   // `divergence()` already checks.
   const OWN_DIRS = [
-    [".claude", "skills"],
-    [".codex", "rsc"],
-    [".cursor", "rules"],
-    [".windsurf", "rules"],
-    [".clinerules"],
-    [".roo", "rules"],
-    [".continue", "rules"],
-    [".junie"],
-    [".kiro", "steering"],
-    [".antigravity"],
-    [".opencode"],
-    [".rsc", "skills"],
+    ['.claude', 'skills'], ['.codex', 'rsc'], ['.cursor', 'rules'], ['.windsurf', 'rules'],
+    ['.clinerules'], ['.roo', 'rules'], ['.continue', 'rules'], ['.junie'], ['.kiro', 'steering'],
+    ['.antigravity'], ['.opencode'], ['.rsc', 'skills'],
   ];
   const fromTeam = (name) => OWN_DIRS.some((dir) => existsSync(join(root, ...dir, name)));
   const missing = manifest.skills.filter((id) => !fromCatalog(id));
@@ -193,31 +152,20 @@ export function evaluateHarness(root, manifest) {
   // A gate the team disarmed that is still armed here. Declared-and-missing only, exactly as for
   // skills above: a marker this machine has and the manifest does not could be a decision somebody
   // is still making, and this file does not tell people what to think about their own work.
-  const optOutsMissing = manifest.optOuts.filter(
-    (n) => !existsSync(join(root, ".rsc", `.no-${n}`)),
-  );
+  const optOutsMissing = manifest.optOuts.filter((n) => !existsSync(join(root, '.rsc', `.no-${n}`)));
   const tierDiffers = manifest.tier && manifest.tier !== localTier(root) ? manifest.tier : null;
   if (!missing.length && !ownMissing.length && !optOutsMissing.length && !tierDiffers) {
-    return {
-      verdict: "current",
-      missing: [],
-      ownMissing: [],
-      optOutsMissing: [],
-      tierDiffers: null,
-    };
+    return { verdict: 'current', missing: [], ownMissing: [], optOutsMissing: [], tierDiffers: null };
   }
-  return { verdict: "behind", missing, ownMissing, optOutsMissing, tierDiffers };
+  return { verdict: 'behind', missing, ownMissing, optOutsMissing, tierDiffers };
 }
 
 /** The tier this machine actually runs at — `balanced` is the documented default, not a guess. */
 function localTier(root) {
   try {
-    return JSON.parse(readFileSync(join(root, ".rsc", "developer.json"), "utf8")).tier === "heavy"
-      ? "heavy"
-      : "balanced";
-  } catch {
-    return "balanced";
-  }
+    return JSON.parse(readFileSync(join(root, '.rsc', 'developer.json'), 'utf8')).tier === 'heavy'
+      ? 'heavy' : 'balanced';
+  } catch { return 'balanced'; }
 }
 
 /**
@@ -233,17 +181,17 @@ export function composeDivergence(manifest, evaluation) {
   const version = safeVersion(manifest.catalogVersion);
   const command = version ? `npx ${PACKAGE}@${version} sync` : `npx ${PACKAGE} sync`;
   let text =
-    "===== rsc =====\n" +
-    "This project declares a harness that no longer matches what is built here — someone changed\n" +
-    "it and git brought the change; nothing is broken.\n";
+    '===== rsc =====\n' +
+    'This project declares a harness that no longer matches what is built here — someone changed\n' +
+    'it and git brought the change; nothing is broken.\n';
   if (evaluation.missing.length) {
-    text += `MISSING, declared in .rsc.json: ${evaluation.missing.join(", ")}.\n`;
+    text += `MISSING, declared in .rsc.json: ${evaluation.missing.join(', ')}.\n`;
   }
   // Named as the convention they are, never as the file that implements them: "the team disarmed
   // the commit-message check" is something a person can agree or disagree with; ".no-gitmoji is
   // absent" is a fact about a directory they have never opened.
   if (evaluation.optOutsMissing?.length) {
-    text += `DISARMED BY THE TEAM, still armed here: ${evaluation.optOutsMissing.join(", ")}.\n`;
+    text += `DISARMED BY THE TEAM, still armed here: ${evaluation.optOutsMissing.join(', ')}.\n`;
   }
   if (evaluation.tierDiffers) {
     text += `DECLARED developer tier: ${evaluation.tierDiffers} — this machine runs the default.\n`;
@@ -252,14 +200,14 @@ export function composeDivergence(manifest, evaluation) {
   // action installs, and these are the one thing rsc will not install. Their version is the commit.
   if (evaluation.ownMissing.length) {
     text +=
-      `ALSO DECLARED, written by the team: ${evaluation.ownMissing.join(", ")} — these arrive through\n` +
-      "git, not through any command, and rsc never installs or overwrites them.\n";
+      `ALSO DECLARED, written by the team: ${evaluation.ownMissing.join(', ')} — these arrive through\n` +
+      'git, not through any command, and rsc never installs or overwrites them.\n';
   }
   return (
     text +
-    "ACTION: mention it in one line and carry on with what the user asked. To converge, run:\n" +
+    'ACTION: mention it in one line and carry on with what the user asked. To converge, run:\n' +
     `  ${command}\n` +
-    "===============\n"
+    '===============\n'
   );
 }
 
@@ -268,16 +216,16 @@ export function composeDivergence(manifest, evaluation) {
  * Pure: it decides nothing about disk and writes nothing, so it can be tested without one.
  */
 export function composeOffer(manifest) {
-  if (manifest.state === "absent") return { offers: false, text: "" };
-  if (manifest.state === "unreadable") {
+  if (manifest.state === 'absent') return { offers: false, text: '' };
+  if (manifest.state === 'unreadable') {
     return {
       offers: false,
       text:
-        "===== rsc =====\n" +
+        '===== rsc =====\n' +
         `This project declares a harness, but its manifest cannot be read (${manifest.reason}).\n` +
-        "Nothing has been installed and nothing was changed. Someone on the team needs to fix\n" +
-        ".rsc.json before the harness can be rebuilt here.\n" +
-        "===============\n",
+        'Nothing has been installed and nothing was changed. Someone on the team needs to fix\n' +
+        '.rsc.json before the harness can be rebuilt here.\n' +
+        '===============\n',
     };
   }
   // The version is named, never guessed: what gets installed is what the team pinned, and a person
@@ -292,28 +240,26 @@ export function composeOffer(manifest) {
   const pin = version ? `${PACKAGE}@${version}` : `${PACKAGE} (no version pinned)`;
   const command = version ? `npx ${PACKAGE}@${version} sync` : `npx ${PACKAGE} sync`;
   const count = manifest.skills.length;
-  const own = manifest.own.length
-    ? `, plus ${manifest.own.length} written by the team (never overwritten)`
-    : "";
+  const own = manifest.own.length ? `, plus ${manifest.own.length} written by the team (never overwritten)` : '';
   return {
     offers: true,
     text:
-      "===== rsc =====\n" +
-      "This project declares a harness that is not built on this machine, so the assistant\n" +
+      '===== rsc =====\n' +
+      'This project declares a harness that is not built on this machine, so the assistant\n' +
       "cannot see any of the project's skills right now. Nothing is broken and nothing was\n" +
-      "changed — the harness simply does not travel through git, by design.\n" +
-      "\n" +
+      'changed — the harness simply does not travel through git, by design.\n' +
+      '\n' +
       `WOULD INSTALL: ${pin} — ${count} skill(s) as pinned in .rsc.json${own}.\n` +
-      "It writes .rsc/ and the skill entries; it never touches anything written by hand.\n" +
-      "\n" +
-      "ACTION: ask the user whether to build it, in one line, and continue with their request\n" +
-      "either way — this must not hold up what they asked for. If there is nobody to ask (CI, an\n" +
-      "unattended run), do NOT install: say it is missing and carry on. On a yes, run EXACTLY:\n" +
+      'It writes .rsc/ and the skill entries; it never touches anything written by hand.\n' +
+      '\n' +
+      'ACTION: ask the user whether to build it, in one line, and continue with their request\n' +
+      'either way — this must not hold up what they asked for. If there is nobody to ask (CI, an\n' +
+      'unattended run), do NOT install: say it is missing and carry on. On a yes, run EXACTLY:\n' +
       `  ${command}\n` +
-      "(the version is the one this project pinned. Do not substitute `@latest`: a release nobody\n" +
-      " on this team adopted is not an upgrade, it is two people quietly drifting apart.)\n" +
+      '(the version is the one this project pinned. Do not substitute `@latest`: a release nobody\n' +
+      ' on this team adopted is not an upgrade, it is two people quietly drifting apart.)\n' +
       "On a no, create .rsc/.no-harness so this is not offered again on this machine.\n" +
-      "===============\n",
+      '===============\n',
   };
 }
 
@@ -355,12 +301,12 @@ async function delegate(target, ownArgc) {
 const PROTECTED = [
   // `git -C <path> commit` is not an edge case: it is the form this workspace's own CLAUDE.md
   // mandates, so without it the reminder would essentially never fire where it was written.
-  { re: /\bgit\s+(-C\s+\S+\s+)?(commit|cz)\b/, what: "commit" },
-  { re: /\bgit\s+(-C\s+\S+\s+)?push\b/, what: "push" },
-  { re: /\bgit\s+(-C\s+\S+\s+)?merge\b/, what: "merge" },
-  { re: /\bgit\s+(-C\s+\S+\s+)?(switch|checkout)\s+(main|master)\b/, what: "switch to the trunk" },
-  { re: /\bnpm\s+publish\b/, what: "publish" },
-  { re: /\brm\s+-rf\b/, what: "delete files irreversibly" },
+  { re: /\bgit\s+(-C\s+\S+\s+)?(commit|cz)\b/, what: 'commit' },
+  { re: /\bgit\s+(-C\s+\S+\s+)?push\b/, what: 'push' },
+  { re: /\bgit\s+(-C\s+\S+\s+)?merge\b/, what: 'merge' },
+  { re: /\bgit\s+(-C\s+\S+\s+)?(switch|checkout)\s+(main|master)\b/, what: 'switch to the trunk' },
+  { re: /\bnpm\s+publish\b/, what: 'publish' },
+  { re: /\brm\s+-rf\b/, what: 'delete files irreversibly' },
 ];
 
 /**
@@ -375,26 +321,22 @@ function alreadyReminded(root) {
   let key = root;
   try {
     key = realpathSync(root);
-  } catch {
-    /* unresolvable is still a usable key */
-  }
+  } catch { /* unresolvable is still a usable key */ }
   // A per-user directory at 0700, not a bare name in a world-writable one. On Linux and in CI
   // containers `os.tmpdir()` is `/tmp` at 1777: the sticky bit stops anyone deleting our file, but
   // nothing stops them CREATING it first — and a planted empty file silences the one risk reminder
   // this design promises, while a planted DANGLING symlink turns our write into a file created at a
   // path they chose, owned by the person we were trying to help.
-  const dir = join(tmpdir(), `rsc-${process.getuid ? process.getuid() : "u"}`);
-  const mark = join(dir, `offer-${createHash("sha256").update(key).digest("hex").slice(0, 16)}`);
+  const dir = join(tmpdir(), `rsc-${process.getuid ? process.getuid() : 'u'}`);
+  const mark = join(dir, `offer-${createHash('sha256').update(key).digest('hex').slice(0, 16)}`);
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
-  } catch {
-    /* fall through: the write below is what actually decides */
-  }
+  } catch { /* fall through: the write below is what actually decides */ }
   try {
     // `wx` is the whole fix: create-or-fail, and it refuses to follow a symlink. Success means WE
     // made it and this is the first reminder. Failure means it already existed — planted or genuine,
     // and either way the honest reading is "do not speak again".
-    writeFileSync(mark, "", { flag: "wx" });
+    writeFileSync(mark, '', { flag: 'wx' });
     return false;
   } catch {
     return true;
@@ -403,46 +345,42 @@ function alreadyReminded(root) {
 
 function readStdin() {
   try {
-    return readFileSync(0, "utf8");
+    return readFileSync(0, 'utf8');
   } catch {
-    return "";
+    return '';
   }
 }
 
 /** The second and last offer: only when they are about to do the thing the absent harness guarded. */
 function remindOnProtectedAction(root) {
-  let command = "";
+  let command = '';
   try {
-    const payload = JSON.parse(readStdin() || "{}");
-    command = String(payload?.tool_input?.command ?? "");
-  } catch {
-    return;
-  }
+    const payload = JSON.parse(readStdin() || '{}');
+    command = String(payload?.tool_input?.command ?? '');
+  } catch { return; }
   const hit = PROTECTED.find(({ re }) => re.test(command));
   if (!hit) return;
   // Read BEFORE claiming the one reminder this project gets: a run with nothing to say must not spend
   // it. Otherwise a project whose manifest arrives later by `git pull` has already used up its budget
   // on a session where it could not have said anything.
   const manifest = readManifest(root);
-  if (manifest.state !== "declared") return;
+  if (manifest.state !== 'declared') return;
   if (alreadyReminded(root)) return;
   const version = safeVersion(manifest.catalogVersion);
-  const pin = version ? `@${version}` : "";
+  const pin = version ? `@${version}` : '';
   // The envelope, not bare stdout. A `PreToolUse` hook's plain stdout is transcript-only, so the one
   // message this path is allowed to send would have gone to a place nobody looks. Every sibling guard
   // in this repo already wraps its output this way. And no `permissionDecision`: informing someone is
   // not denying them, and nothing here may ever cost a person their tool call.
-  process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        additionalContext:
-          `rsc: you are about to ${hit.what}, and this project's checks for that are not built on ` +
-          "this machine. Nothing is blocked, and this is the last time it will be mentioned. " +
-          `To build them: npx ${PACKAGE}${pin} sync`,
-      },
-    }),
-  );
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      additionalContext:
+        `rsc: you are about to ${hit.what}, and this project's checks for that are not built on ` +
+        'this machine. Nothing is blocked, and this is the last time it will be mentioned. ' +
+        `To build them: npx ${PACKAGE}${pin} sync`,
+    },
+  }));
 }
 
 /**
@@ -455,26 +393,25 @@ export async function bootstrap(target, root, mode, ownArgc = 3) {
 
   // Declining is a decision, and it is respected whole: no opening offer, no divergence note, and no
   // risk reminder either. Ignoring the offer is a different thing entirely — that leaves the door open.
-  const declined = existsSync(join(root, ".rsc", ".no-harness"));
+  const declined = existsSync(join(root, '.rsc', '.no-harness'));
 
   if (mounted) {
     // The harness works. It may still be out of date, and a manifest that arrived by `git pull` is
     // exactly the case that used to pass in silence — half the feature missing. Say it, then get out
     // of the way: being behind is not a reason to stop working.
-    if (mode === "announce" && !declined) {
+    if (mode === 'announce' && !declined) {
       const manifest = readManifest(root);
       const evaluation = evaluateHarness(root, manifest);
-      if (evaluation.verdict === "behind")
-        process.stdout.write(composeDivergence(manifest, evaluation));
+      if (evaluation.verdict === 'behind') process.stdout.write(composeDivergence(manifest, evaluation));
     }
     return delegate(target, ownArgc);
   }
 
   if (declined) return;
-  if (mode === "guard") return remindOnProtectedAction(root);
+  if (mode === 'guard') return remindOnProtectedAction(root);
   // Only one hook per session opens with the offer, so the person is told once and not seven times —
   // settled by WHICH hook this is, with no marker in their tree (spec AC#2).
-  if (mode !== "announce") return;
+  if (mode !== 'announce') return;
   const { text } = composeOffer(readManifest(root));
   if (text) process.stdout.write(text);
 }
@@ -513,7 +450,7 @@ if (sameFile(fileURLToPath(import.meta.url), process.argv[1])) {
   try {
     await bootstrap(target, root ?? process.cwd(), mode);
   } catch (err) {
-    if (err?.code !== "ERR_MODULE_NOT_FOUND") {
+    if (err?.code !== 'ERR_MODULE_NOT_FOUND') {
       process.stderr.write(`rsc: hook failed and was ignored — ${err?.message ?? err}\n`);
     }
   }

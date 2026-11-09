@@ -274,3 +274,6 @@ dist-ssr
 
 .vercel
 .env*
+
+# rsc local state (hooks, seals, logs) and managed skill links — machine-local
+.claude/skills/asdd
